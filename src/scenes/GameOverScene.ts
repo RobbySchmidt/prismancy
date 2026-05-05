@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, SceneKeys } from '../config/GameConfig';
+import { STARTING_FLOOR_ID } from '../data/floors';
 
 export class GameOverScene extends Phaser.Scene {
   /**
@@ -60,9 +61,20 @@ export class GameOverScene extends Phaser.Scene {
     // Stop everything related to the dead run, then start a fresh GameScene.
     // Stopping the paused GameScene first is important — `scene.start` on a
     // paused scene doesn't reliably re-run its lifecycle.
+    //
+    // Why pass an explicit init payload: Phaser 3's `scene.start(key)` only
+    // *replaces* the scene's `settings.data` when you actually pass a
+    // payload. With no second argument the previous payload survives — so
+    // dying on Floor 2 and pressing R would respawn you in the Sapphire
+    // Swamp with the floor-transition carry-over still intact (HP/items/
+    // gems). Force a clean Floor 1 fresh-run init by passing `floorIndex 1`
+    // + `STARTING_FLOOR_ID` and *no* `carryOver`.
     this.scene.stop(SceneKeys.UI);
     this.scene.stop(SceneKeys.Game);
-    this.scene.start(SceneKeys.Game);
+    this.scene.start(SceneKeys.Game, {
+      floorIndex: 1,
+      floorId: STARTING_FLOOR_ID,
+    });
     this.scene.launch(SceneKeys.UI);
     this.scene.stop(SceneKeys.GameOver);
   }
