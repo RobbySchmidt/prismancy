@@ -491,77 +491,205 @@ export class PreloadScene extends Phaser.Scene {
    * each brick, dark under-shadow, mossy palette accent + glowing crack.
    */
   private drawWallTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
+    g.clear();
+    if (theme.decorationStyle === 'swamp') {
+      this.drawSwampWallTexture(g, theme);
+    } else {
+      this.drawForestWallTexture(g, theme);
+    }
+    g.generateTexture(wallTileKey(theme.id), TILE_SIZE, TILE_SIZE);
+  }
+
+  /**
+   * Forest wall — vertical bark planks with dark gaps between them, knot
+   * details, a mossy crown along the top edge with leaf silhouettes peeking
+   * out, and a few firefly-style glow accents in the bark. Reads as "the
+   * forest has closed in around you" rather than a stone keep wall.
+   */
+  private drawForestWallTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
     const { wallBase, wallHighlight, ambient, glow } = theme.palette;
     const rng = new RNG(`${theme.id}-wall`);
 
-    g.clear();
-
-    // Base fill
-    g.fillStyle(wallBase, 1);
-    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-
-    // Brick pattern: two rows, second offset by half a brick.
-    // Brick size: full width = TILE_SIZE/2 wide, TILE_SIZE/2 tall.
-    const BRICK_W = TILE_SIZE / 2;
-    const BRICK_H = TILE_SIZE / 2;
-    const drawBrick = (bx: number, by: number): void => {
-      // Brick face (slightly inset from mortar).
-      g.fillStyle(wallBase, 1);
-      g.fillRect(bx, by, BRICK_W - 1, BRICK_H - 1);
-      // Top highlight strip.
-      g.fillStyle(wallHighlight, 1);
-      g.fillRect(bx, by, BRICK_W - 1, 3);
-      // Bottom shadow strip.
-      g.fillStyle(ambient, 1);
-      g.fillRect(bx, by + BRICK_H - 3, BRICK_W - 1, 2);
-    };
-
-    // Mortar background (darker than wallBase).
+    // Background gap colour (between planks)
     g.fillStyle(ambient, 1);
     g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-    // Row 0 — flush bricks
-    drawBrick(0, 0);
-    drawBrick(BRICK_W, 0);
-    // Row 1 — offset by half so vertical seams stagger
-    drawBrick(-BRICK_W / 2, BRICK_H);
-    drawBrick(BRICK_W / 2, BRICK_H);
-    drawBrick((BRICK_W * 3) / 2, BRICK_H);
-
-    // Mossy highlight patches — scattered, palette-driven via wallHighlight.
-    g.fillStyle(wallHighlight, 0.9);
-    const moss = 2 + rng.intBetween(0, 2);
-    for (let i = 0; i < moss; i++) {
-      const mx = rng.intBetween(4, TILE_SIZE - 6);
-      const my = rng.intBetween(4, TILE_SIZE - 6);
-      g.fillRect(mx, my, 2, 2);
-      g.fillRect(mx + 1, my - 1, 1, 1);
-    }
-
-    // Glow crack — short broken polyline with bright pixel near the head.
-    const cracks = 1 + rng.intBetween(0, 1);
-    for (let c = 0; c < cracks; c++) {
-      let x = rng.intBetween(8, TILE_SIZE - 10);
-      let y = rng.intBetween(6, TILE_SIZE - 18);
-      g.fillStyle(glow, 0.85);
-      g.fillRect(x, y, 1, 1);
-      g.fillStyle(0xffffff, 0.7);
-      g.fillRect(x, y, 1, 1);
-      const segs = 4 + rng.intBetween(0, 2);
-      g.fillStyle(glow, 0.55);
-      for (let s = 0; s < segs; s++) {
-        x += rng.intBetween(-1, 1);
-        y += 1 + rng.intBetween(0, 1);
-        if (y >= TILE_SIZE - 2 || x < 1 || x >= TILE_SIZE - 1) break;
-        g.fillRect(x, y, 1, 1);
+    // Four vertical bark planks, each 14 px wide with a 2 px dark gap.
+    const PLANK_W = 14;
+    const GAP = 2;
+    for (let i = 0; i < 4; i++) {
+      const px = i * (PLANK_W + GAP) + GAP;
+      // Dark side shadow on the right, key-light strip on the left.
+      g.fillStyle(0x0a0604, 1);
+      g.fillRect(px, 0, PLANK_W, TILE_SIZE);
+      g.fillStyle(wallBase, 1);
+      g.fillRect(px + 1, 0, PLANK_W - 2, TILE_SIZE);
+      g.fillStyle(wallHighlight, 1);
+      g.fillRect(px + 1, 0, 2, TILE_SIZE); // left highlight strip
+      g.fillStyle(0x0a0604, 1);
+      g.fillRect(px + PLANK_W - 2, 0, 1, TILE_SIZE); // right shadow strip
+      // Vertical bark grooves (3-4 thin dark lines per plank).
+      g.fillStyle(0x0a0604, 0.55);
+      const grooves = 3 + rng.intBetween(0, 1);
+      for (let gi = 0; gi < grooves; gi++) {
+        const gx = px + 3 + rng.intBetween(0, PLANK_W - 6);
+        const gy = rng.intBetween(2, 10);
+        const gh = TILE_SIZE - gy - rng.intBetween(2, 8);
+        g.fillRect(gx, gy, 1, gh);
+      }
+      // Bark knots — 0-2 small dark circles per plank.
+      const knots = rng.intBetween(0, 2);
+      for (let k = 0; k < knots; k++) {
+        const kx = px + 3 + rng.intBetween(0, PLANK_W - 6);
+        const ky = 8 + rng.intBetween(0, TILE_SIZE - 20);
+        g.fillStyle(0x0a0604, 1);
+        g.fillCircle(kx, ky, 2);
+        g.fillStyle(wallBase, 1);
+        g.fillCircle(kx, ky, 1);
+        g.fillStyle(0x0a0604, 1);
+        g.fillRect(kx, ky, 1, 1);
       }
     }
 
-    // Outer outline so wall tiles separate cleanly from the floor / each other.
+    // Mossy crown along the top — a few overlapping dark-green domes.
+    g.fillStyle(0x081210, 1);
+    g.fillRect(0, 0, TILE_SIZE, 6);
+    g.fillStyle(0x14361a, 1);
+    g.fillEllipse(8, 4, 16, 8);
+    g.fillEllipse(24, 5, 18, 9);
+    g.fillEllipse(42, 4, 16, 8);
+    g.fillEllipse(58, 5, 14, 7);
+    g.fillStyle(0x2d6634, 1);
+    g.fillEllipse(8, 3, 12, 5);
+    g.fillEllipse(28, 3, 14, 5);
+    g.fillEllipse(50, 3, 12, 5);
+    g.fillStyle(0x4ea656, 0.9);
+    g.fillEllipse(10, 2, 6, 2);
+    g.fillEllipse(40, 2, 7, 2);
+    // Small leaf silhouettes peeking up
+    g.fillStyle(0x14361a, 1);
+    g.fillTriangle(14, 0, 18, 3, 12, 3);
+    g.fillTriangle(36, 0, 40, 3, 33, 3);
+    g.fillTriangle(54, 0, 58, 3, 51, 3);
+
+    // Firefly glow accents in the bark (palette glow colour).
+    const fireflies = 1 + rng.intBetween(0, 2);
+    for (let f = 0; f < fireflies; f++) {
+      const fx = rng.intBetween(4, TILE_SIZE - 4);
+      const fy = rng.intBetween(12, TILE_SIZE - 6);
+      g.fillStyle(0x040a05, 1);
+      g.fillCircle(fx, fy, 2);
+      g.fillStyle(glow, 1);
+      g.fillCircle(fx, fy, 1.3);
+      g.fillStyle(0xffffff, 0.85);
+      g.fillRect(fx, fy - 1, 1, 1);
+    }
+
+    // Outer outline so wall tiles separate cleanly from the floor.
     g.lineStyle(2, 0x000000, 0.45);
     g.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
+  }
 
-    g.generateTexture(wallTileKey(theme.id), TILE_SIZE, TILE_SIZE);
+  /**
+   * Swamp wall — tangled mangrove-root wall: dark woody vertical roots of
+   * varying widths intertwined with each other, slime-green algae filling
+   * the gaps between them, sapphire-glow nodes at root joints, a few
+   * hanging algae strands. Reads as wet, organic, swallowed-by-the-bog.
+   */
+  private drawSwampWallTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
+    const { wallBase, wallHighlight, ambient, glow } = theme.palette;
+    const rng = new RNG(`${theme.id}-wall`);
+
+    // Algae-slime base between roots.
+    g.fillStyle(0x081818, 1);
+    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    g.fillStyle(0x123028, 1);
+    for (let i = 0; i < 12; i++) {
+      const sx = rng.intBetween(0, TILE_SIZE);
+      const sy = rng.intBetween(0, TILE_SIZE);
+      g.fillEllipse(sx, sy, 6 + rng.intBetween(0, 4), 4 + rng.intBetween(0, 3));
+    }
+
+    // 5-6 vertical roots of varying widths and slight curve via stacked
+    // segments. Each root is dark woody brown with a lighter highlight on
+    // its left side (key light from upper-left).
+    const rootCount = 5 + rng.intBetween(0, 1);
+    const rootXs: number[] = [];
+    for (let r = 0; r < rootCount; r++) {
+      const baseX = Math.floor((TILE_SIZE / rootCount) * r) + rng.intBetween(0, 4);
+      rootXs.push(baseX);
+      const width = 6 + rng.intBetween(0, 4);
+      // Build the root as a stack of 8 px segments, slightly drifting.
+      let x = baseX;
+      const segH = 8;
+      for (let y = 0; y < TILE_SIZE; y += segH) {
+        x += rng.intBetween(-1, 1);
+        // Outline
+        g.fillStyle(0x040408, 1);
+        g.fillRect(x - 1, y, width + 2, segH);
+        // Body — mid woody brown
+        g.fillStyle(0x2a1a0e, 1);
+        g.fillRect(x, y, width, segH);
+        // Inner darker tone (right side shadow)
+        g.fillStyle(0x180a04, 1);
+        g.fillRect(x + width - 2, y, 2, segH);
+        // Highlight strip (left side, key light)
+        g.fillStyle(wallBase, 1);
+        g.fillRect(x, y, 2, segH);
+        g.fillStyle(wallHighlight, 1);
+        g.fillRect(x + 1, y, 1, segH - 1);
+      }
+    }
+
+    // Algae draping across roots — a few thin teal threads.
+    g.lineStyle(1, 0x2c7060, 0.85);
+    for (let a = 0; a < 3; a++) {
+      const ay = 12 + rng.intBetween(0, TILE_SIZE - 24);
+      g.beginPath();
+      g.moveTo(0, ay);
+      let cx = 0;
+      let cy = ay;
+      for (let s = 0; s < 8; s++) {
+        cx += 8;
+        cy += rng.intBetween(-2, 2);
+        g.lineTo(cx, cy);
+      }
+      g.strokePath();
+    }
+
+    // Sapphire glow nodes at root joints (where the segment edges show).
+    const nodes = 2 + rng.intBetween(0, 2);
+    for (let n = 0; n < nodes; n++) {
+      const rx = rootXs[rng.intBetween(0, rootXs.length - 1)] + 3;
+      const ry = 8 + rng.intBetween(0, 5) * 8;
+      g.fillStyle(0x040408, 1);
+      g.fillCircle(rx, ry, 2.2);
+      g.fillStyle(glow, 1);
+      g.fillCircle(rx, ry, 1.4);
+      g.fillStyle(0xffffff, 0.85);
+      g.fillRect(rx, ry - 1, 1, 1);
+    }
+
+    // Hanging algae strands at the top edge — short tendrils dripping down.
+    g.fillStyle(0x081818, 1);
+    g.fillRect(0, 0, TILE_SIZE, 4);
+    g.fillStyle(0x2c7060, 1);
+    for (let i = 0; i < 6; i++) {
+      const tx = i * 11 + rng.intBetween(0, 4);
+      const tlen = 4 + rng.intBetween(0, 5);
+      g.fillRect(tx, 0, 1, tlen);
+      g.fillStyle(0x4ea66a, 0.85);
+      g.fillRect(tx, 0, 1, Math.min(2, tlen));
+      g.fillStyle(0x2c7060, 1);
+    }
+
+    // Subtle ambient overlay so palette tints any flat areas.
+    g.fillStyle(ambient, 0.18);
+    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+    // Outer outline so wall tiles separate cleanly from the floor.
+    g.lineStyle(2, 0x000000, 0.5);
+    g.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
   }
 
   // ---------------------------------------------------------------------------
@@ -1084,40 +1212,75 @@ export class PreloadScene extends Phaser.Scene {
     const w = 36;
     const h = 28;
     const cx = w / 2;
-    const cy = h / 2;
+    const cy = h / 2 + 1;
     const { glow } = theme.palette;
 
     g.clear();
 
     // Drop shadow underneath
-    this.groundShadow(g, cx, h - 3, w / 2 - 2, 3, 0.45);
+    this.groundShadow(g, cx, cy + 7, w / 2 - 2, 3, 0.5);
 
-    // Rock body — base, then progressively lighter ellipses for tone bands.
-    g.fillStyle(0x14110d, 1);
-    g.fillEllipse(cx, cy + 2, w - 4, h - 6);
+    // Asymmetric mossy boulder: an offset main body + a smaller side lump,
+    // four tonal bands, then a moss cap that drapes down one flank, then an
+    // emerald-glow crystal cluster sprouting from the crown to mirror the
+    // mangrove's glow-node detail. Outlines are layered so the silhouette
+    // reads cleanly against any floor variant.
+    g.fillStyle(0x06070a, 1);
+    g.fillEllipse(cx - 1, cy + 1, 30, 18);
+    g.fillEllipse(cx + 9, cy + 3, 14, 10);
+
+    g.fillStyle(0x1f1c18, 1);
+    g.fillEllipse(cx - 1, cy + 1, 28, 16);
+    g.fillEllipse(cx + 9, cy + 3, 12, 8);
+
     g.fillStyle(0x3a3631, 1);
-    g.fillEllipse(cx, cy + 1, w - 6, h - 8);
+    g.fillEllipse(cx - 2, cy, 26, 14);
+    g.fillEllipse(cx + 9, cy + 2, 10, 6);
+
     g.fillStyle(0x5a554c, 1);
-    g.fillEllipse(cx, cy - 1, w - 10, h - 12);
-    g.fillStyle(0x726b5e, 1);
-    g.fillEllipse(cx - 4, cy - 4, 12, 5);
-    // Tiny lighter highlight pixels
-    g.fillStyle(0x9a9080, 1);
-    g.fillRect(cx - 6, cy - 5, 2, 1);
-    g.fillRect(cx - 2, cy - 6, 1, 1);
+    g.fillEllipse(cx - 3, cy - 2, 20, 9);
+    g.fillEllipse(cx + 8, cy + 1, 7, 4);
 
-    // Outline
-    g.lineStyle(1.5, 0x080604, 1);
-    g.strokeEllipse(cx, cy, w - 4, h - 6);
+    // Top-left highlight band (key light)
+    g.fillStyle(0x827a6a, 1);
+    g.fillEllipse(cx - 5, cy - 4, 11, 4);
+    g.fillStyle(0xa39a86, 1);
+    g.fillRect(cx - 7, cy - 5, 2, 1);
+    g.fillRect(cx - 3, cy - 6, 1, 1);
 
-    // Moss patches in floor's glow color
-    g.fillStyle(glow, 0.9);
-    g.fillCircle(cx - 8, cy - 2, 2);
-    g.fillCircle(cx + 6, cy + 3, 1.5);
-    g.fillCircle(cx + 2, cy - 6, 1.2);
-    // Brighter moss pixel highlight
+    // Moss cap — draped over the crown, dripping down the front-right.
+    g.fillStyle(0x12281a, 1);
+    g.fillEllipse(cx - 2, cy - 3, 22, 6);
+    g.fillStyle(0x1f4a26, 1);
+    g.fillEllipse(cx - 2, cy - 4, 18, 5);
+    g.fillStyle(0x2d6634, 1);
+    g.fillEllipse(cx - 4, cy - 5, 10, 3);
+    // Drip tendrils
+    g.fillStyle(0x1f4a26, 1);
+    g.fillRect(cx - 8, cy - 2, 1, 3);
+    g.fillRect(cx + 4, cy - 1, 1, 4);
+    g.fillRect(cx + 11, cy, 1, 3);
+
+    // Emerald crystal cluster on the crown — glow-coloured shards.
+    const crystal = (sx: number, sy: number, hy: number): void => {
+      g.fillStyle(0x040c08, 1);
+      g.fillTriangle(sx - 1.5, sy + hy, sx + 1.5, sy + hy, sx, sy - hy);
+      g.fillStyle(glow, 1);
+      g.fillTriangle(sx - 1, sy + hy - 1, sx + 1, sy + hy - 1, sx, sy - hy + 1);
+      g.fillStyle(0xffffff, 0.85);
+      g.fillRect(sx, sy - hy + 2, 1, Math.max(1, hy - 2));
+    };
+    crystal(cx - 2, cy - 6, 4);
+    crystal(cx + 1, cy - 5, 3);
+    crystal(cx - 5, cy - 5, 2);
+
+    // Glow node accent on the side lump
+    g.fillStyle(0x040c08, 1);
+    g.fillCircle(cx + 11, cy + 1, 1.8);
+    g.fillStyle(glow, 1);
+    g.fillCircle(cx + 11, cy + 1, 1.2);
     g.fillStyle(0xffffff, 0.8);
-    g.fillRect(cx - 8, cy - 3, 1, 1);
+    g.fillRect(cx + 11, cy, 1, 1);
 
     g.generateTexture(rockDecoKey(theme.id), w, h);
   }
@@ -1139,52 +1302,95 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Ground shadow
-    this.groundShadow(g, cx, h - 3, 8, 2.5, 0.45);
+    // Ground shadow + roots first so the trunk overlaps them.
+    this.groundShadow(g, cx, h - 2, 10, 3, 0.5);
 
-    // Trunk outline + base + highlight + bark lines
+    // Root flares — three small triangular toes spreading from the trunk
+    // base. Mirrors how the mangrove fans out from a central knot.
     g.fillStyle(0x100a06, 1);
-    g.fillRect(cx - 4, 25, 8, 17);
+    g.fillTriangle(cx - 6, 42, cx - 2, 38, cx - 2, 42);
+    g.fillTriangle(cx + 6, 42, cx + 2, 38, cx + 2, 42);
+    g.fillTriangle(cx - 2, 43, cx + 2, 43, cx, 39);
     g.fillStyle(0x3a2818, 1);
-    g.fillRect(cx - 3, 26, 6, 16);
+    g.fillTriangle(cx - 5, 41, cx - 2, 39, cx - 2, 41);
+    g.fillTriangle(cx + 5, 41, cx + 2, 39, cx + 2, 41);
+
+    // Trunk — tapered: wider at the base (8 px) narrowing to 6 px at the top.
+    g.fillStyle(0x100a06, 1);
+    g.fillTriangle(cx - 4, 42, cx + 4, 42, cx + 3, 24);
+    g.fillTriangle(cx - 4, 42, cx - 3, 24, cx + 3, 24);
+    g.fillStyle(0x3a2818, 1);
+    g.fillTriangle(cx - 3, 41, cx + 3, 41, cx + 2, 25);
+    g.fillTriangle(cx - 3, 41, cx - 2, 25, cx + 2, 25);
+    // Bark highlight strip (key light from the upper-left)
     g.fillStyle(0x5a3e22, 1);
-    g.fillRect(cx - 3, 26, 1, 16); // left highlight
+    g.fillRect(cx - 3, 26, 1, 15);
+    g.fillStyle(0x7a5430, 1);
+    g.fillRect(cx - 3, 28, 1, 4);
+    // Bark shadow strip on the right
     g.fillStyle(0x1f1208, 1);
-    g.fillRect(cx + 2, 26, 1, 16); // right shadow
+    g.fillRect(cx + 2, 26, 1, 15);
     // Bark notches
     g.fillStyle(0x1f1208, 1);
-    g.fillRect(cx - 2, 30, 2, 1);
-    g.fillRect(cx, 35, 2, 1);
+    g.fillRect(cx - 1, 29, 2, 1);
+    g.fillRect(cx, 34, 2, 1);
+    g.fillRect(cx - 2, 38, 2, 1);
 
-    // Foliage — three overlapping ellipses, dark to mid to highlight.
-    g.fillStyle(0x040a05, 1); // outline
+    // Foliage crown — four overlapping clumps, four tonal bands. Outline
+    // is drawn first as a slightly oversized silhouette so the highlights
+    // read cleanly without anti-aliasing artifacts.
+    g.fillStyle(0x040a05, 1);
+    g.fillEllipse(cx, 18, 28, 24);
+    g.fillEllipse(cx - 9, 13, 16, 16);
+    g.fillEllipse(cx + 9, 13, 16, 16);
+    g.fillEllipse(cx, 7, 14, 12);
+
+    g.fillStyle(0x102015, 1); // deep shadow
     g.fillEllipse(cx, 18, 26, 22);
-    g.fillEllipse(cx - 8, 14, 16, 16);
-    g.fillEllipse(cx + 8, 14, 16, 16);
-    g.fillStyle(0x132014, 1);
-    g.fillEllipse(cx, 18, 24, 20);
-    g.fillEllipse(cx - 7, 14, 14, 14);
-    g.fillEllipse(cx + 7, 14, 14, 14);
-    // Mid green
-    g.fillStyle(0x1f3a24, 1);
-    g.fillEllipse(cx, 17, 20, 16);
-    g.fillEllipse(cx - 6, 13, 11, 11);
-    // Highlight cluster top-left
-    g.fillStyle(0x2d6634, 1);
-    g.fillEllipse(cx - 4, 11, 10, 8);
-    // Sparkle pixel highlight
-    g.fillStyle(0x88c060, 1);
-    g.fillRect(cx - 6, 9, 2, 1);
+    g.fillEllipse(cx - 8, 13, 14, 14);
+    g.fillEllipse(cx + 8, 13, 14, 14);
+    g.fillEllipse(cx, 7, 12, 10);
 
-    // Glow accents (palette-coloured berries / leaves)
-    g.fillStyle(glow, 0.95);
-    g.fillCircle(cx + 6, 10, 1.6);
-    g.fillCircle(cx - 8, 18, 1.3);
-    g.fillCircle(cx + 3, 22, 1.1);
+    g.fillStyle(0x1f3a24, 1); // mid green
+    g.fillEllipse(cx, 17, 22, 18);
+    g.fillEllipse(cx - 7, 12, 12, 12);
+    g.fillEllipse(cx + 7, 12, 12, 12);
+
+    g.fillStyle(0x2d6634, 1); // upper highlight
+    g.fillEllipse(cx - 4, 11, 12, 9);
+    g.fillEllipse(cx + 5, 10, 9, 7);
+
+    g.fillStyle(0x4ea656, 1); // brightest highlight
+    g.fillEllipse(cx - 5, 9, 7, 4);
+
+    // Sparkle highlight pixels (mirrors the lily pad's pad-edge sparkle)
+    g.fillStyle(0xb0e890, 1);
+    g.fillRect(cx - 7, 8, 2, 1);
+    g.fillRect(cx - 3, 7, 1, 1);
+
+    // Visible leaf silhouettes on the crown edge — small triangular points
+    // poking out so it reads as foliage, not a blob.
+    g.fillStyle(0x1f3a24, 1);
+    g.fillTriangle(cx + 11, 14, cx + 14, 12, cx + 13, 16);
+    g.fillTriangle(cx - 12, 16, cx - 15, 14, cx - 13, 18);
+    g.fillTriangle(cx + 2, 3, cx + 5, 6, cx, 6);
+
+    // Glow accents — fireflies / glow-berries in the floor's palette.
+    const glowAccent = (sx: number, sy: number, r: number): void => {
+      g.fillStyle(0x040a05, 1);
+      g.fillCircle(sx, sy, r + 0.8);
+      g.fillStyle(glow, 1);
+      g.fillCircle(sx, sy, r);
+      g.fillStyle(0xffffff, 0.9);
+      g.fillRect(sx, sy - 1, 1, 1);
+    };
+    glowAccent(cx + 6, 10, 1.4);
+    glowAccent(cx - 8, 17, 1.2);
+    glowAccent(cx + 3, 21, 1.0);
 
     // Inner shadow at bottom of foliage so trunk reads as separate
-    g.fillStyle(ambient, 0.5);
-    g.fillEllipse(cx, 24, 20, 6);
+    g.fillStyle(ambient, 0.55);
+    g.fillEllipse(cx, 24, 22, 6);
 
     g.generateTexture(treeDecoKey(theme.id), w, h);
   }

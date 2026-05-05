@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  DAMSELFLY_BURST_INITIAL_DELAY_JITTER_MS,
   DAMSELFLY_BURST_INITIAL_DELAY_MS,
   DAMSELFLY_BURST_INTERVAL_MS,
   DAMSELFLY_BURST_SPREAD_RAD,
@@ -49,7 +50,12 @@ export class Damselfly extends BaseEnemy {
     this.target = target;
     this.projectilePool = projectilePool;
     this.rotationDir = Math.random() < 0.5 ? -1 : 1;
-    this.nextBurstAt = scene.time.now + DAMSELFLY_BURST_INITIAL_DELAY_MS;
+    // Stagger the first burst per-instance so multiple Damselflies don't
+    // fire in lockstep; their cycles drift apart over time.
+    this.nextBurstAt =
+      scene.time.now +
+      DAMSELFLY_BURST_INITIAL_DELAY_MS +
+      Math.random() * DAMSELFLY_BURST_INITIAL_DELAY_JITTER_MS;
   }
 
   protected tickAI(time: number): void {

@@ -203,15 +203,31 @@ export const DAMSELFLY_RADIAL_GAIN = 1.4;
 /** Tangent ratio so the strafe is dominant but radial pulls back when out of range. */
 export const DAMSELFLY_TANGENT_RATIO = 0.95;
 /** Burst cycle: telegraph → dash → recovery. */
-export const DAMSELFLY_BURST_INTERVAL_MS = 1500;
+/**
+ * Burst-cycle period. Long enough that two Damselflies in the same room
+ * spend most of their time *not* firing at once; combined with a randomised
+ * `BURST_INITIAL_DELAY_JITTER_MS` per-instance offset, multiple damselflies
+ * in a room desynchronise so the player gets readable burst windows
+ * instead of a constant cone barrage.
+ */
+export const DAMSELFLY_BURST_INTERVAL_MS = 2200;
 export const DAMSELFLY_TELEGRAPH_MS = 400;
 export const DAMSELFLY_DASH_DURATION_MS = 250;
 export const DAMSELFLY_DASH_SPEED = 320;
 export const DAMSELFLY_RECOVERY_MS = 500;
 /** Two projectiles fired during the dash, with a small angular spread. */
-export const DAMSELFLY_PROJECTILE_SPEED = 350;
-export const DAMSELFLY_BURST_SPREAD_RAD = (10 * Math.PI) / 180;
+export const DAMSELFLY_PROJECTILE_SPEED = 280;
+/**
+ * Twin-shot half-angle. ±14° gives a readable V (at 200 px range the
+ * projectiles are ~97 px apart, so there's a real gap to sidestep through)
+ * without making the spread loud enough to stand out from other floor-2
+ * mobs visually. ±10° looked too parallel; ±18° looked too cone-y.
+ */
+export const DAMSELFLY_BURST_SPREAD_RAD = (14 * Math.PI) / 180;
 export const DAMSELFLY_BURST_INITIAL_DELAY_MS = 800;
+/** Per-instance random offset added on top of the initial delay so multiple
+ *  Damselflies in a room don't fire in lockstep. */
+export const DAMSELFLY_BURST_INITIAL_DELAY_JITTER_MS = 1000;
 
 // --- Bog Tortoise (Floor 2) --------------------------------------------------
 
@@ -283,26 +299,61 @@ export const DAMSELFLY_EMPRESS_RECOVERY_MS = 700;
 /** During a dash, drop projectiles perpendicular to the dash direction at intervals. */
 export const DAMSELFLY_EMPRESS_TRAIL_INTERVAL_MS = 110;
 export const DAMSELFLY_EMPRESS_TRAIL_SPEED = 200;
-export const DAMSELFLY_EMPRESS_PHASE2_ADD_INTERVAL_MS = 3500;
-export const DAMSELFLY_EMPRESS_PHASE2_MAX_ADDS = 3;
+/**
+ * Phase 2: snappier rhythm + landing radial. Telegraph and recovery shorten
+ * so the player has less downtime between dashes; on dash-end the boss
+ * fires a small radial so "follow her to her endpoint" gets punished.
+ * Trail stays as the perpendicular pair so the dodge corridor stays open.
+ */
+export const DAMSELFLY_EMPRESS_PHASE2_TELEGRAPH_MS = 260;
+export const DAMSELFLY_EMPRESS_PHASE2_RECOVERY_MS = 480;
+export const DAMSELFLY_EMPRESS_PHASE2_TRAIL_INTERVAL_MS = 190;
+export const DAMSELFLY_EMPRESS_PHASE2_LANDING_RADIAL_THORNS = 5;
+export const DAMSELFLY_EMPRESS_PHASE2_LANDING_RADIAL_SPEED = 170;
 
 // --- Bog Colossus (boss, Floor 2) --------------------------------------------
 
 export const BOG_COLOSSUS_VISUAL_SCALE = 1.6;
 export const BOG_COLOSSUS_PHASE_FLASH_MS = 200;
 export const BOG_COLOSSUS_INITIAL_DELAY_MS = 1500;
-export const BOG_COLOSSUS_WALK_SPEED = 50;
-/** Shell-pop + radial-burst cadence. */
-export const BOG_COLOSSUS_PHASE1_CYCLE_MS = 4000;
-export const BOG_COLOSSUS_PHASE2_CYCLE_MS = 3200;
+export const BOG_COLOSSUS_PHASE1_WALK_SPEED = 50;
+export const BOG_COLOSSUS_PHASE2_WALK_SPEED = 70;
+/** Shell-pop + radial-burst cadence. Phase 1 tightened from 4000 → 2800 ms. */
+export const BOG_COLOSSUS_PHASE1_CYCLE_MS = 2800;
+/** Phase 2 cycle tightened from 3200 → 2700 ms — orbit events come faster. */
+export const BOG_COLOSSUS_PHASE2_CYCLE_MS = 2700;
 export const BOG_COLOSSUS_SHELL_DURATION_MS = 900;
-export const BOG_COLOSSUS_PHASE1_BURST_THORNS = 8;
-/** Phase 2: spawns 6 orbiting thorns that circle the boss, then fly outward. */
+export const BOG_COLOSSUS_PHASE1_BURST_THORNS = 10;
+/**
+ * Phase 1 Gungeon-style overlay: each pop fires two radial waves. Wave 2 is
+ * offset by half a step (so it threads the gaps in wave 1) and travels
+ * slower, so dodging the first wave doesn't clear the second.
+ */
+export const BOG_COLOSSUS_PHASE1_SECOND_WAVE_DELAY_MS = 350;
+export const BOG_COLOSSUS_PHASE1_SECOND_WAVE_SPEED_FACTOR = 0.7;
+/** Phase 1 walk: snipe an aimed thorn at the player on a slow cadence. */
+export const BOG_COLOSSUS_PHASE1_WALK_FIRE_INTERVAL_MS = 1400;
+export const BOG_COLOSSUS_PHASE1_WALK_FIRE_SPEED = 200;
+/** Phase 2: spawns orbiting thorns that circle the boss, then fly outward. */
 export const BOG_COLOSSUS_PHASE2_ORBIT_THORNS = 6;
 export const BOG_COLOSSUS_PHASE2_ORBIT_DURATION_MS = 1800;
 export const BOG_COLOSSUS_PHASE2_ORBIT_RADIUS = 96;
-export const BOG_COLOSSUS_PHASE2_ORBIT_SPEED_RAD = (120 * Math.PI) / 180; // rad/s
+export const BOG_COLOSSUS_PHASE2_ORBIT_SPEED_RAD = (160 * Math.PI) / 180; // rad/s
 export const BOG_COLOSSUS_PHASE2_ORBIT_RELEASE_SPEED = 240;
+/**
+ * Counter-rotating inner ring — adds a second layer to the orbit pattern
+ * (mandala feel). 4 thorns at a smaller radius spinning the opposite
+ * direction at higher angular speed, so the player has to read both
+ * rotations. Released outward with the outer ring at orbit-end.
+ */
+export const BOG_COLOSSUS_PHASE2_INNER_THORNS = 4;
+export const BOG_COLOSSUS_PHASE2_INNER_RADIUS = 56;
+export const BOG_COLOSSUS_PHASE2_INNER_SPEED_RAD = -(220 * Math.PI) / 180; // rad/s, opposite
+/** Phase 2 only: aimed thorns at the player while the orbit ring is up. */
+export const BOG_COLOSSUS_PHASE2_AIMED_INTERVAL_MS = 600;
+export const BOG_COLOSSUS_PHASE2_AIMED_SPEED = 220;
+/** Phase 2 walk snipe: faster cadence than Phase 1 between orbit windows. */
+export const BOG_COLOSSUS_PHASE2_WALK_FIRE_INTERVAL_MS = 950;
 
 // --- Forest Heart (boss) -----------------------------------------------------
 

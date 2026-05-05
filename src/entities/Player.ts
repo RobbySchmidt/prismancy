@@ -93,6 +93,27 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       tint: this.stats.getMissileTint(),
     });
     this.nextFireAt = time + interval;
+    this.spawnWandSparkle();
+  }
+
+  /**
+   * Brief gold flash at the wand tip when the player casts. Position is
+   * sprite-relative (the wand is drawn in the texture at grid 19,14 with PX
+   * 2 and a centered 24×26 grid in a 64-px texture, so the tip sits ~+15 px
+   * right and ~+3 px down from the sprite centre). Fades + shrinks over
+   * ~150 ms; cheap and self-cleaning.
+   */
+  private spawnWandSparkle(): void {
+    const sparkle = this.scene.add.circle(this.x + 15, this.y + 3, 3.5, 0xfff8c0, 1);
+    sparkle.setDepth(DepthLayers.Player + 1);
+    this.scene.tweens.add({
+      targets: sparkle,
+      alpha: 0,
+      scale: 0.3,
+      duration: 150,
+      ease: 'Sine.Out',
+      onComplete: () => sparkle.destroy(),
+    });
   }
 
   /**

@@ -4,9 +4,12 @@ import {
   DAMSELFLY_EMPRESS_DASH_SPEED,
   DAMSELFLY_EMPRESS_INITIAL_DELAY_MS,
   DAMSELFLY_EMPRESS_PHASE1_CYCLE_MS,
-  DAMSELFLY_EMPRESS_PHASE2_ADD_INTERVAL_MS,
   DAMSELFLY_EMPRESS_PHASE2_CYCLE_MS,
-  DAMSELFLY_EMPRESS_PHASE2_MAX_ADDS,
+  DAMSELFLY_EMPRESS_PHASE2_LANDING_RADIAL_SPEED,
+  DAMSELFLY_EMPRESS_PHASE2_LANDING_RADIAL_THORNS,
+  DAMSELFLY_EMPRESS_PHASE2_RECOVERY_MS,
+  DAMSELFLY_EMPRESS_PHASE2_TELEGRAPH_MS,
+  DAMSELFLY_EMPRESS_PHASE2_TRAIL_INTERVAL_MS,
   DAMSELFLY_EMPRESS_PHASE_FLASH_MS,
   DAMSELFLY_EMPRESS_RECOVERY_MS,
   DAMSELFLY_EMPRESS_TELEGRAPH_MS,
@@ -14,17 +17,14 @@ import {
   DAMSELFLY_EMPRESS_TRAIL_SPEED,
   DAMSELFLY_EMPRESS_VISUAL_SCALE,
 } from '../../config/GameConfig';
-import { ENEMIES, type EnemyId } from '../../data/enemies';
+import { ENEMIES } from '../../data/enemies';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
-import { type BaseEnemy } from './BaseEnemy';
 import { BossEnemy, type BossPhaseDefinition } from './BossEnemy';
 
 export interface DamselflyEmpressHost {
   enemyProjectilePool: EnemyProjectilePool;
-  spawnEnemyAt(id: EnemyId, x: number, y: number): BaseEnemy | null;
   getPlayer(): Player;
-  getRoomBounds(): { minX: number; maxX: number; minY: number; maxY: number };
 }
 
 type DashState = 'idle' | 'telegraph' | 'dash' | 'recovery';
@@ -33,8 +33,9 @@ type DashState = 'idle' | 'telegraph' | 'dash' | 'recovery';
  * Damselfly Empress — Sapphire Swamp boss based on Damselfly. Dashes
  * straight across the room, dropping projectiles perpendicular to the dash
  * direction at fixed intervals (so the trail forms a "cross-thorn fence"
- * the player has to thread). Phase 2 (≤ 50 % HP): faster dash cycle + up
- * to 3 Damselfly adds.
+ * the player has to thread). Phase 2 (≤ 50 % HP): snappier rhythm
+ * (shorter telegraph + recovery), tighter trail cadence, and a small
+ * radial when the dash lands.
  */
 export class DamselflyEmpress extends BossEnemy {
   override readonly displayName = 'Damselfly Empress';
@@ -53,9 +54,6 @@ export class DamselflyEmpress extends BossEnemy {
   /** Scene time for the next perpendicular projectile drop during a dash. */
   private nextTrailDropAt = 0;
 
-  private nextAddAt = 0;
-  private adds: BaseEnemy[] = [];
-
   constructor(scene: Phaser.Scene, x: number, y: number, host: DamselflyEmpressHost) {
     super(scene, x, y, ENEMIES['boss-damselfly-empress']);
     this.host = host;
@@ -65,13 +63,28 @@ export class DamselflyEmpress extends BossEnemy {
 
   protected tickAI(time: number): void {
     this.tickDashCycle(time);
-    if (this.currentPhase >= 2) {
-      this.tickAdds(time);
-    }
     if (this.dashState === 'dash' && time >= this.nextTrailDropAt) {
       this.dropTrailProjectile();
-      this.nextTrailDropAt = time + DAMSELFLY_EMPRESS_TRAIL_INTERVAL_MS;
+      this.nextTrailDropAt = time + this.getTrailIntervalMs();
     }
+  }
+
+  private getTelegraphMs(): number {
+    return this.currentPhase >= 2
+      ? DAMSELFLY_EMPRESS_PHASE2_TELEGRAPH_MS
+      : DAMSELFLY_EMPRESS_TELEGRAPH_MS;
+  }
+
+  private getRecoveryMs(): number {
+    return this.currentPhase >= 2
+      ? DAMSELFLY_EMPRESS_PHASE2_RECOVERY_MS
+      : DAMSELFLY_EMPRESS_RECOVERY_MS;
+  }
+
+  private getTrailIntervalMs(): number {
+    return this.currentPhase >= 2
+      ? DAMSELFLY_EMPRESS_PHASE2_TRAIL_INTERVAL_MS
+      : DAMSELFLY_EMPRESS_TRAIL_INTERVAL_MS;
   }
 
   private tickDashCycle(time: number): void {
@@ -94,14 +107,15 @@ export class DamselflyEmpress extends BossEnemy {
 
   private beginTelegraph(time: number): void {
     this.dashState = 'telegraph';
-    this.nextStateChangeAt = time + DAMSELFLY_EMPRESS_TELEGRAPH_MS;
+    const telegraphMs = this.getTelegraphMs();
+    this.nextStateChangeAt = time + telegraphMs;
     this.setVelocity(0, 0);
     // Wing-flutter feel: alpha pulse so the player reads "wind-up incoming".
     this.scene.tweens.killTweensOf(this);
     this.scene.tweens.add({
       targets: this,
       alpha: 0.55,
-      duration: DAMSELFLY_EMPRESS_TELEGRAPH_MS / 2,
+      duration: telegraphMs / 2,
       yoyo: true,
     });
   }
@@ -130,7 +144,29 @@ export class DamselflyEmpress extends BossEnemy {
   private beginRecovery(time: number): void {
     this.dashState = 'recovery';
     this.setVelocity(0, 0);
-    this.nextStateChangeAt = time + DAMSELFLY_EMPRESS_RECOVERY_MS;
+    this.nextStateChangeAt = time + this.getRecoveryMs();
+    if (this.currentPhase >= 2) {
+      this.fireLandingRadial();
+    }
+  }
+
+  /**
+   * Phase 2 only: when the dash ends, fire a small radial burst from the
+   * boss's stop position. Punishes "follow her to her endpoint" strategies
+   * and adds visual flair to mark the recovery moment.
+   */
+  private fireLandingRadial(): void {
+    const count = DAMSELFLY_EMPRESS_PHASE2_LANDING_RADIAL_THORNS;
+    const baseOffset = Math.random() * Math.PI * 2;
+    for (let i = 0; i < count; i++) {
+      const a = baseOffset + (i / count) * Math.PI * 2;
+      this.host.enemyProjectilePool.fire(
+        this.x,
+        this.y,
+        Math.cos(a) * DAMSELFLY_EMPRESS_PHASE2_LANDING_RADIAL_SPEED,
+        Math.sin(a) * DAMSELFLY_EMPRESS_PHASE2_LANDING_RADIAL_SPEED,
+      );
+    }
   }
 
   private endCycle(time: number): void {
@@ -143,17 +179,16 @@ export class DamselflyEmpress extends BossEnemy {
     // length, so the next state change is the remaining idle window
     // (cycle - telegraph - dash - recovery), clamped at 0.
     const idle =
-      cycle -
-      DAMSELFLY_EMPRESS_TELEGRAPH_MS -
-      DAMSELFLY_EMPRESS_DASH_DURATION_MS -
-      DAMSELFLY_EMPRESS_RECOVERY_MS;
+      cycle - this.getTelegraphMs() - DAMSELFLY_EMPRESS_DASH_DURATION_MS - this.getRecoveryMs();
     this.nextStateChangeAt = time + Math.max(0, idle);
   }
 
   /**
    * Drop two projectiles perpendicular to the dash direction at the boss's
    * current position — one going each way from the dash line. The result is
-   * a "fence" the player has to thread between or arc around.
+   * a "fence" the player has to thread between or arc around. Same pattern
+   * in both phases; Phase 2 only differs in cadence (see
+   * `getTrailIntervalMs`).
    */
   private dropTrailProjectile(): void {
     const px = -this.dashDirY;
@@ -172,26 +207,6 @@ export class DamselflyEmpress extends BossEnemy {
     );
   }
 
-  private tickAdds(time: number): void {
-    if (time < this.nextAddAt) return;
-    this.adds = this.adds.filter((a) => a.active);
-    if (this.adds.length < DAMSELFLY_EMPRESS_PHASE2_MAX_ADDS) {
-      const bounds = this.host.getRoomBounds();
-      const margin = 0.2;
-      const x =
-        Math.random() < 0.5
-          ? bounds.minX + (bounds.maxX - bounds.minX) * margin * Math.random()
-          : bounds.maxX - (bounds.maxX - bounds.minX) * margin * Math.random();
-      const y =
-        Math.random() < 0.5
-          ? bounds.minY + (bounds.maxY - bounds.minY) * margin * Math.random()
-          : bounds.maxY - (bounds.maxY - bounds.minY) * margin * Math.random();
-      const add = this.host.spawnEnemyAt('damselfly', x, y);
-      if (add) this.adds.push(add);
-    }
-    this.nextAddAt = time + DAMSELFLY_EMPRESS_PHASE2_ADD_INTERVAL_MS;
-  }
-
   protected onPhaseChanged(newPhase: number): void {
     if (newPhase !== 2) return;
     this.scene.tweens.killTweensOf(this);
@@ -205,6 +220,5 @@ export class DamselflyEmpress extends BossEnemy {
     const now = this.scene.time.now;
     this.nextStateChangeAt = now + 400;
     this.dashState = 'idle';
-    this.nextAddAt = now + 1500;
   }
 }
