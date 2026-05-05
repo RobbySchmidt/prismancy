@@ -39,7 +39,7 @@ export const ENEMIES = {
     moveSpeed: 110,
     hitboxRadius: 12,
     floor: 'emerald-forest',
-    coinDropChance: 0.15,
+    coinDropChance: 0.4,
   },
   'mossy-slime': {
     id: 'mossy-slime',
@@ -51,7 +51,7 @@ export const ENEMIES = {
     moveSpeed: 280,
     hitboxRadius: 14,
     floor: 'emerald-forest',
-    coinDropChance: 0.25,
+    coinDropChance: 0.55,
   },
   'vine-sprout': {
     id: 'vine-sprout',
@@ -64,7 +64,7 @@ export const ENEMIES = {
     moveSpeed: 0,
     hitboxRadius: 14,
     floor: 'emerald-forest',
-    coinDropChance: 0.3,
+    coinDropChance: 0.65,
   },
   'pixie-dancer': {
     id: 'pixie-dancer',
@@ -76,7 +76,7 @@ export const ENEMIES = {
     moveSpeed: 140,
     hitboxRadius: 10,
     floor: 'emerald-forest',
-    coinDropChance: 0.2,
+    coinDropChance: 0.45,
   },
   'boss-vine-lord': {
     id: 'boss-vine-lord',

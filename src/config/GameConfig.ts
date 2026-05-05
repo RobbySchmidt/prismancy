@@ -305,7 +305,7 @@ export const LOCK_FLOOR_THRESHOLD = 2;
  * the user can poke the shop without farming drops first; will move to 0
  * (or be derived from meta-progression) once the run-economy is balanced.
  */
-export const STARTING_COINS = 50;
+export const STARTING_COINS = 0;
 
 /**
  * Shop pricing + slot layout. Heart / Key prices are flat; item prices come

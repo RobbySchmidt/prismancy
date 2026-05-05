@@ -280,7 +280,7 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 
 **Missile-Spawn-Position:** `Player.handleShooting` spawnt Missiles am `body.center` (= +12 px unter `this.y`), nicht am Texture-Center. Hintergrund: die Hitbox-Tuning-Verschiebung des Body nach unten heißt, dass `this.y` an der Top-Wall *innerhalb* der Wand liegt — Missile-Spawn dort kollidiert sofort mit der Wand und wird deaktiviert.
 
-**Coin Drops von Gegnern:** `EnemyDefinition.coinDropChance` (0..1) wird in `BaseEnemy.die()` per `Math.random()` gerollt. Bei Erfolg fired `enemy:droppedCoin` Event mit `{x, y}`; GameScene-Listener spawnt einen Coin-Pickup. Aktuelle Werte: forest-sprite 0.15, pixie-dancer 0.20, mossy-slime 0.25, vine-sprout 0.30, alle Bosse 0 (haben eigenen Reward-Flow). Im Schnitt ~1 Coin/Raum bei 3-5 Gegnern.
+**Coin Drops von Gegnern:** `EnemyDefinition.coinDropChance` (0..1) wird in `BaseEnemy.die()` per `Math.random()` gerollt. Bei Erfolg fired `enemy:droppedCoin` Event mit `{x, y}`; GameScene-Listener spawnt einen Coin-Pickup. Aktuelle Werte (nach Playtest hochgesetzt — vorher max ~8 Coins/Floor): forest-sprite 0.40, pixie-dancer 0.45, mossy-slime 0.55, vine-sprout 0.65, alle Bosse 0 (haben eigenen Reward-Flow).
 
 **DEV-Hooks** (nur `import.meta.env.DEV`):
 - `__wiz.spawnTreasure()` — Treasure-Pedestal im aktuellen Raum
@@ -288,7 +288,7 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 - `__wiz.spawnBoss(id)` — force-spawnt Boss im aktuellen Raum, schließt Türen, killt vorhandene Enemies. IDs: `'boss-vine-lord'`, `'boss-mossy-behemoth'`, `'boss-pixie-queen'`, `'boss-forest-heart'`
 - `__wiz.stats()`, `__wiz.itemSystem()` — Inspect
 
-**`STARTING_COINS = 50`** als Test-Konstante in GameConfig.ts (Standard wird später 0 oder Meta-Progression).
+**`STARTING_COINS = 0`** in GameConfig.ts (war zwischenzeitlich 50 zum Testen). Spieler startet jetzt ohne Coins, muss alles von Gegnern + Crates + Drops sammeln.
 
 **Geplante Progression:**
 1. **Emerald Forest** (Floor 1) — implementiert inkl. 4 Bosse (Vine Lord, Mossy Behemoth, Pixie Queen, Forest Heart, random pick).
