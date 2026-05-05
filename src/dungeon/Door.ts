@@ -2,9 +2,11 @@ import Phaser from 'phaser';
 import {
   TILE_SIZE,
   bossDoorKey,
+  normalDoorKey,
   shopDoorKey,
+  shopDoorLockedKey,
   treasureDoorKey,
-  wallTileKey,
+  treasureDoorLockedKey,
 } from '../config/GameConfig';
 import { DepthLayers } from '../config/DepthLayers';
 import { type Direction, DoorKind } from '../types';
@@ -16,11 +18,14 @@ import { type Direction, DoorKind } from '../types';
  *  - a Zone with a static body the GameScene uses as an overlap trigger to
  *    detect "player walked through this door".
  *
- * Boss doors render with the special boss-door texture in both states.
- * Treasure / shop doors render with their own dedicated textures so the
- * player can tell at a glance which room is on the other side. Locked doors
- * stay closed even after the room is cleared — they only open via
- * `tryUnlock`, which the GameScene calls when the player has a key.
+ * Every closed door renders with a kind-specific texture so the player can
+ * tell at a glance which room is on the other side, even mid-combat:
+ * normal doors get a wooden plank panel, treasure doors a golden chest,
+ * shop doors a gold coin, boss doors a magenta-skull sigil. Locked
+ * treasure / shop doors swap in a variant with an iron keyhole plate
+ * stamped over them. Locked doors stay closed even after the room is
+ * cleared — they only open via `tryUnlock`, which the GameScene calls when
+ * the player has a key.
  */
 export class Door {
   readonly direction: Direction;
@@ -111,15 +116,24 @@ export class Door {
   }
 
   /**
-   * Pick the barrier texture by (kind, locked). Locked treasure / shop doors
-   * get their own dedicated textures so the player sees the lock + room hint
-   * at a glance; everything else falls back to the wall-tile look.
+   * Pick the barrier texture by (kind, locked). Each kind has its own
+   * always-on texture; treasure / shop additionally swap in a locked
+   * variant (with a stamped keyhole plate) when `locked` is true.
    */
   private barrierTextureKey(): string {
-    if (this.kind === DoorKind.Boss) return bossDoorKey(this.floorId);
-    if (this.locked && this.kind === DoorKind.Treasure) return treasureDoorKey(this.floorId);
-    if (this.locked && this.kind === DoorKind.Shop) return shopDoorKey(this.floorId);
-    return wallTileKey(this.floorId);
+    switch (this.kind) {
+      case DoorKind.Boss:
+        return bossDoorKey(this.floorId);
+      case DoorKind.Treasure:
+        return this.locked
+          ? treasureDoorLockedKey(this.floorId)
+          : treasureDoorKey(this.floorId);
+      case DoorKind.Shop:
+        return this.locked ? shopDoorLockedKey(this.floorId) : shopDoorKey(this.floorId);
+      case DoorKind.Normal:
+      default:
+        return normalDoorKey(this.floorId);
+    }
   }
 
   getBarrier(): Phaser.Physics.Arcade.Image | null {

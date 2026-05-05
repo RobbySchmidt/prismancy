@@ -171,6 +171,139 @@ export const PIXIE_QUEEN_PHASE_FLASH_MS = 200;
 /** Min distance (px) the random fallback teleport keeps from the player. */
 export const PIXIE_QUEEN_FALLBACK_MIN_DISTANCE = 3 * 64;
 
+// --- Bog Frog (Floor 2) ------------------------------------------------------
+
+/** Idle-then-shoot tongue cycle (ms). Telegraph + shot + post-shot wait + hop. */
+export const BOG_FROG_IDLE_MS = 1200;
+export const BOG_FROG_TELEGRAPH_MS = 400;
+export const BOG_FROG_POST_SHOT_MS = 600;
+/** Hop reposition: short distance + duration so the frog moves before re-arming. */
+export const BOG_FROG_HOP_DURATION_MS = 280;
+export const BOG_FROG_HOP_DISTANCE = 80;
+/** Tongue projectile speed (px/s). Faster than the standard enemy thorn so it actually pressures the player. */
+export const BOG_FROG_TONGUE_SPEED = 280;
+
+// --- Snapper Bloom (Floor 2, rooted) -----------------------------------------
+
+/** Cooldown between 3-thorn fan bursts. */
+export const SNAPPER_BLOOM_FIRE_INTERVAL_MS = 1800;
+/** Initial delay before the first burst so the player can read the spawn. */
+export const SNAPPER_BLOOM_FIRE_INITIAL_DELAY_MS = 900;
+/** Mouth-open telegraph window (ms) before the burst leaves. */
+export const SNAPPER_BLOOM_TELEGRAPH_MS = 300;
+/** Fan half-spread (radians). 18° ≈ 0.314. */
+export const SNAPPER_BLOOM_FAN_SPREAD_RAD = (18 * Math.PI) / 180;
+
+// --- Damselfly (Floor 2) -----------------------------------------------------
+
+/** Kept distance from the player while strafing. */
+export const DAMSELFLY_IDEAL_DISTANCE = 160;
+/** Strafing radial gain (mirrors PixieDancer's pull-to-distance behaviour). */
+export const DAMSELFLY_RADIAL_GAIN = 1.4;
+/** Tangent ratio so the strafe is dominant but radial pulls back when out of range. */
+export const DAMSELFLY_TANGENT_RATIO = 0.95;
+/** Burst cycle: telegraph → dash → recovery. */
+export const DAMSELFLY_BURST_INTERVAL_MS = 1500;
+export const DAMSELFLY_TELEGRAPH_MS = 400;
+export const DAMSELFLY_DASH_DURATION_MS = 250;
+export const DAMSELFLY_DASH_SPEED = 320;
+export const DAMSELFLY_RECOVERY_MS = 500;
+/** Two projectiles fired during the dash, with a small angular spread. */
+export const DAMSELFLY_PROJECTILE_SPEED = 350;
+export const DAMSELFLY_BURST_SPREAD_RAD = (10 * Math.PI) / 180;
+export const DAMSELFLY_BURST_INITIAL_DELAY_MS = 800;
+
+// --- Bog Tortoise (Floor 2) --------------------------------------------------
+
+/** Walk speed before / after the shell-pop burst. */
+export const BOG_TORTOISE_WALK_SPEED = 60;
+/** Cooldown between shell-pop bursts (ms). */
+export const BOG_TORTOISE_BURST_INTERVAL_MS = 3500;
+/** Shell-retract duration (invulnerable + stationary). */
+export const BOG_TORTOISE_SHELL_DURATION_MS = 800;
+/** Number of thorns in the radial burst. */
+export const BOG_TORTOISE_BURST_THORN_COUNT = 6;
+/** Initial delay before the first burst. */
+export const BOG_TORTOISE_BURST_INITIAL_DELAY_MS = 1500;
+
+// --- Toad Sovereign (boss, Floor 2) ------------------------------------------
+
+export const TOAD_SOVEREIGN_VISUAL_SCALE = 2.4;
+export const TOAD_SOVEREIGN_PHASE_FLASH_MS = 200;
+/** Phase 1: idle-then-shoot cadence + tongue-burst spread. */
+export const TOAD_SOVEREIGN_PHASE1_IDLE_MS = 1100;
+export const TOAD_SOVEREIGN_PHASE1_TELEGRAPH_MS = 380;
+export const TOAD_SOVEREIGN_PHASE1_HOP_DURATION_MS = 320;
+export const TOAD_SOVEREIGN_PHASE1_HOP_DISTANCE = 110;
+/** Phase 1 shoots a 3-tongue burst aimed cardinal + ±25°. */
+export const TOAD_SOVEREIGN_TONGUE_SPREAD_RAD = (25 * Math.PI) / 180;
+export const TOAD_SOVEREIGN_TONGUE_SPEED = 280;
+export const TOAD_SOVEREIGN_INITIAL_DELAY_MS = 900;
+/** Phase 2: triple-hop combo with radial burst on each landing. */
+export const TOAD_SOVEREIGN_PHASE2_HOPS_PER_COMBO = 3;
+export const TOAD_SOVEREIGN_PHASE2_HOP_DURATION_MS = 280;
+export const TOAD_SOVEREIGN_PHASE2_HOP_GAP_MS = 220;
+export const TOAD_SOVEREIGN_PHASE2_COMBO_GAP_MS = 1300;
+export const TOAD_SOVEREIGN_PHASE2_LANDING_THORNS = 5;
+export const TOAD_SOVEREIGN_PHASE2_ADD_INTERVAL_MS = 4500;
+export const TOAD_SOVEREIGN_PHASE2_MAX_ADDS = 2;
+
+// --- Bloomheart (boss, Floor 2) ----------------------------------------------
+
+export const BLOOMHEART_VISUAL_SCALE = 2.4;
+export const BLOOMHEART_PHASE_FLASH_MS = 200;
+export const BLOOMHEART_INITIAL_DELAY_MS = 900;
+/** Phase 1: 5-thorn wide fan (±30°) on a slow cadence. */
+export const BLOOMHEART_PHASE1_FAN_INTERVAL_MS = 1600;
+export const BLOOMHEART_FAN_SPREAD_RAD = (30 * Math.PI) / 180;
+export const BLOOMHEART_PHASE1_TELEGRAPH_MS = 320;
+/** Phase 2: faster fan, plus a delayed-burst spore + adds. */
+export const BLOOMHEART_PHASE2_FAN_INTERVAL_MS = 1200;
+export const BLOOMHEART_PHASE2_SPORE_INTERVAL_MS = 2700;
+/** Spore travel + how long it floats before bursting into thorns. */
+export const BLOOMHEART_SPORE_SPEED = 140;
+export const BLOOMHEART_SPORE_LIFETIME_MS = 700;
+/** Number of mini-thorns the spore bursts into when it pops. */
+export const BLOOMHEART_SPORE_BURST_COUNT = 6;
+export const BLOOMHEART_PHASE2_ADD_INTERVAL_MS = 4000;
+export const BLOOMHEART_PHASE2_MAX_ADDS = 2;
+
+// --- Damselfly Empress (boss, Floor 2) ---------------------------------------
+
+export const DAMSELFLY_EMPRESS_VISUAL_SCALE = 1.6;
+export const DAMSELFLY_EMPRESS_PHASE_FLASH_MS = 200;
+export const DAMSELFLY_EMPRESS_INITIAL_DELAY_MS = 900;
+/** Phase 1: dash cycle = pause-and-aim → dash → recovery. */
+export const DAMSELFLY_EMPRESS_PHASE1_CYCLE_MS = 1800;
+export const DAMSELFLY_EMPRESS_PHASE2_CYCLE_MS = 1200;
+export const DAMSELFLY_EMPRESS_TELEGRAPH_MS = 380;
+export const DAMSELFLY_EMPRESS_DASH_DURATION_MS = 480;
+export const DAMSELFLY_EMPRESS_DASH_SPEED = 360;
+export const DAMSELFLY_EMPRESS_RECOVERY_MS = 700;
+/** During a dash, drop projectiles perpendicular to the dash direction at intervals. */
+export const DAMSELFLY_EMPRESS_TRAIL_INTERVAL_MS = 110;
+export const DAMSELFLY_EMPRESS_TRAIL_SPEED = 200;
+export const DAMSELFLY_EMPRESS_PHASE2_ADD_INTERVAL_MS = 3500;
+export const DAMSELFLY_EMPRESS_PHASE2_MAX_ADDS = 3;
+
+// --- Bog Colossus (boss, Floor 2) --------------------------------------------
+
+export const BOG_COLOSSUS_VISUAL_SCALE = 1.6;
+export const BOG_COLOSSUS_PHASE_FLASH_MS = 200;
+export const BOG_COLOSSUS_INITIAL_DELAY_MS = 1500;
+export const BOG_COLOSSUS_WALK_SPEED = 50;
+/** Shell-pop + radial-burst cadence. */
+export const BOG_COLOSSUS_PHASE1_CYCLE_MS = 4000;
+export const BOG_COLOSSUS_PHASE2_CYCLE_MS = 3200;
+export const BOG_COLOSSUS_SHELL_DURATION_MS = 900;
+export const BOG_COLOSSUS_PHASE1_BURST_THORNS = 8;
+/** Phase 2: spawns 6 orbiting thorns that circle the boss, then fly outward. */
+export const BOG_COLOSSUS_PHASE2_ORBIT_THORNS = 6;
+export const BOG_COLOSSUS_PHASE2_ORBIT_DURATION_MS = 1800;
+export const BOG_COLOSSUS_PHASE2_ORBIT_RADIUS = 96;
+export const BOG_COLOSSUS_PHASE2_ORBIT_SPEED_RAD = (120 * Math.PI) / 180; // rad/s
+export const BOG_COLOSSUS_PHASE2_ORBIT_RELEASE_SPEED = 240;
+
 // --- Forest Heart (boss) -----------------------------------------------------
 
 /** Phase 1: cooldown (ms) between radial waves. */
@@ -214,6 +347,15 @@ export const TextureKeys = {
   MossySlime: 'tex-enemy-mossy-slime',
   VineSprout: 'tex-enemy-vine-sprout',
   PixieDancer: 'tex-enemy-pixie-dancer',
+  BogFrog: 'tex-enemy-bog-frog',
+  SnapperBloom: 'tex-enemy-snapper-bloom',
+  Damselfly: 'tex-enemy-damselfly',
+  BogTortoise: 'tex-enemy-bog-tortoise',
+  BossToadSovereign: 'tex-boss-toad-sovereign',
+  BossBloomheart: 'tex-boss-bloomheart',
+  BossDamselflyEmpress: 'tex-boss-damselfly-empress',
+  BossBogColossus: 'tex-boss-bog-colossus',
+  Stairs: 'tex-stairs',
   HeartFull: 'tex-heart-full',
   HeartHalf: 'tex-heart-half',
   HeartEmpty: 'tex-heart-empty',
@@ -233,6 +375,10 @@ export const TextureKeys = {
   ItemCrownOfTheVine: 'tex-item-crown-of-the-vine',
   ItemAncientHeart: 'tex-item-ancient-heart',
   ItemWitheredFang: 'tex-item-withered-fang',
+  ItemSpyglass: 'tex-item-spyglass',
+  ItemLilyDiadem: 'tex-item-lily-diadem',
+  ItemMirePearl: 'tex-item-mire-pearl',
+  ItemFrogTongue: 'tex-item-frog-tongue',
   BossMossyBehemoth: 'tex-boss-mossy-behemoth',
   BossPixieQueen: 'tex-boss-pixie-queen',
   BossForestHeart: 'tex-boss-forest-heart',
@@ -272,8 +418,25 @@ export function treasureDoorKey(floorId: string): string {
   return `tex-treasuredoor-${floorId}`;
 }
 
+export function treasureDoorLockedKey(floorId: string): string {
+  return `tex-treasuredoor-locked-${floorId}`;
+}
+
 export function shopDoorKey(floorId: string): string {
   return `tex-shopdoor-${floorId}`;
+}
+
+export function shopDoorLockedKey(floorId: string): string {
+  return `tex-shopdoor-locked-${floorId}`;
+}
+
+/**
+ * Wooden door for normal rooms. Replaces the wall-tile fallback so the
+ * player can read which adjacent rooms are reachable while still fighting in
+ * the current one (rooms with closed doors visually announce "exit here").
+ */
+export function normalDoorKey(floorId: string): string {
+  return `tex-normaldoor-${floorId}`;
 }
 
 /**
@@ -299,6 +462,13 @@ export const DEFAULT_MISSILE_TINT = 0xffffff;
  * Pure constant for now — wired up in a later chunk.
  */
 export const LOCK_FLOOR_THRESHOLD = 2;
+
+/**
+ * Hold-R-to-restart-run threshold (ms). Long enough that an accidental
+ * tap doesn't kill the run, short enough that intentional holds feel
+ * snappy. UI shows a fill bar while held.
+ */
+export const RESTART_HOLD_DURATION_MS = 1200;
 
 /**
  * Coin balance the player starts a fresh run with. TEMPORARY test value so

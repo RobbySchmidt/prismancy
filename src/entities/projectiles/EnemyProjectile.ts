@@ -12,6 +12,13 @@ import { DepthLayers } from '../../config/DepthLayers';
  */
 export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
   private spawnedAt = 0;
+  /**
+   * Per-instance lifetime override, defaulting to ENEMY_PROJECTILE_LIFETIME_MS.
+   * Reset on each `fire()` call. Bosses with long-running custom shots (e.g.
+   * Bog Colossus orbital thorns) bump this so the projectile survives the
+   * orbit + outward flight without the pool auto-deactivating it mid-pattern.
+   */
+  private lifetimeMs = ENEMY_PROJECTILE_LIFETIME_MS;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, TextureKeys.Thorn);
@@ -32,12 +39,22 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     this.setVelocity(vx, vy);
     this.setRotation(Math.atan2(vy, vx));
     this.spawnedAt = this.scene.time.now;
+    this.lifetimeMs = ENEMY_PROJECTILE_LIFETIME_MS;
+  }
+
+  /**
+   * Override the lifetime for this projectile in ms. Call after `fire()`.
+   * Used by bosses whose attacks need a longer-lived projectile (e.g. orbit
+   * patterns). Reset to the default on the next `fire()`.
+   */
+  setLifetime(ms: number): void {
+    this.lifetimeMs = ms;
   }
 
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
     if (!this.active) return;
-    if (time - this.spawnedAt >= ENEMY_PROJECTILE_LIFETIME_MS) {
+    if (time - this.spawnedAt >= this.lifetimeMs) {
       this.deactivate();
     }
   }

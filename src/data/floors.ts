@@ -30,11 +30,38 @@ export const FLOORS = {
       rock: 0.08,
       tree: 0.08,
     },
+    decorationStyle: 'forest',
     enemyRoster: [
       { id: 'forest-sprite', weight: 4 },
       { id: 'mossy-slime', weight: 3 },
       { id: 'pixie-dancer', weight: 2 },
       { id: 'vine-sprout', weight: 2 },
+    ] satisfies readonly EnemyRosterEntry[],
+  },
+  'sapphire-swamp': {
+    id: 'sapphire-swamp',
+    displayName: 'Sapphire Swamp',
+    palette: {
+      // Murky deep teal water + sapphire-blue glow accents. Walls lean
+      // navy-stone so the floor reads "swamp at night with magical lights".
+      floorBase: 0x0e1d24,
+      floorAccent: 0x183038,
+      wallBase: 0x1a2230,
+      wallHighlight: 0x2c3e58,
+      ambient: 0x05090f,
+      glow: 0x4ad8ff,
+    },
+    decorationDensities: {
+      mushroom: 0.07,
+      rock: 0.07,
+      tree: 0.06,
+    },
+    decorationStyle: 'swamp',
+    enemyRoster: [
+      { id: 'bog-frog', weight: 4 },
+      { id: 'snapper-bloom', weight: 2 },
+      { id: 'damselfly', weight: 2 },
+      { id: 'bog-tortoise', weight: 1 },
     ] satisfies readonly EnemyRosterEntry[],
   },
 } as const satisfies Record<string, FloorTheme>;

@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
 import {
   ENEMY_PROJECTILE_DAMAGE,
+  GAME_HEIGHT,
+  GAME_WIDTH,
   KNOCKBACK_FORCE_ENEMY,
   KNOCKBACK_FORCE_PLAYER,
+  RESTART_HOLD_DURATION_MS,
   ROOM_ENTRY_GRACE_MS,
   ROOM_HEIGHT_TILES,
   ROOM_WIDTH_TILES,
@@ -21,9 +24,13 @@ import { FLOORS, STARTING_FLOOR_ID, type FloorId } from '../data/floors';
 import { Player } from '../entities/Player';
 import { BaseEnemy } from '../entities/enemies/BaseEnemy';
 import { type BossEnemy } from '../entities/enemies/BossEnemy';
+import { Bloomheart, type BloomheartHost } from '../entities/enemies/Bloomheart';
+import { BogColossus, type BogColossusHost } from '../entities/enemies/BogColossus';
+import { DamselflyEmpress, type DamselflyEmpressHost } from '../entities/enemies/DamselflyEmpress';
 import { ForestHeart, type ForestHeartHost } from '../entities/enemies/ForestHeart';
 import { MossyBehemoth, type MossyBehemothHost } from '../entities/enemies/MossyBehemoth';
 import { PixieQueen, type PixieQueenHost } from '../entities/enemies/PixieQueen';
+import { ToadSovereign, type ToadSovereignHost } from '../entities/enemies/ToadSovereign';
 import { VineLord, type VineLordHost } from '../entities/enemies/VineLord';
 import { createEnemy } from '../entities/enemies';
 import { BasePickup } from '../entities/pickups/BasePickup';
@@ -56,10 +63,25 @@ import {
   type ItemDefinition,
   type RoomDescriptor,
 } from '../types';
-import { pickItemFromPool, type ItemId } from '../data/items';
+import { ITEMS, pickItemFromPool, type ItemId } from '../data/items';
 import { pickBossForFloor } from '../data/bosses';
 import { EventBus } from '../utils/EventBus';
 import { RNG } from '../utils/RNG';
+
+/**
+ * Snapshot of run-wide state that survives a floor transition. Inventory,
+ * picked items, max+current HP, and earned gems all carry over between
+ * floors; only the layout / room-state / live entities are rebuilt fresh.
+ * Set on the GameScene via `init` data when the player descends stairs.
+ */
+export interface RunCarryOver {
+  healthCurrent: number;
+  healthMax: number;
+  coins: number;
+  keys: number;
+  pickedItemIds: readonly string[];
+  gemFloorIds: readonly string[];
+}
 
 export interface GameSceneInitData {
   floorId?: FloorId;
@@ -70,7 +92,16 @@ export interface GameSceneInitData {
    * locked. Defaults to 1 (Floor 1 = Emerald Forest, no locked doors).
    */
   floorIndex?: number;
+  /**
+   * Optional carry-over from a previous floor. When present, the new
+   * GameScene rehydrates its stats / inventory / item-system / health
+   * instead of starting from baseline.
+   */
+  carryOver?: RunCarryOver;
 }
+
+/** Canonical floor progression. Drives `__wiz.gotoFloor` + stairs descent. */
+const FLOOR_ORDER: readonly FloorId[] = ['emerald-forest', 'sapphire-swamp'];
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -142,6 +173,29 @@ export class GameScene extends Phaser.Scene {
   /** The boss currently active in the room, or null if no boss fight is live. */
   private activeBoss: BossEnemy | null = null;
 
+  /**
+   * Stairs sprite spawned in the boss room after a kill. Held as a field
+   * (not just `pickups` membership) so the player↔stairs overlap can fire
+   * a transition instead of a normal pickup-collect path.
+   */
+  private stairsSprite: Phaser.GameObjects.Image | null = null;
+  private stairsOverlap: Phaser.Physics.Arcade.Collider | null = null;
+  /** Pending carry-over snapshot from the previous floor's `init` call. */
+  private carryOverFromInit: RunCarryOver | null = null;
+
+  // --- Hold-R-to-restart-run ---------------------------------------------------
+
+  /** Phaser Key for the R restart-hold; created in create(). */
+  private restartKey: Phaser.Input.Keyboard.Key | null = null;
+  /** Timestamp the player started holding R, or null if not currently held. */
+  private restartHoldStartedAt: number | null = null;
+  /** Background bar of the hold-R fill widget. */
+  private restartHoldBg: Phaser.GameObjects.Rectangle | null = null;
+  /** Foreground (filling) bar of the hold-R fill widget. */
+  private restartHoldFill: Phaser.GameObjects.Rectangle | null = null;
+  /** "Hold R to restart…" label above the bar. */
+  private restartHoldLabel: Phaser.GameObjects.Text | null = null;
+
   private readonly playerTookDamageHandler = (): void => {
     if (!this.bossNoHitInProgress) return;
     const desc = this.layout?.rooms.get(this.currentRoomId);
@@ -166,6 +220,7 @@ export class GameScene extends Phaser.Scene {
     this.dungeonSeed =
       data.dungeonSeed ?? `prismancy-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
     this.floorIndex = data.floorIndex ?? 1;
+    this.carryOverFromInit = data.carryOver ?? null;
     this.registry.set('currentFloorId', this.currentFloorId);
     this.registry.set('dungeonSeed', this.dungeonSeed);
     this.registry.set('floorIndex', this.floorIndex);
@@ -195,6 +250,21 @@ export class GameScene extends Phaser.Scene {
     this.player = new Player(this, 0, 0, this.inputManager, this.missilePool, this.stats);
 
     this.itemSystem = new ItemSystem(this.stats, this.player.health);
+
+    // Floor-transition rehydrate: if the previous floor handed us a
+    // carry-over snapshot, replay item effects (silently — no item:picked
+    // toast spam), restore inventory + gems, then clamp current/max HP.
+    // `restore` runs LAST so item-driven max-HP bonuses are baked in
+    // before we set the actual current value.
+    if (this.carryOverFromInit) {
+      const co = this.carryOverFromInit;
+      this.itemSystem.hydrate(
+        co.pickedItemIds,
+        (id) => (ITEMS as Record<string, ItemDefinition | undefined>)[id],
+      );
+      this.inventory.hydrate({ coins: co.coins, keys: co.keys, gems: co.gemFloorIds });
+      this.player.health.restore(co.healthCurrent, co.healthMax);
+    }
     // Expose to other scenes (HUD reads coin/key counters from here once
     // the inventory HUD lands).
     this.registry.set('stats', this.stats);
@@ -210,6 +280,13 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
 
     this.enterRoom(this.layout.startId, null);
+
+    // Hold-R-to-restart: dedicated key (separate from InputManager so
+    // movement keys don't get tangled with the restart hold) plus a small
+    // hidden UI widget that fades in while the player holds the key.
+    this.restartKey = this.input.keyboard?.addKey('R') ?? null;
+    this.restartHoldStartedAt = null;
+    this.buildRestartHoldWidget();
 
     this.dropSystem = new DropSystem(
       {
@@ -239,6 +316,28 @@ export class GameScene extends Phaser.Scene {
       EventBus.off('map:teleport', this.mapTeleportHandler);
       EventBus.off('player:tookDamage', this.playerTookDamageHandler);
       EventBus.off('boss:killed', this.bossKilledHandler);
+      // Phaser destroys child GameObjects on scene shutdown, but our class
+      // fields are still pointing at them. If the scene is restarted (e.g.
+      // via `__wiz.gotoFloor`), the next `create()` would see a truthy but
+      // dead `currentRoom` and `enterRoom` would call tearDown on it. Wipe
+      // the per-run references here so a fresh `create()` rebuilds from
+      // scratch. The `!` fields use cast-to-undefined to honour TypeScript's
+      // definite-assignment contract while still clearing the slot.
+      this.currentRoom = undefined as unknown as Room;
+      this.enemies = undefined as unknown as Phaser.Physics.Arcade.Group;
+      this.pickups = undefined as unknown as Phaser.Physics.Arcade.Group;
+      this.activeBoss = null;
+      this.bossNoHitInProgress = false;
+      this.registry.set('bossNoHitInProgress', false);
+      this.inTransition = false;
+      this.currentShopPriceLabels = [];
+      this.stairsSprite = null;
+      this.stairsOverlap = null;
+      this.restartHoldStartedAt = null;
+      this.restartKey = null;
+      this.restartHoldBg = null;
+      this.restartHoldFill = null;
+      this.restartHoldLabel = null;
     });
 
     // Dev-only browser console hook so the user can spawn a treasure-pool
@@ -253,14 +352,105 @@ export class GameScene extends Phaser.Scene {
         /**
          * Force-spawn a specific boss in the current room. Bypasses the
          * `pickBossForFloor` weighted roll — handy for testing a boss whose
-         * 25% chance per run hasn't come up. Pass the EnemyId
-         * (`'boss-pixie-queen'`, `'boss-mossy-behemoth'`, `'boss-vine-lord'`,
-         * `'boss-forest-heart'`). Run `__wiz.spawnBoss('boss-pixie-queen')`
-         * in the browser console while standing in any room.
+         * 25 % chance per run hasn't come up. Emerald: `'boss-vine-lord'`,
+         * `'boss-mossy-behemoth'`, `'boss-pixie-queen'`, `'boss-forest-heart'`.
+         * Sapphire: `'boss-toad-sovereign'`, `'boss-bloomheart'`,
+         * `'boss-damselfly-empress'`, `'boss-bog-colossus'`.
+         * Run `__wiz.spawnBoss('boss-bloomheart')` in the browser console.
          */
         spawnBoss: (bossId: string) => this.devSpawnBoss(bossId),
+        /**
+         * Restart the run on the requested floor. Useful before stairs +
+         * boss-pool exist for Floor 2: lets you test new mob rosters /
+         * palettes without grinding through Floor 1 first.
+         * Usage: `__wiz.gotoFloor(2)`.
+         */
+        gotoFloor: (floorIndex: number) => this.devGotoFloor(floorIndex),
       };
     }
+  }
+
+  /**
+   * Dev helper: restart GameScene on a specific floor index. Maps the index
+   * to a FloorId via the canonical progression order. Items / coins / HP
+   * reset because GameScene's init wipes those — this is for visual /
+   * mechanic testing, not for piping a save through.
+   */
+  private devGotoFloor(floorIndex: number): void {
+    const idx = Math.max(1, Math.min(FLOOR_ORDER.length, Math.floor(floorIndex)));
+    const floorId = FLOOR_ORDER[idx - 1]!;
+    // eslint-disable-next-line no-console
+    console.log(`[__wiz.gotoFloor] Restarting on floor ${idx} (${floorId})`);
+    this.scene.restart({ floorIndex: idx, floorId });
+  }
+
+  /**
+   * Snapshot the run-wide state into a `RunCarryOver` object, ready to hand
+   * to the next GameScene's `init`. Only data that should survive a floor
+   * transition is captured — live entities (player sprite, enemies, layout)
+   * are deliberately excluded since the next scene rebuilds them.
+   */
+  private snapshotRunCarryOver(): RunCarryOver {
+    return {
+      healthCurrent: this.player.health.getCurrent(),
+      healthMax: this.player.health.getMax(),
+      coins: this.inventory.getCoins(),
+      keys: this.inventory.getKeys(),
+      pickedItemIds: Array.from(this.itemSystem.getPickedIds()),
+      gemFloorIds: Array.from(this.inventory.getGems()),
+    };
+  }
+
+  /**
+   * Walk through the stairs spawned after a boss kill: snapshot run state,
+   * advance the floor index, restart GameScene + UIScene with the next
+   * floor's data. If there is no next floor in `FLOOR_ORDER` the call is a
+   * no-op (Phase 5 Chunk 4 will hook this to the win screen).
+   */
+  private advanceToNextFloor(): void {
+    if (this.inTransition) return;
+    const currentIdx = FLOOR_ORDER.indexOf(this.currentFloorId);
+    if (currentIdx === -1 || currentIdx + 1 >= FLOOR_ORDER.length) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[advanceToNextFloor] No next floor after ${this.currentFloorId} (would be the win condition).`,
+      );
+      return;
+    }
+    const nextFloorId = FLOOR_ORDER[currentIdx + 1]!;
+    const carryOver = this.snapshotRunCarryOver();
+    this.inTransition = true;
+
+    // Brief fade so the descent reads as "going somewhere", not a snap-cut.
+    this.cameras.main.fadeOut(260, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this.scene.stop(SceneKeys.UI);
+      this.scene.start(SceneKeys.Game, {
+        floorIndex: this.floorIndex + 1,
+        floorId: nextFloorId,
+        carryOver,
+      });
+      this.scene.launch(SceneKeys.UI);
+    });
+  }
+
+  /**
+   * Hold-R-during-run reset. Wipes the entire run (no carry-over) and drops
+   * the player on a fresh Floor 1 with a new seed. Symmetric with the
+   * post-game-over restart, but reachable mid-run via input.
+   */
+  private restartRun(): void {
+    if (this.inTransition) return;
+    this.inTransition = true;
+    this.cameras.main.fadeOut(180, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this.scene.stop(SceneKeys.UI);
+      this.scene.start(SceneKeys.Game, {
+        floorIndex: 1,
+        floorId: STARTING_FLOOR_ID,
+      });
+      this.scene.launch(SceneKeys.UI);
+    });
   }
 
   /**
@@ -562,6 +752,14 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // Re-entry into a cleared boss room: respawn the stairs so the player
+    // can still descend after returning from a side trip. Skipped on the
+    // last floor in `FLOOR_ORDER` since there's nowhere to go (Phase 5
+    // Chunk 4 will hook this branch up to the win screen).
+    if (desc.kind === RoomKind.Boss && desc.cleared && this.hasNextFloor()) {
+      this.spawnStairsInCurrentRoom();
+    }
+
     // If the room starts cleared (start room or already-visited room), doors
     // are already open. Otherwise the Room constructor builds them closed.
 
@@ -604,6 +802,13 @@ export class GameScene extends Phaser.Scene {
     this.enemies.destroy();
     this.missilePool.deactivateAll();
     this.enemyProjectilePool.deactivateAll();
+
+    // Stairs sprite + overlap are room-scoped: reborn via the boss-room
+    // re-entry path in `enterRoom` so we always destroy them on teardown.
+    this.stairsOverlap?.destroy();
+    this.stairsOverlap = null;
+    this.stairsSprite?.destroy();
+    this.stairsSprite = null;
 
     // If we were in a boss fight, the boss was just destroyed along with the
     // enemies group — drop the references + clear the no-hit flag so the next
@@ -658,7 +863,12 @@ export class GameScene extends Phaser.Scene {
     const interiorMaxY = (ROOM_HEIGHT_TILES - 2) * TILE_SIZE;
     const minDistSq = SAFE_SPAWN_DISTANCE * SAFE_SPAWN_DISTANCE;
 
-    const roster = FLOORS[this.currentFloorId].enemyRoster;
+    // Widen each floor's `as const`-narrowed roster so a single
+    // `rng.pickWeighted` call accepts every floor — without the cast,
+    // TypeScript treats every floor's tuple type as incompatible with the
+    // others.
+    const roster = FLOORS[this.currentFloorId]
+      .enemyRoster as readonly { id: EnemyId; weight: number }[];
     const ctx = {
       scene: this,
       target: this.player,
@@ -760,7 +970,14 @@ export class GameScene extends Phaser.Scene {
    * keeps `constructBossById` flat — each `case` just hands the boss its
    * host-typed view of this object.
    */
-  private bossHost(): VineLordHost & MossyBehemothHost & PixieQueenHost & ForestHeartHost {
+  private bossHost(): VineLordHost &
+    MossyBehemothHost &
+    PixieQueenHost &
+    ForestHeartHost &
+    ToadSovereignHost &
+    BloomheartHost &
+    DamselflyEmpressHost &
+    BogColossusHost {
     return {
       enemyProjectilePool: this.enemyProjectilePool,
       spawnEnemyAt: (id, sx, sy) => this.spawnEnemyAt(id, sx, sy),
@@ -795,6 +1012,14 @@ export class GameScene extends Phaser.Scene {
         return new PixieQueen(this, x, y, host);
       case 'boss-forest-heart':
         return new ForestHeart(this, x, y, host);
+      case 'boss-toad-sovereign':
+        return new ToadSovereign(this, x, y, host);
+      case 'boss-bloomheart':
+        return new Bloomheart(this, x, y, host);
+      case 'boss-damselfly-empress':
+        return new DamselflyEmpress(this, x, y, host);
+      case 'boss-bog-colossus':
+        return new BogColossus(this, x, y, host);
       default:
         console.warn(`[GameScene] Unknown boss id: ${bossId}`);
         return null;
@@ -828,12 +1053,68 @@ export class GameScene extends Phaser.Scene {
         gem.setSpawnProtection(700);
         this.pickups.add(gem);
       }
+
+      // Stairs to the next floor. Only spawn if there IS a next floor;
+      // otherwise this kill is the run finale (handled in Phase 5 Chunk 4).
+      if (this.hasNextFloor()) {
+        this.spawnStairsInCurrentRoom();
+      }
     }
 
     this.activeBoss = null;
     this.bossNoHitInProgress = false;
     this.registry.set('bossNoHitInProgress', false);
     void payload; // payload.noHit is also available; we trust our own flag
+  }
+
+  /**
+   * True if there's a floor after `this.currentFloorId` in `FLOOR_ORDER`.
+   * Used to gate stairs spawning + the floor-transition path.
+   */
+  private hasNextFloor(): boolean {
+    const idx = FLOOR_ORDER.indexOf(this.currentFloorId);
+    return idx >= 0 && idx + 1 < FLOOR_ORDER.length;
+  }
+
+  /**
+   * Place the stairs sprite in the current room (above the loot, so the
+   * player picks rewards up first then walks onto the stairs to descend).
+   * Wires a player-overlap that triggers `advanceToNextFloor` on contact.
+   * Idempotent — calling twice destroys the previous instance first.
+   */
+  private spawnStairsInCurrentRoom(): void {
+    const center = this.currentRoom?.getCenter();
+    if (!center) return;
+
+    // Tear down a previous stairs instance (re-entry / paranoia).
+    this.stairsOverlap?.destroy();
+    this.stairsOverlap = null;
+    this.stairsSprite?.destroy();
+    this.stairsSprite = null;
+
+    // Stairs sit ~2.5 tiles above center, above the gem-reward slot, so the
+    // boss-pool item + hearts read first as the player walks up.
+    const stairsX = center.x;
+    const stairsY = center.y - TILE_SIZE * 2.5;
+
+    this.stairsSprite = this.add
+      .image(stairsX, stairsY, TextureKeys.Stairs)
+      .setDepth(DepthLayers.FloorDecoration);
+    this.physics.add.existing(this.stairsSprite, true);
+
+    // Subtle pulse so the stairs telegraph "step on me".
+    this.tweens.add({
+      targets: this.stairsSprite,
+      scale: { from: 0.96, to: 1.04 },
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+    });
+
+    this.stairsOverlap = this.physics.add.overlap(this.player, this.stairsSprite, () => {
+      this.advanceToNextFloor();
+    });
   }
 
   /**
@@ -850,7 +1131,7 @@ export class GameScene extends Phaser.Scene {
       `${this.dungeonSeed}-boss-${this.currentRoomId}-${Math.floor(x)}-${Math.floor(y)}-${seedSuffix}`,
     );
     const exclude = pickedIds as ReadonlySet<ItemId>;
-    const itemDef = pickItemFromPool(ItemPool.Boss, rng, exclude);
+    const itemDef = pickItemFromPool(ItemPool.Boss, rng, exclude, this.currentFloorId);
     if (!itemDef) return null;
     const pickup = new ItemPickup(this, x, y, itemDef, this.itemSystem);
     pickup.setSpawnProtection(700);
@@ -1285,5 +1566,94 @@ export class GameScene extends Phaser.Scene {
       this.scene.launch(SceneKeys.GameOver);
       this.scene.pause();
     });
+  }
+
+  /**
+   * Hold-R-during-run polling. The widget fades in as the user holds R, the
+   * fill bar tracks elapsed time, and on threshold we kick a fresh run.
+   * Releasing R before the threshold cleanly resets the widget. Skipped
+   * during room transitions so the bar doesn't appear mid-fade.
+   */
+  override update(time: number, _delta: number): void {
+    void _delta;
+    if (this.inTransition) return;
+    if (!this.restartKey) return;
+
+    // Start tracking only on a fresh keydown — `JustDown` returns true only
+    // for the first frame after a press transition. Without this guard,
+    // holding R through a hold-R reset would immediately re-arm tracking on
+    // the new scene and loop forever (user reports a 1.2 s flicker).
+    if (this.restartHoldStartedAt === null) {
+      if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
+        this.restartHoldStartedAt = time;
+        this.setRestartHoldWidgetVisible(true);
+      }
+      return;
+    }
+
+    if (this.restartKey.isDown) {
+      const elapsed = time - this.restartHoldStartedAt;
+      const progress = Math.min(1, elapsed / RESTART_HOLD_DURATION_MS);
+      this.updateRestartHoldFill(progress);
+      if (progress >= 1) {
+        this.restartHoldStartedAt = null;
+        this.setRestartHoldWidgetVisible(false);
+        this.restartRun();
+      }
+    } else {
+      this.restartHoldStartedAt = null;
+      this.setRestartHoldWidgetVisible(false);
+    }
+  }
+
+  /**
+   * Build the screen-fixed "Hold R to restart..." widget — a label above a
+   * thin progress bar, both invisible by default. ScrollFactor 0 + high
+   * depth pin them to the camera so they ride over the world.
+   */
+  private buildRestartHoldWidget(): void {
+    const cx = GAME_WIDTH / 2;
+    const y = GAME_HEIGHT - 60;
+    const barW = 180;
+    const barH = 6;
+
+    this.restartHoldLabel = this.add
+      .text(cx, y - 14, 'Hold R to restart run', {
+        fontSize: '13px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(DepthLayers.HUD)
+      .setAlpha(0);
+
+    this.restartHoldBg = this.add
+      .rectangle(cx, y, barW, barH, 0x222222, 0.85)
+      .setStrokeStyle(1, 0xffffff, 0.7)
+      .setScrollFactor(0)
+      .setDepth(DepthLayers.HUD)
+      .setAlpha(0);
+
+    this.restartHoldFill = this.add
+      .rectangle(cx - barW / 2 + 1, y, 0, barH - 2, 0xff6677, 1)
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0)
+      .setDepth(DepthLayers.HUD)
+      .setAlpha(0);
+  }
+
+  private setRestartHoldWidgetVisible(visible: boolean): void {
+    const a = visible ? 1 : 0;
+    this.restartHoldLabel?.setAlpha(a);
+    this.restartHoldBg?.setAlpha(a);
+    this.restartHoldFill?.setAlpha(a);
+    if (!visible && this.restartHoldFill) this.restartHoldFill.width = 0;
+  }
+
+  private updateRestartHoldFill(progress: number): void {
+    if (!this.restartHoldFill) return;
+    const fullW = 180 - 2;
+    this.restartHoldFill.width = Math.max(0, Math.min(1, progress)) * fullW;
   }
 }

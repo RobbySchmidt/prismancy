@@ -108,6 +108,7 @@ export const ITEMS = {
       { stat: 'missileScale', add: 0.2 },
     ],
     missileTint: 0x6effa0,
+    floor: 'emerald-forest',
   },
   ancientHeart: {
     id: 'ancientHeart',
@@ -117,6 +118,7 @@ export const ITEMS = {
     pools: [ItemPool.Boss],
     effects: [{ stat: 'fireRate', mult: 1.2 }],
     maxHealthBonus: 2,
+    floor: 'emerald-forest',
   },
   witheredFang: {
     id: 'witheredFang',
@@ -129,6 +131,56 @@ export const ITEMS = {
       { stat: 'missileSpeed', mult: 0.85 },
       { stat: 'missileScale', add: 0.3 },
     ],
+    floor: 'emerald-forest',
+  },
+  spyglass: {
+    id: 'spyglass',
+    displayName: 'Spyglass',
+    description: '+40% Range, +10% Missile Speed.',
+    textureKey: TextureKeys.ItemSpyglass,
+    pools: [ItemPool.Treasure, ItemPool.Shop],
+    effects: [
+      { stat: 'range', mult: 1.4 },
+      { stat: 'missileSpeed', mult: 1.1 },
+    ],
+    shopPrice: 14,
+  },
+  lilyDiadem: {
+    id: 'lilyDiadem',
+    displayName: 'Lily Diadem',
+    description: '+1 max HP, +15% Fire Rate. Sapphire missile.',
+    textureKey: TextureKeys.ItemLilyDiadem,
+    pools: [ItemPool.Boss],
+    effects: [{ stat: 'fireRate', mult: 1.15 }],
+    missileTint: 0x4ad8ff,
+    maxHealthBonus: 2,
+    floor: 'sapphire-swamp',
+  },
+  mirePearl: {
+    id: 'mirePearl',
+    displayName: 'Mire Pearl',
+    description: '+50% Range, +1 Damage. Pearl-blue missile.',
+    textureKey: TextureKeys.ItemMirePearl,
+    pools: [ItemPool.Boss],
+    effects: [
+      { stat: 'range', mult: 1.5 },
+      { stat: 'damage', add: 1 },
+    ],
+    missileTint: 0xb0e8ff,
+    floor: 'sapphire-swamp',
+  },
+  frogTongue: {
+    id: 'frogTongue',
+    displayName: "Frog's Tongue",
+    description: '+25% Missile Speed, +20% Fire Rate.',
+    textureKey: TextureKeys.ItemFrogTongue,
+    pools: [ItemPool.Boss],
+    effects: [
+      { stat: 'missileSpeed', mult: 1.25 },
+      { stat: 'fireRate', mult: 1.2 },
+    ],
+    missileTint: 0xff7aa0,
+    floor: 'sapphire-swamp',
   },
 } as const satisfies Record<string, ItemDefinition>;
 
@@ -145,18 +197,26 @@ export function getItemsForPool(pool: ItemPool): readonly ItemDefinition[] {
 }
 
 /**
- * Pick an item from `pool`, optionally excluding ids the player already has.
- * Deterministic given the same `rng` state. Returns null if no eligible
- * item remains.
+ * Pick an item from `pool`, optionally excluding ids the player already has
+ * and optionally restricting to a specific floor. Floor filtering matches
+ * items whose `floor` is unset (floor-agnostic) OR equals `currentFloor`,
+ * and is currently meaningful only for the boss pool. Deterministic given
+ * the same `rng` state. Returns null if no eligible item remains.
  */
 export function pickItemFromPool(
   pool: ItemPool,
   rng: RNG,
   exclude?: ReadonlySet<ItemId>,
+  currentFloor?: string,
 ): ItemDefinition | null {
-  const eligible = getItemsForPool(pool).filter(
+  let eligible = getItemsForPool(pool).filter(
     (item) => !exclude?.has(item.id as ItemId),
   );
+  if (currentFloor !== undefined) {
+    eligible = eligible.filter(
+      (item) => item.floor === undefined || item.floor === currentFloor,
+    );
+  }
   if (eligible.length === 0) return null;
   return rng.pickWeighted(eligible, (item) => item.weight ?? 1);
 }

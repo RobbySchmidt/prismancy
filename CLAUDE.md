@@ -176,7 +176,7 @@ src/
 - [x] `ItemSystem` (passive only — active items mit Cooldown/Space verschoben Phase 6)
 - [x] Treasure-Räume mit Item-Pedestals (auto-spawn, deterministisch via Seed, `desc.looted` verhindert Doppel-Spawn)
 - [x] Item-Pickup-Animation: Toast unten-mittig (Name gold + Description), 7 Start-Items
-- [x] Items: `Magic Tome`, `Hot Tea`, `Wizard's Sneakers`, `Telescopic Wand`, `Lead Cap`, `Caffeine Pill`, `Pixie Dust` + 4 Boss-Pool-Items (`Crown of the Vine`, `Ancient Heart`, `Withered Fang`) + `Heart Container` (HP-Up). Items modifizieren auch Missile-Visuals (`missileScale`, `missileTint`). 15-20 Items kommen iterativ.
+- [x] Items: `Magic Tome`, `Hot Tea`, `Wizard's Sneakers`, `Telescopic Wand`, `Lead Cap`, `Caffeine Pill`, `Pixie Dust`, `Spyglass` (+40% range, +10% missile speed) + Emerald-Boss-Pool (`Crown of the Vine`, `Ancient Heart`, `Withered Fang`) + Sapphire-Boss-Pool (`Lily Diadem`, `Mire Pearl`, `Frog's Tongue`) + `Heart Container` (HP-Up). Items modifizieren auch Missile-Visuals (`missileScale`, `missileTint`). Boss-Pool-Items haben `floor`-Tag und werden via `pickItemFromPool(..., currentFloor)` floor-spezifisch gepickt.
 - [ ] Missile-Modifikatoren (Homing, Piercing, Splitting, Elemental) als Missile-Flags — verschoben Phase 6
 - [x] Pickups: Hearts, Coins, Keys, Items, Gems (Bombs verschoben Phase 6)
 - [x] **Crates** (brown + gold) als Room-Drops mit deterministischen Inhalten + Spawn-Protection 700ms damit der Spieler den Loot sieht
@@ -208,11 +208,15 @@ src/
 - [x] Random-Pick aus 4 Bossen pro Run via `pickBossForFloor` mit Seed `${dungeonSeed}-boss`
 - [x] Boss-Roster `data/bosses.ts` data-driven
 
-**Chunk 3 — Floor-Progression (TODO)**
-- [ ] Sapphire Swamp als Floor 2: neue `FloorTheme` (Palette, Enemy-Roster, Boss-Roster), eigener Boss
-- [ ] Treppe/Trap-Door spawnt nach Boss-Kill, walk-on transitiert zu Floor 2
-- [ ] HP/Damage-Skalierung pro Floor (z.B. enemy.hp *= 1.3, contactDamage * 1.2)
-- [ ] Floor-Theme-Switch: Camera-Background, Sprites, Decorations, Wall-Texturen
+**Chunk 3 — Floor-Progression (mostly DONE)**
+- [x] Sapphire Swamp als Floor 2: neue `FloorTheme` (Sapphire-Palette, eigener Enemy-Roster, Boss-Roster), 4 eigene Bosse
+- [x] Sapphire Mobs (4): **Bog Frog** (idle-fire-hop tongue burst), **Snapper Bloom** (rooted, 3-thorn fan + telegraph), **Damselfly** (orbital strafe + dash-burst), **Bog Tortoise** (slow walk, shell-pop radial, invuln in shell)
+- [x] Sapphire Bosse (4, random pick): **Toad Sovereign** (HP 70, idle-tongue-hop → Phase 2: 3-Hop-Combo + 5-Thorn radial je Landung + Bog-Frog-Adds), **Bloomheart** (HP 60, rooted 5-thorn fan → Phase 2: schneller + delayed-burst spore + Snapper-Adds), **Damselfly Empress** (HP 50, dash mit perpendicular trail → Phase 2: schneller + Damselfly-Adds), **Bog Colossus** (HP 75, walk + shell-pop 8-thorn radial → Phase 2: 6 orbiting thorns die nach 1.8s radial wegfliegen)
+- [x] Treppe/Trap-Door spawnt nach Boss-Kill (mit `hasNextFloor()`-Gate), walk-on transitiert zu Floor 2 mit Fade. Re-Entry des cleared Boss-Rooms respawnt Treppe.
+- [x] **Run-Carry-Over:** Items (über `pickedItemIds`-Replay), HP/MaxHP, Coins, Keys, Gems werden über Floor-Wechsel persistiert. `RunCarryOver` Snapshot in `GameSceneInitData.carryOver`. Hydrate-Methoden auf `Inventory` / `ItemSystem` / `PlayerHealth` (event-stumm, kein Toast-Spam).
+- [x] **Floor-themed Boss-Pool-Items:** `ItemDefinition.floor` Tag + `pickItemFromPool(pool, rng, exclude, currentFloor)` filtert Boss-Items nach Floor. Emerald-Pool (Crown of the Vine, Ancient Heart, Withered Fang) droppt nicht mehr auf Sapphire. Sapphire-Pool: **Lily Diadem** (+1 maxHP, +15% fireRate), **Mire Pearl** (+50% range, +1 dmg), **Frog's Tongue** (+25% missile speed, +20% fireRate).
+- [x] Floor-Theme-Switch: Camera-Background (`theme.palette.ambient`), Wall-/Floor-Textures, Decorations alle per-floor in PreloadScene. Sapphire-Decos: **Lily Pad** (statt Tree, mit Bloom + Saphir-Wassertropfen) + **Mangroven-Wurzel** (statt Rock, verschlungene Wurzelbänder mit Saphir-Glow-Knoten + Algen-Strängen) via neuem `FloorTheme.decorationStyle: 'forest' | 'swamp'` Diskriminator.
+- [ ] HP/Damage-Skalierung pro Floor — *noch nicht relevant*: neue Sapphire-Mobs/Bosse haben passende Werte direkt eingebacken. Wird interessant sobald Floor-1-Mobs auf Floor 3+ wiederkehren.
 
 **Chunk 4 — Onyx Mansion + Secret Endboss (TODO)**
 - [ ] Onyx Mansion als Final Floor mit Endboss
@@ -266,7 +270,15 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 
 **Pickup-Persistenz pro Raum:** `RoomDescriptor.pendingPickups` snapshottet uncollected Drops beim `tearDownActiveRoom`. Restore in `enterRoom` plus clear of the field (live group nimmt's auf). Item-Pickups (Treasure-Pedestals, Gold-Crate-Items) snapshotten NICHT — sie werden über `desc.looted` getrackt oder sind ephemerial (Gold Crate items: must collect immediately).
 
-**Boss-System (Phase 5):** `RoomKind.Boss` triggert in `enterRoom` einen Boss-Spawn statt normaler Enemies (`enemySpawnCount = 0` für Boss-Räume). `pickBossForFloor(floorId, rng)` mit Seed `${dungeonSeed}-boss` wählt deterministisch 1 von 4 Bossen für Emerald Forest. `bossNoHitInProgress`-Flag wird auf `false` gesetzt sobald `player:tookDamage` während Boss-Room feuert. Bei `boss:killed`: Türen auf, Boss-Pool-Item-Pedestal + 2 Hearts in Mitte, Gem-Pickup wenn no-hit. Spawn-Protection 700 ms auf alle Reward-Pickups.
+**Boss-System (Phase 5):** `RoomKind.Boss` triggert in `enterRoom` einen Boss-Spawn statt normaler Enemies (`enemySpawnCount = 0` für Boss-Räume). `pickBossForFloor(floorId, rng)` mit Seed `${dungeonSeed}-boss` wählt deterministisch 1 von 4 Bossen pro Floor (Emerald + Sapphire haben jeweils 4). `bossNoHitInProgress`-Flag wird auf `false` gesetzt sobald `player:tookDamage` während Boss-Room feuert. Bei `boss:killed`: Türen auf, Boss-Pool-Item-Pedestal + 2 Hearts in Mitte, Gem-Pickup wenn no-hit, **Treppe** wenn `hasNextFloor()`. Spawn-Protection 700 ms auf alle Reward-Pickups.
+
+**Floor-Transition (Stairs):** `handleBossKilled` spawnt nach Loot eine Stairs-Image (oben-mittig im Boss-Raum) auf `DepthLayers.FloorDecoration` mit Pulse-Tween + Player-Overlap. Auf Overlap → `advanceToNextFloor()`: Snapshot `RunCarryOver`, Camera-Fade-Out 260ms, dann `scene.stop(UI) + scene.start(Game, {floorIndex+1, floorId, carryOver}) + scene.launch(UI)`. `FLOOR_ORDER = ['emerald-forest', 'sapphire-swamp']` — wird gegated für Win-Screen sobald Onyx kommt. Re-Entry des cleared Boss-Rooms respawnt die Treppe via `enterRoom`-Path. `tearDownActiveRoom` zerstört Sprite + Overlap.
+
+**Run-Restart:** Zwei Wege um einen Run zu reseten:
+1. **Game-Over-R:** `GameOverScene` poll'd `R` (und `Enter`) via `JustDown` im update-loop statt `keyboard.once` (Bug-Fix: paused-scene + `scene.start` racet, once-listener feuerte unzuverlässig). `restartTriggered`-Flag verhindert Doppel-Restart.
+2. **Hold-R im Run:** GameScene polled `R` mit `JustDown`-Guard (sonst Endlos-Loop wenn R nach Restart weiter gehalten wird), zeigt Fill-Bar unten-mittig (`buildRestartHoldWidget`), nach `RESTART_HOLD_DURATION_MS = 1200` → `restartRun()` (kein carryOver, Floor 1 fresh). Symmetric mit Game-Over-Restart, nur reachable mid-run.
+
+**SHUTDOWN-Reset:** `scene.restart()` zerstört Phaser-Children, lässt aber Class-Felder (`this.currentRoom`, `this.enemies`, `this.pickups`, etc.) als JS-Refs auf tote Objekte stehen. Im `Phaser.Scenes.Events.SHUTDOWN`-Handler nullen wir die Per-Run-Felder explizit (`undefined as unknown as Room` für `!:`-Felder, `null` für Union-Felder). Sonst sieht der nächste `create()` einen truthy `currentRoom` und `tearDownActiveRoom` knallt auf `this.enemies.clear()`.
 
 **Hitbox-Tuning (User-Validated):**
 - `PLAYER_HITBOX_RADIUS = 13` (war 18 — zu groß für Squeeze zwischen Rocks). Body-Center +12 px nach unten so der Hut nicht die Hitbox ist, sondern die Robe.
@@ -285,17 +297,28 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 **DEV-Hooks** (nur `import.meta.env.DEV`):
 - `__wiz.spawnTreasure()` — Treasure-Pedestal im aktuellen Raum
 - `__wiz.simulateFloor2()` — markiert Treasure/Shop-Türen als locked zum Lock-Test
-- `__wiz.spawnBoss(id)` — force-spawnt Boss im aktuellen Raum, schließt Türen, killt vorhandene Enemies. IDs: `'boss-vine-lord'`, `'boss-mossy-behemoth'`, `'boss-pixie-queen'`, `'boss-forest-heart'`
+- `__wiz.spawnBoss(id)` — force-spawnt Boss im aktuellen Raum, schließt Türen, killt vorhandene Enemies. Emerald: `'boss-vine-lord'`, `'boss-mossy-behemoth'`, `'boss-pixie-queen'`, `'boss-forest-heart'`. Sapphire: `'boss-toad-sovereign'`, `'boss-bloomheart'`, `'boss-damselfly-empress'`, `'boss-bog-colossus'`.
+- `__wiz.gotoFloor(n)` — restart auf Floor n (1=Emerald, 2=Sapphire). Resettet alle Run-Stats; nur für Mob-/Theme-Testing.
 - `__wiz.stats()`, `__wiz.itemSystem()` — Inspect
 
 **`STARTING_COINS = 0`** in GameConfig.ts (war zwischenzeitlich 50 zum Testen). Spieler startet jetzt ohne Coins, muss alles von Gegnern + Crates + Drops sammeln.
 
 **Geplante Progression:**
 1. **Emerald Forest** (Floor 1) — implementiert inkl. 4 Bosse (Vine Lord, Mossy Behemoth, Pixie Queen, Forest Heart, random pick).
-2. **Sapphire Swamp** (Floor 2) — Phase 5 Chunk 3, Palette TBD, eigener Enemy-Roster + Boss.
-3. **Onyx Mansion** (Endgame) — Phase 5 Chunk 4, finaler Boss + Secret Endboss (gem-locked).
+2. **Sapphire Swamp** (Floor 2) — implementiert. 4 Mobs (Bog Frog, Snapper Bloom, Damselfly, Bog Tortoise), 4 Bosse (Toad Sovereign, Bloomheart, Damselfly Empress, Bog Colossus). Eigene Decos (Lily Pad + Mangroven-Wurzel) statt der Forest-Decos via `decorationStyle`-Diskriminator.
+3. **Onyx Mansion** (Endgame) — Phase 5 Chunk 4, finaler Boss + Secret Endboss (gem-locked) + Win-Screen.
 
-Weitere Edelsteinfloors (Ruby/Topaz/...) können zwischen Sapphire und Onyx ergänzt werden.
+Weitere Edelsteinfloors (Ruby/Topaz/...) können zwischen Sapphire und Onyx ergänzt werden. Floor-Reihenfolge wird in `FLOOR_ORDER` (`GameScene.ts`) gegated; Stairs verwenden den nächsten Eintrag.
+
+**Door-System:** Türen rendern kind-aware Texturen wenn geschlossen, sodass der Spieler im Kampf sieht welche Räume anschließen. `Door.barrierTextureKey()` switch:
+- `Boss` → `bossDoorKey(floorId)` (Totenkopf-Sigil, immer)
+- `Treasure` → `treasureDoorKey(floorId)` (Goldtruhe), bei `locked` → `treasureDoorLockedKey` (Truhe + Eisen-Lock-Plate mit Schlüsselloch)
+- `Shop` → `shopDoorKey(floorId)` (Goldmünze mit Tally-Marks — *nicht* "$"-Glyph, weil das beim Pixel-Scaling wie ein Schlüsselloch gelesen wurde), bei `locked` → `shopDoorLockedKey`
+- `Normal` → `normalDoorKey(floorId)` (Holzplanken-Tür mit Eisenband + Ring-Griff)
+
+Drawn in `PreloadScene` per Floor-Theme. `drawLockBadge` ist shared zwischen Treasure/Shop-Locked-Varianten.
+
+**Item-Pool-Floor-Filter:** `pickItemFromPool(pool, rng, exclude, currentFloor?)` filtert nur den Boss-Pool nach `ItemDefinition.floor`. Treasure/Shop-Items haben bewusst kein Floor-Tag (sind floor-agnostic). Beim Boss-Reward übergibt `spawnBossPoolItem` den `currentFloorId`. Items ohne `floor`-Tag werden in jedem Boss-Pool gefunden — derzeit haben aber alle 6 Boss-Items einen Floor-Tag.
 
 ---
 

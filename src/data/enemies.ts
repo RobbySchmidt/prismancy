@@ -78,6 +78,61 @@ export const ENEMIES = {
     floor: 'emerald-forest',
     coinDropChance: 0.45,
   },
+  'bog-frog': {
+    id: 'bog-frog',
+    textureKey: TextureKeys.BogFrog,
+    displayName: 'Bog Frog',
+    /** Mid-tier HP. Hops between shots, fires a fast tongue projectile. */
+    hp: 5,
+    contactDamage: 1,
+    /** Hop velocity (px/s) during the reposition hop, zero otherwise. */
+    moveSpeed: 220,
+    hitboxRadius: 12,
+    floor: 'sapphire-swamp',
+    coinDropChance: 0.5,
+  },
+  'snapper-bloom': {
+    id: 'snapper-bloom',
+    textureKey: TextureKeys.SnapperBloom,
+    displayName: 'Snapper Bloom',
+    /** Rooted, tankier than vine-sprout because the 3-thorn fan is harder to dodge. */
+    hp: 6,
+    contactDamage: 1,
+    moveSpeed: 0,
+    hitboxRadius: 14,
+    floor: 'sapphire-swamp',
+    coinDropChance: 0.7,
+  },
+  'damselfly': {
+    id: 'damselfly',
+    textureKey: TextureKeys.Damselfly,
+    displayName: 'Damselfly',
+    /** Glass cannon: low HP, fast strafing, dash-bursts twin projectiles.
+     * HP bumped from 3 → 4 in the visibility pass — at 3 HP the player
+     * was killing them too fast to register them as a distinct enemy
+     * type, on top of the cyan body blending into the Sapphire floor. */
+    hp: 4,
+    contactDamage: 1,
+    moveSpeed: 180,
+    hitboxRadius: 11,
+    floor: 'sapphire-swamp',
+    coinDropChance: 0.45,
+  },
+  'bog-tortoise': {
+    id: 'bog-tortoise',
+    textureKey: TextureKeys.BogTortoise,
+    displayName: 'Bog Tortoise',
+    /** Tankiest non-boss mob. Slow walker; periodically retracts into shell
+     * (invulnerable, brief) then pops out with a 6-thorn radial burst. */
+    hp: 8,
+    contactDamage: 1,
+    /** Walk speed handled by class with BOG_TORTOISE_WALK_SPEED — definition value
+     * matches so any future generic spawner reads it consistently. */
+    moveSpeed: 60,
+    hitboxRadius: 15,
+    floor: 'sapphire-swamp',
+    coinDropChance: 0.7,
+  },
   'boss-vine-lord': {
     id: 'boss-vine-lord',
     /**
@@ -132,6 +187,54 @@ export const ENEMIES = {
     moveSpeed: 0,
     hitboxRadius: 28,
     floor: 'emerald-forest',
+    coinDropChance: 0,
+  },
+  'boss-toad-sovereign': {
+    id: 'boss-toad-sovereign',
+    textureKey: TextureKeys.BossToadSovereign,
+    displayName: 'Toad Sovereign',
+    hp: 70,
+    contactDamage: 1,
+    /** Hop velocity — applied during each hop arc, zero between. */
+    moveSpeed: 280,
+    hitboxRadius: 22,
+    floor: 'sapphire-swamp',
+    coinDropChance: 0,
+  },
+  'boss-bloomheart': {
+    id: 'boss-bloomheart',
+    textureKey: TextureKeys.BossBloomheart,
+    displayName: 'Bloomheart',
+    hp: 60,
+    contactDamage: 1,
+    /** Rooted — physics body has moves=false in Bloomheart. */
+    moveSpeed: 0,
+    hitboxRadius: 22,
+    floor: 'sapphire-swamp',
+    coinDropChance: 0,
+  },
+  'boss-damselfly-empress': {
+    id: 'boss-damselfly-empress',
+    textureKey: TextureKeys.BossDamselflyEmpress,
+    displayName: 'Damselfly Empress',
+    hp: 50,
+    contactDamage: 1,
+    /** Dash velocity — applied during each dash, zero between. */
+    moveSpeed: 360,
+    hitboxRadius: 18,
+    floor: 'sapphire-swamp',
+    coinDropChance: 0,
+  },
+  'boss-bog-colossus': {
+    id: 'boss-bog-colossus',
+    textureKey: TextureKeys.BossBogColossus,
+    displayName: 'Bog Colossus',
+    hp: 75,
+    contactDamage: 1,
+    /** Slow walk speed — see Bog Colossus class for the shell-pop pause. */
+    moveSpeed: 50,
+    hitboxRadius: 26,
+    floor: 'sapphire-swamp',
     coinDropChance: 0,
   },
 } as const satisfies Record<string, EnemyDefinition>;

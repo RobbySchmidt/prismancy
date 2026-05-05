@@ -99,4 +99,18 @@ export class PlayerHealth {
     this.nextVulnerableAt = 0;
     EventBus.emit('player:healthChanged', { current: this.current, max: this.max });
   }
+
+  /**
+   * Restore health state from a snapshot (floor-transition carry-over).
+   * `max` may exceed the constructor default if the player picked up HP-up
+   * items on previous floors. `current` is clamped to `[0, max]`. Emits
+   * `player:healthChanged` so the HUD repaints.
+   */
+  restore(current: number, max: number): void {
+    if (max <= 0) throw new Error(`PlayerHealth.restore: max must be > 0 (got ${max})`);
+    this.max = max;
+    this.current = Math.max(0, Math.min(current, max));
+    this.nextVulnerableAt = 0;
+    EventBus.emit('player:healthChanged', { current: this.current, max: this.max });
+  }
 }

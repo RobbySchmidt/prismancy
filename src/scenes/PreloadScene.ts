@@ -10,9 +10,12 @@ import {
   floorTileKey,
   gemTextureKey,
   mushroomDecoKey,
+  normalDoorKey,
   rockDecoKey,
   shopDoorKey,
+  shopDoorLockedKey,
   treasureDoorKey,
+  treasureDoorLockedKey,
   treeDecoKey,
   wallTileKey,
 } from '../config/GameConfig';
@@ -80,6 +83,14 @@ export class PreloadScene extends Phaser.Scene {
     this.drawMossySlimeTexture(g);
     this.drawVineSproutTexture(g);
     this.drawPixieDancerTexture(g);
+    this.drawBogFrogTexture(g);
+    this.drawSnapperBloomTexture(g);
+    this.drawDamselflyTexture(g);
+    this.drawBogTortoiseTexture(g);
+    this.drawBossToadSovereignTexture(g);
+    this.drawBossBloomheartTexture(g);
+    this.drawBossDamselflyEmpressTexture(g);
+    this.drawBossBogColossusTexture(g);
     this.drawBossMossyBehemothTexture(g);
     this.drawBossPixieQueenTexture(g);
     this.drawBossForestHeartTexture(g);
@@ -101,16 +112,32 @@ export class PreloadScene extends Phaser.Scene {
     this.drawItemCrownOfTheVineTexture(g);
     this.drawItemAncientHeartTexture(g);
     this.drawItemWitheredFangTexture(g);
+    this.drawItemSpyglassTexture(g);
+    this.drawItemLilyDiademTexture(g);
+    this.drawItemMirePearlTexture(g);
+    this.drawItemFrogTongueTexture(g);
+    this.drawStairsTexture(g);
 
     for (const theme of Object.values(FLOORS)) {
       this.drawFloorTextures(g, theme);
       this.drawWallTexture(g, theme);
       this.drawBossDoorTexture(g, theme);
-      this.drawTreasureDoorTexture(g, theme);
-      this.drawShopDoorTexture(g, theme);
+      this.drawNormalDoorTexture(g, theme);
+      this.drawTreasureDoorTexture(g, theme, false);
+      this.drawTreasureDoorTexture(g, theme, true);
+      this.drawShopDoorTexture(g, theme, false);
+      this.drawShopDoorTexture(g, theme, true);
       this.drawMushroomTexture(g, theme);
-      this.drawRockTexture(g, theme);
-      this.drawTreeTexture(g, theme);
+      // Swamp floors use lily pads + mangrove roots in place of trees + rocks.
+      // Both variants write to the same texture keys (treeDecoKey / rockDecoKey)
+      // so the consumer (Room) doesn't need to know which silhouette it got.
+      if (theme.decorationStyle === 'swamp') {
+        this.drawLilyPadTexture(g, theme);
+        this.drawMangroveRootTexture(g, theme);
+      } else {
+        this.drawRockTexture(g, theme);
+        this.drawTreeTexture(g, theme);
+      }
       this.drawGemTexture(g, theme);
     }
 
@@ -617,11 +644,123 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   /**
-   * Treasure door — same chiseled stone frame as the boss door but the
-   * sigil center is a golden padlock (gold body + dark keyhole) so the
-   * player can read at a glance "key required, item room beyond".
+   * Normal-room door — same chiseled stone frame as the special doors, but
+   * the inset is a plain wooden plank panel with iron straps and a small
+   * iron handle. No corner studs (those are reserved for special rooms) so
+   * the player can read at a glance "ordinary door, just walk through when
+   * the room is cleared".
    */
-  private drawTreasureDoorTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
+  private drawNormalDoorTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
+    const { wallBase, ambient } = theme.palette;
+    const cx = TILE_SIZE / 2;
+    const cy = TILE_SIZE / 2;
+
+    g.clear();
+
+    // Dark base
+    g.fillStyle(0x14080a, 1);
+    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+    // Stone frame matching the wall theme so the door reads as set into the wall
+    g.fillStyle(wallBase, 1);
+    g.fillRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    g.fillStyle(ambient, 1);
+    g.fillRect(6, 6, TILE_SIZE - 12, TILE_SIZE - 12);
+
+    // Frame highlight + shadow strips for chiseled feel
+    g.fillStyle(0x4a3a2a, 1);
+    g.fillRect(2, 2, TILE_SIZE - 4, 2);
+    g.fillRect(2, 2, 2, TILE_SIZE - 4);
+    g.fillStyle(0x080404, 1);
+    g.fillRect(2, TILE_SIZE - 4, TILE_SIZE - 4, 2);
+    g.fillRect(TILE_SIZE - 4, 2, 2, TILE_SIZE - 4);
+
+    // Wooden plank panel inside the frame
+    const woodLeft = 8;
+    const woodTop = 8;
+    const woodRight = TILE_SIZE - 8;
+    const woodBottom = TILE_SIZE - 8;
+    const woodW = woodRight - woodLeft; // 48
+    const woodH = woodBottom - woodTop; // 48
+
+    g.fillStyle(0x4a2e16, 1);
+    g.fillRect(woodLeft, woodTop, woodW, woodH);
+    // Wood-grain highlight rows
+    g.fillStyle(0x6a3e1e, 1);
+    g.fillRect(woodLeft + 1, woodTop + 1, woodW - 2, 1);
+    g.fillRect(woodLeft + 1, woodTop + woodH - 3, woodW - 2, 1);
+    // Wood-grain shadow row at the bottom
+    g.fillStyle(0x2e1a0a, 1);
+    g.fillRect(woodLeft + 1, woodTop + woodH - 2, woodW - 2, 1);
+
+    // Vertical plank seams (3 planks → 2 seams)
+    const seam1 = woodLeft + Math.floor(woodW / 3); // 24
+    const seam2 = woodLeft + Math.floor((woodW * 2) / 3); // 40
+    g.fillStyle(0x2e1a0a, 1);
+    g.fillRect(seam1, woodTop + 1, 1, woodH - 2);
+    g.fillRect(seam2, woodTop + 1, 1, woodH - 2);
+    g.fillStyle(0x6a3e1e, 1);
+    g.fillRect(seam1 + 1, woodTop + 1, 1, woodH - 2);
+    g.fillRect(seam2 + 1, woodTop + 1, 1, woodH - 2);
+
+    // Iron straps (top + bottom)
+    const strapH = 4;
+    const strapTopY = woodTop + 4;
+    const strapBotY = woodBottom - 4 - strapH;
+    g.fillStyle(0x1a1a22, 1);
+    g.fillRect(woodLeft, strapTopY, woodW, strapH);
+    g.fillRect(woodLeft, strapBotY, woodW, strapH);
+    g.fillStyle(0x3a3a44, 1);
+    g.fillRect(woodLeft, strapTopY, woodW, 1);
+    g.fillRect(woodLeft, strapBotY, woodW, 1);
+    g.fillStyle(0x080808, 1);
+    g.fillRect(woodLeft, strapTopY + strapH - 1, woodW, 1);
+    g.fillRect(woodLeft, strapBotY + strapH - 1, woodW, 1);
+
+    // Rivets on the straps
+    const rivet = (sx: number, sy: number): void => {
+      g.fillStyle(0x080808, 1);
+      g.fillRect(sx, sy, 2, 2);
+      g.fillStyle(0x7a7a84, 1);
+      g.fillRect(sx, sy, 1, 1);
+    };
+    rivet(woodLeft + 2, strapTopY + 1);
+    rivet(woodRight - 4, strapTopY + 1);
+    rivet(woodLeft + 2, strapBotY + 1);
+    rivet(woodRight - 4, strapBotY + 1);
+
+    // Iron handle ring on the right side, between the straps
+    const handleX = cx + 10;
+    const handleY = cy;
+    g.fillStyle(0x080808, 1);
+    g.fillCircle(handleX, handleY, 4);
+    g.fillStyle(0x3a3a44, 1);
+    g.fillCircle(handleX, handleY, 3);
+    g.fillStyle(0x7a7a84, 1);
+    g.fillRect(handleX - 1, handleY - 3, 1, 1);
+    // Hole through the ring (lets the wood show through)
+    g.fillStyle(0x4a2e16, 1);
+    g.fillCircle(handleX, handleY, 1);
+
+    // Outline
+    g.lineStyle(2, 0x000000, 1);
+    g.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+    g.generateTexture(normalDoorKey(theme.id), TILE_SIZE, TILE_SIZE);
+  }
+
+  /**
+   * Treasure door — chiseled stone frame with a golden treasure chest as the
+   * center sigil so the player reads "item room beyond" at a glance, even
+   * during combat. When `locked`, an iron lock plate with a keyhole is
+   * stamped over the lower part of the door — that's the visual cue from
+   * floor 2 onwards that this door consumes a key.
+   */
+  private drawTreasureDoorTexture(
+    g: Phaser.GameObjects.Graphics,
+    theme: FloorTheme,
+    locked: boolean,
+  ): void {
     const { wallBase, ambient } = theme.palette;
     const cx = TILE_SIZE / 2;
     const cy = TILE_SIZE / 2;
@@ -658,54 +797,131 @@ export class PreloadScene extends Phaser.Scene {
     stud(4, TILE_SIZE - 8);
     stud(TILE_SIZE - 8, TILE_SIZE - 8);
 
-    // Gold halo behind the lock
+    // Gold halo behind the chest
     g.fillStyle(0xffd84a, 0.18);
     g.fillCircle(cx, cy, 16);
-    g.fillStyle(0xffd84a, 0.32);
+    g.fillStyle(0xffd84a, 0.28);
     g.fillCircle(cx, cy, 11);
 
-    // Shackle (the curved bar on top of the lock body) — drawn as a thick
-    // semicircle minus the inner cutout.
-    g.fillStyle(0x7a5a1a, 1);
-    g.fillCircle(cx, cy - 2, 7);
-    g.fillStyle(0xffd84a, 1);
-    g.fillCircle(cx, cy - 2, 6);
-    g.fillStyle(ambient, 1);
-    g.fillCircle(cx, cy - 2, 4);
-    // Cut the bottom of the shackle so it sits on the lock body
-    g.fillStyle(ambient, 1);
-    g.fillRect(cx - 7, cy, 14, 4);
+    // Treasure chest body — wooden box with gold trim and a clasp.
+    const chestLeft = cx - 11;
+    const chestRight = cx + 11;
+    const chestTop = cy - 8;
+    const chestBottom = cy + 9;
+    const chestW = chestRight - chestLeft; // 22
+    const chestH = chestBottom - chestTop; // 17
+    const lidH = 6;
 
-    // Lock body — chunky rectangle below the shackle
+    // Outline / shadow behind the chest
     g.fillStyle(0x080404, 1);
-    g.fillRect(cx - 7, cy - 1, 14, 11);
-    g.fillStyle(0x7a5a1a, 1);
-    g.fillRect(cx - 6, cy, 12, 9);
-    g.fillStyle(0xffd84a, 1);
-    g.fillRect(cx - 5, cy + 1, 10, 7);
-    // Top highlight on the lock
-    g.fillStyle(0xfff0a0, 1);
-    g.fillRect(cx - 5, cy + 1, 10, 1);
-    g.fillRect(cx - 5, cy + 1, 1, 6);
+    g.fillRect(chestLeft - 1, chestTop - 1, chestW + 2, chestH + 2);
+    // Body wood (lower half)
+    g.fillStyle(0x4a2e16, 1);
+    g.fillRect(chestLeft, chestTop, chestW, chestH);
+    // Lid wood (slightly lighter)
+    g.fillStyle(0x6a3e1e, 1);
+    g.fillRect(chestLeft, chestTop, chestW, lidH);
+    // Top highlight on the lid
+    g.fillStyle(0x8a5a2e, 1);
+    g.fillRect(chestLeft + 1, chestTop, chestW - 2, 1);
+    // Lid seam shadow
+    g.fillStyle(0x1a0a04, 1);
+    g.fillRect(chestLeft, chestTop + lidH, chestW, 1);
+    // Vertical plank seams on the body
+    g.fillStyle(0x2e1a0a, 1);
+    g.fillRect(cx - 5, chestTop + lidH + 2, 1, chestH - lidH - 4);
+    g.fillRect(cx + 4, chestTop + lidH + 2, 1, chestH - lidH - 4);
 
-    // Keyhole — dark circle + tail
-    g.fillStyle(0x14080a, 1);
-    g.fillCircle(cx, cy + 3, 2);
-    g.fillRect(cx - 1, cy + 3, 2, 4);
+    // Gold corner brackets (top + bottom of the chest)
+    const bracket = (sx: number, sy: number): void => {
+      g.fillStyle(0x7a5a1a, 1);
+      g.fillRect(sx, sy, 3, 3);
+      g.fillStyle(0xffd84a, 1);
+      g.fillRect(sx, sy, 2, 2);
+      g.fillStyle(0xfff0a0, 1);
+      g.fillRect(sx, sy, 1, 1);
+    };
+    bracket(chestLeft, chestTop);
+    bracket(chestRight - 3, chestTop);
+    bracket(chestLeft, chestBottom - 3);
+    bracket(chestRight - 3, chestBottom - 3);
+
+    // Front clasp — small gold plate straddling the lid seam
+    g.fillStyle(0x080404, 1);
+    g.fillRect(cx - 3, chestTop + lidH - 1, 6, 5);
+    g.fillStyle(0x7a5a1a, 1);
+    g.fillRect(cx - 2, chestTop + lidH - 1, 4, 4);
+    g.fillStyle(0xffd84a, 1);
+    g.fillRect(cx - 2, chestTop + lidH - 1, 3, 3);
+    g.fillStyle(0xfff0a0, 1);
+    g.fillRect(cx - 2, chestTop + lidH - 1, 1, 1);
+
+    if (locked) {
+      this.drawLockBadge(g);
+    }
 
     // Outline
     g.lineStyle(2, 0x000000, 1);
     g.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-    g.generateTexture(treasureDoorKey(theme.id), TILE_SIZE, TILE_SIZE);
+    g.generateTexture(
+      locked ? treasureDoorLockedKey(theme.id) : treasureDoorKey(theme.id),
+      TILE_SIZE,
+      TILE_SIZE,
+    );
+  }
+
+  /**
+   * Iron lock plate with a keyhole, stamped over the lower portion of a
+   * special-room door to communicate "key required". Reused by both the
+   * locked treasure and locked shop doors so the visual language stays
+   * consistent.
+   */
+  private drawLockBadge(g: Phaser.GameObjects.Graphics): void {
+    const cx = TILE_SIZE / 2;
+    const plateW = 16;
+    const plateH = 13;
+    const plateLeft = cx - plateW / 2; // 24
+    const plateTop = TILE_SIZE - 18; // 46
+
+    // Plate shadow / dark border
+    g.fillStyle(0x080404, 1);
+    g.fillRect(plateLeft, plateTop, plateW, plateH);
+    // Iron face
+    g.fillStyle(0x363842, 1);
+    g.fillRect(plateLeft + 1, plateTop + 1, plateW - 2, plateH - 2);
+    // Top highlight
+    g.fillStyle(0x5a5a64, 1);
+    g.fillRect(plateLeft + 1, plateTop + 1, plateW - 2, 1);
+    g.fillRect(plateLeft + 1, plateTop + 1, 1, plateH - 2);
+    // Bottom shadow
+    g.fillStyle(0x14141c, 1);
+    g.fillRect(plateLeft + 1, plateTop + plateH - 2, plateW - 2, 1);
+    // Rivets (top corners of plate)
+    g.fillStyle(0x7a7a84, 1);
+    g.fillRect(plateLeft + 2, plateTop + 2, 1, 1);
+    g.fillRect(plateLeft + plateW - 3, plateTop + 2, 1, 1);
+
+    // Keyhole — bold black circle + tail, centered on the plate
+    const khCx = cx;
+    const khCy = plateTop + 5;
+    g.fillStyle(0x000000, 1);
+    g.fillCircle(khCx, khCy, 2);
+    g.fillRect(khCx - 1, khCy + 1, 2, 5);
   }
 
   /**
    * Shop door — wooden brown accents on the chiseled stone frame, with a
    * stylised gold coin in the center (concentric circles + a "$" mark) so
-   * the player reads "store / merchant" at a glance.
+   * the player reads "store / merchant" at a glance. When `locked`, the
+   * iron keyhole plate is stamped over the lower part to signal "consumes a
+   * key" from floor 2 onwards.
    */
-  private drawShopDoorTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
+  private drawShopDoorTexture(
+    g: Phaser.GameObjects.Graphics,
+    theme: FloorTheme,
+    locked: boolean,
+  ): void {
     const { wallBase, ambient } = theme.palette;
     const cx = TILE_SIZE / 2;
     const cy = TILE_SIZE / 2;
@@ -770,20 +986,32 @@ export class PreloadScene extends Phaser.Scene {
     // Top-left highlight on the coin
     g.fillStyle(0xfff0a0, 0.8);
     g.fillCircle(cx - 2, cy - 2, 2);
-
-    // "$" mark — pixel-style. Three short bars forming an S + a vertical line.
+    // Sparkle accent at the top-right edge of the coin
+    g.fillStyle(0xfff0a0, 1);
+    g.fillRect(cx + 3, cy - 3, 1, 1);
+    g.fillRect(cx + 4, cy - 2, 1, 1);
+    // Tiny tally marks on the coin face — three short horizontal dashes.
+    // (Replaces the old "$" glyph which, at this pixel scale, read as a
+    // keyhole silhouette: thick middle block + thin top/bottom tails.)
     const dark = 0x14080a;
     g.fillStyle(dark, 1);
-    g.fillRect(cx - 1, cy - 5, 2, 11); // vertical bar
-    g.fillRect(cx - 3, cy - 3, 6, 2);  // top bar
-    g.fillRect(cx - 3, cy - 1, 6, 2);  // mid bar (offset for S-curve feel)
-    g.fillRect(cx - 3, cy + 1, 6, 2);  // bottom bar
+    g.fillRect(cx - 3, cy - 1, 6, 1);
+    g.fillRect(cx - 3, cy + 1, 6, 1);
+    g.fillRect(cx - 3, cy + 3, 4, 1);
+
+    if (locked) {
+      this.drawLockBadge(g);
+    }
 
     // Outline
     g.lineStyle(2, 0x000000, 1);
     g.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-    g.generateTexture(shopDoorKey(theme.id), TILE_SIZE, TILE_SIZE);
+    g.generateTexture(
+      locked ? shopDoorLockedKey(theme.id) : shopDoorKey(theme.id),
+      TILE_SIZE,
+      TILE_SIZE,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -959,6 +1187,184 @@ export class PreloadScene extends Phaser.Scene {
     g.fillEllipse(cx, 24, 20, 6);
 
     g.generateTexture(treeDecoKey(theme.id), w, h);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lily Pad decoration (swamp-style replacement for tree)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Top-down lily pad — flat oval body with radial veins, a small
+   * pink-white bloom growing out one side, and a couple of sapphire-glow
+   * water droplets. Sits on the same `treeDecoKey(theme.id)` slot the
+   * forest tree uses, so swamp floors can reuse the existing scatter logic.
+   */
+  private drawLilyPadTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
+    const w = 36;
+    const h = 32;
+    const cx = w / 2;
+    const cy = h / 2 + 2; // body sits slightly low so the bloom has room on top
+    const { glow } = theme.palette;
+
+    g.clear();
+
+    // Soft shadow underneath the pad
+    this.groundShadow(g, cx, cy + 5, 14, 3, 0.4);
+
+    // Pad body — outlined ellipse with three tone bands
+    g.fillStyle(0x040c10, 1);
+    g.fillEllipse(cx, cy, 30, 16);
+    g.fillStyle(0x1f4a4a, 1); // dark teal pad
+    g.fillEllipse(cx, cy, 28, 14);
+    g.fillStyle(0x2c7060, 1); // mid teal
+    g.fillEllipse(cx, cy - 1, 24, 11);
+    // Top-left highlight band
+    g.fillStyle(0x4ea66a, 1);
+    g.fillEllipse(cx - 5, cy - 3, 12, 4);
+
+    // Radial dark veins from the center (fanning outward).
+    g.lineStyle(1, 0x0a1820, 0.85);
+    const veinAngles = [
+      Math.PI * 0.15,
+      Math.PI * 0.5,
+      Math.PI * 0.85,
+      -Math.PI * 0.15,
+      -Math.PI * 0.5,
+      -Math.PI * 0.85,
+    ];
+    for (const a of veinAngles) {
+      g.beginPath();
+      g.moveTo(cx, cy);
+      g.lineTo(cx + Math.cos(a) * 13, cy + Math.sin(a) * 6);
+      g.strokePath();
+    }
+
+    // Lily bloom on top — small white-pink rosette with yellow center.
+    const bloomY = cy - 7;
+    g.fillStyle(0x081020, 1); // outline
+    g.fillCircle(cx, bloomY, 5);
+    // Petals — 4 directional + 4 diagonal, two-tone
+    const petal = (sx: number, sy: number, color: number): void => {
+      g.fillStyle(color, 1);
+      g.fillCircle(sx, sy, 1.8);
+    };
+    petal(cx, bloomY - 3, 0xffffff);
+    petal(cx + 3, bloomY, 0xffffff);
+    petal(cx, bloomY + 3, 0xffffff);
+    petal(cx - 3, bloomY, 0xffffff);
+    petal(cx + 2, bloomY - 2, 0xffd0e0);
+    petal(cx - 2, bloomY - 2, 0xffd0e0);
+    petal(cx + 2, bloomY + 2, 0xffd0e0);
+    petal(cx - 2, bloomY + 2, 0xffd0e0);
+    // Yellow stamen center + sparkle
+    g.fillStyle(0xffd84a, 1);
+    g.fillCircle(cx, bloomY, 1.4);
+    g.fillStyle(0xfff8a0, 1);
+    g.fillRect(cx, bloomY - 1, 1, 1);
+
+    // Sapphire glow droplets — small beads of water on the pad surface.
+    g.fillStyle(glow, 0.95);
+    g.fillCircle(cx + 8, cy + 1, 1.2);
+    g.fillCircle(cx - 7, cy + 2, 1.0);
+    g.fillStyle(0xffffff, 0.85);
+    g.fillRect(cx + 8, cy, 1, 1);
+
+    g.generateTexture(treeDecoKey(theme.id), w, h);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mangrove Root decoration (swamp-style replacement for rock)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Tangled mangrove-root / liana cluster — three thick curved root bands
+   * radiating from a central knot, with sapphire-glow nodes at the bends
+   * and a couple of algae strands draped between them. Sits on the
+   * `rockDecoKey(theme.id)` slot.
+   */
+  private drawMangroveRootTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
+    const w = 36;
+    const h = 28;
+    const cx = w / 2;
+    const cy = h / 2 + 1;
+    const { glow } = theme.palette;
+
+    g.clear();
+
+    // Drop shadow underneath
+    this.groundShadow(g, cx, cy + 5, w / 2 - 2, 2.5, 0.5);
+
+    // Root bands — drawn as overlapping rotated thick capsules. Each is
+    // outline + dark fill + lighter highlight on top.
+    const drawRoot = (
+      ax: number,
+      ay: number,
+      bx: number,
+      by: number,
+      thickness: number,
+    ): void => {
+      // Outline
+      g.lineStyle(thickness + 2, 0x0a0a0a, 1);
+      g.beginPath();
+      g.moveTo(ax, ay);
+      g.lineTo(bx, by);
+      g.strokePath();
+      // Body (dark woody brown)
+      g.lineStyle(thickness, 0x2a1a0e, 1);
+      g.beginPath();
+      g.moveTo(ax, ay);
+      g.lineTo(bx, by);
+      g.strokePath();
+      // Highlight strip (lighter brown — top side)
+      g.lineStyle(Math.max(1, thickness - 3), 0x5a3a1e, 1);
+      g.beginPath();
+      g.moveTo(ax, ay - 0.5);
+      g.lineTo(bx, by - 0.5);
+      g.strokePath();
+    };
+
+    // Three root bands fanning out from the central knot.
+    drawRoot(cx, cy, cx - 14, cy + 4, 6); // left
+    drawRoot(cx, cy, cx + 14, cy + 5, 6); // right
+    drawRoot(cx, cy, cx - 6, cy - 8, 5);  // upper-left curling
+    drawRoot(cx, cy, cx + 7, cy - 7, 5);  // upper-right curling
+
+    // Central knot — a darker chunky disc that ties the roots together.
+    g.fillStyle(0x080404, 1);
+    g.fillCircle(cx, cy, 5);
+    g.fillStyle(0x2a1a0e, 1);
+    g.fillCircle(cx, cy, 4);
+    g.fillStyle(0x4a2e16, 1);
+    g.fillCircle(cx - 1, cy - 1, 2);
+
+    // Sapphire glow nodes — at the joints where roots branch.
+    const glowNode = (sx: number, sy: number): void => {
+      g.fillStyle(0x080404, 1);
+      g.fillCircle(sx, sy, 2);
+      g.fillStyle(glow, 1);
+      g.fillCircle(sx, sy, 1.4);
+      g.fillStyle(0xffffff, 0.8);
+      g.fillRect(sx, sy - 1, 1, 1);
+    };
+    glowNode(cx - 8, cy);
+    glowNode(cx + 8, cy);
+    glowNode(cx - 3, cy - 5);
+    glowNode(cx + 3, cy - 4);
+
+    // Algae strands — thin teal threads draped across two of the roots.
+    g.lineStyle(1, glow, 0.55);
+    g.beginPath();
+    g.moveTo(cx - 11, cy + 2);
+    g.lineTo(cx - 9, cy + 5);
+    g.lineTo(cx - 5, cy + 6);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(cx + 6, cy + 6);
+    g.lineTo(cx + 10, cy + 5);
+    g.lineTo(cx + 13, cy + 7);
+    g.strokePath();
+
+    g.generateTexture(rockDecoKey(theme.id), w, h);
   }
 
   // ---------------------------------------------------------------------------
@@ -1320,6 +1726,619 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(cx - 11, cy - 9, 1, 1);
 
     g.generateTexture(TextureKeys.PixieDancer, size, size);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bog Frog (Floor 2)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Squat round frog with bulging eyes and a pink tongue. Built from
+   * outlined ellipses + spots in the sapphire-swamp palette so it reads
+   * as a swamp creature when placed against the floor 2 background.
+   */
+  private drawBogFrogTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 36;
+    const h = 32;
+    const cx = w / 2;
+    const cy = h / 2;
+    g.clear();
+
+    // Soft cyan glow halo so the frog reads as a swamp critter under the
+    // sapphire palette's blue-tinted ambient lighting.
+    g.fillStyle(0x4ad8ff, 0.15);
+    g.fillEllipse(cx, cy + 1, w - 6, h - 8);
+
+    // Ground shadow
+    this.groundShadow(g, cx, h - 4, 11, 2.5, 0.5);
+
+    // Body — outline + fill + highlight
+    g.fillStyle(0x0e2a18, 1);
+    g.fillEllipse(cx, cy + 3, 24, 18);
+    g.fillStyle(0x2c6e44, 1);
+    g.fillEllipse(cx, cy + 3, 22, 16);
+    g.fillStyle(0x4ea66a, 1);
+    g.fillEllipse(cx - 4, cy, 10, 6);
+
+    // Belly (lighter underside)
+    g.fillStyle(0x7eccaa, 0.7);
+    g.fillEllipse(cx, cy + 7, 16, 6);
+
+    // Spots (darker green-blue speckle)
+    g.fillStyle(0x183c28, 1);
+    g.fillCircle(cx + 5, cy - 1, 1.5);
+    g.fillCircle(cx - 6, cy + 4, 1.5);
+    g.fillCircle(cx + 7, cy + 4, 1.2);
+    g.fillCircle(cx - 2, cy + 1, 1.2);
+
+    // Eye sockets (raised bumps on the head)
+    g.fillStyle(0x0e2a18, 1);
+    g.fillCircle(cx - 5, cy - 5, 4.5);
+    g.fillCircle(cx + 5, cy - 5, 4.5);
+    g.fillStyle(0x4ea66a, 1);
+    g.fillCircle(cx - 5, cy - 5, 3.5);
+    g.fillCircle(cx + 5, cy - 5, 3.5);
+    // Yellow eye + black pupil + sparkle
+    g.fillStyle(0xfff0a0, 1);
+    g.fillCircle(cx - 5, cy - 5, 2.5);
+    g.fillCircle(cx + 5, cy - 5, 2.5);
+    g.fillStyle(0x111111, 1);
+    g.fillCircle(cx - 5, cy - 5, 1.3);
+    g.fillCircle(cx + 5, cy - 5, 1.3);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(cx - 6, cy - 6, 1, 1);
+    g.fillRect(cx + 4, cy - 6, 1, 1);
+
+    // Mouth — thin dark line + pink tongue tip
+    g.fillStyle(0x111111, 1);
+    g.fillRect(cx - 4, cy + 1, 8, 1);
+    g.fillStyle(0xff7aa0, 1);
+    g.fillRect(cx - 1, cy + 1, 2, 2);
+
+    g.generateTexture(TextureKeys.BogFrog, w, h);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Snapper Bloom (Floor 2, rooted)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Venus-flytrap-style rooted enemy. Stem is dark teal/blue, the bulbous
+   * head is a cracked-open mouth in violet-pink with white tooth pixels.
+   * Outlined like the rest so it sits in the floor 2 palette.
+   */
+  private drawSnapperBloomTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 36;
+    const h = 44;
+    const cx = w / 2;
+    g.clear();
+
+    // Ground shadow at the base
+    this.groundShadow(g, cx, h - 3, 9, 2.5, 0.5);
+
+    // Root mound
+    g.fillStyle(0x040810, 1);
+    g.fillEllipse(cx, h - 5, 20, 10);
+    g.fillStyle(0x1a2230, 1);
+    g.fillEllipse(cx, h - 5, 18, 8);
+    g.fillStyle(0x2c3e58, 1);
+    g.fillEllipse(cx - 3, h - 6, 6, 2);
+
+    // Stem — three shaded tones
+    g.fillStyle(0x040810, 1);
+    g.fillRect(cx - 3, h - 22, 6, 18);
+    g.fillStyle(0x1f3848, 1);
+    g.fillRect(cx - 2, h - 22, 4, 18);
+    g.fillStyle(0x3a607a, 1);
+    g.fillRect(cx - 2, h - 22, 1, 18);
+
+    // Side leaves (small fronds)
+    g.fillStyle(0x040810, 1);
+    g.fillEllipse(cx - 8, h - 16, 8, 4);
+    g.fillEllipse(cx + 8, h - 18, 8, 4);
+    g.fillStyle(0x2c6e6e, 1);
+    g.fillEllipse(cx - 8, h - 16, 7, 3);
+    g.fillEllipse(cx + 8, h - 18, 7, 3);
+
+    // Bulb / head — outlined
+    const headY = h - 28;
+    g.fillStyle(0x0a0410, 1);
+    g.fillEllipse(cx, headY, 22, 18);
+    // Outer petals (violet)
+    g.fillStyle(0x5a1f7a, 1);
+    g.fillEllipse(cx, headY, 20, 16);
+    g.fillStyle(0x7a3fbe, 1);
+    g.fillEllipse(cx - 3, headY - 2, 8, 5);
+
+    // Mouth opening — dark cleft + white tooth pixels
+    g.fillStyle(0x14040a, 1);
+    g.fillEllipse(cx, headY + 1, 14, 6);
+    g.fillStyle(0xff5aa8, 1);
+    g.fillEllipse(cx, headY + 1, 11, 4);
+    // Tooth ring
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(cx - 5, headY - 1, 1, 2);
+    g.fillRect(cx - 2, headY - 2, 1, 2);
+    g.fillRect(cx + 1, headY - 2, 1, 2);
+    g.fillRect(cx + 4, headY - 1, 1, 2);
+    g.fillRect(cx - 5, headY + 2, 1, 2);
+    g.fillRect(cx - 2, headY + 3, 1, 2);
+    g.fillRect(cx + 1, headY + 3, 1, 2);
+    g.fillRect(cx + 4, headY + 2, 1, 2);
+
+    // Glowing inner pupil — single sapphire dot in the throat
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(cx, headY + 1, 1.4);
+
+    g.generateTexture(TextureKeys.SnapperBloom, w, h);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Damselfly (Floor 2)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Long-bodied dragonfly silhouette: thin segmented body, four translucent
+   * wings, oversized compound eye + warm magenta-pink accents so the
+   * sprite pops against the cool Sapphire-Swamp palette instead of
+   * disappearing into it.
+   */
+  private drawDamselflyTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 44;
+    const h = 28;
+    const cx = w / 2;
+    const cy = h / 2;
+    g.clear();
+
+    // Pink-magenta glow halo (warm contrast vs the cool floor)
+    g.fillStyle(0xff7aa0, 0.2);
+    g.fillEllipse(cx, cy, w - 4, h - 6);
+
+    // Wings — translucent with magenta tips for visibility
+    const wing = (sx: number, sy: number, rx: number, ry: number): void => {
+      g.fillStyle(0xffd0e0, 0.5);
+      g.fillEllipse(sx, sy, rx * 2, ry * 2);
+      g.fillStyle(0xff7aa0, 0.55);
+      g.fillEllipse(sx + (sx > cx ? 2 : -2), sy, rx, ry * 0.7);
+      g.lineStyle(1, 0xa83458, 0.8);
+      g.strokeEllipse(sx, sy, rx * 2, ry * 2);
+    };
+    wing(cx - 6, cy - 6, 7, 3);
+    wing(cx + 6, cy - 6, 7, 3);
+    wing(cx - 8, cy + 5, 7, 3);
+    wing(cx + 8, cy + 5, 7, 3);
+
+    // Body — long horizontal capsule, warm orange highlight
+    g.fillStyle(0x140820, 1);
+    g.fillEllipse(cx, cy, 30, 7);
+    g.fillStyle(0x4a1a4a, 1);
+    g.fillEllipse(cx, cy, 28, 5);
+    g.fillStyle(0xff7aa0, 1);
+    g.fillEllipse(cx, cy - 1, 22, 2);
+    // Bright segment dots
+    g.fillStyle(0xffd84a, 1);
+    g.fillRect(cx - 8, cy - 1, 2, 1);
+    g.fillRect(cx, cy - 1, 2, 1);
+    g.fillRect(cx + 7, cy - 1, 2, 1);
+
+    // Head bulb (warmer)
+    g.fillStyle(0x140820, 1);
+    g.fillCircle(cx - 14, cy, 4.5);
+    g.fillStyle(0x6a204a, 1);
+    g.fillCircle(cx - 14, cy, 3.5);
+    // Compound eye — yellow for contrast
+    g.fillStyle(0xffd84a, 1);
+    g.fillCircle(cx - 15, cy - 1, 2);
+    g.fillStyle(0x111111, 1);
+    g.fillCircle(cx - 15, cy - 1, 1);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(cx - 16, cy - 2, 1, 1);
+
+    // Tail tip — bright pink
+    g.fillStyle(0xff7aa0, 1);
+    g.fillRect(cx + 13, cy - 1, 3, 2);
+    g.fillStyle(0xffd84a, 1);
+    g.fillRect(cx + 14, cy - 1, 1, 1);
+
+    g.generateTexture(TextureKeys.Damselfly, w, h);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bog Tortoise (Floor 2)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Wide low-slung tortoise: dark purple shell with sapphire-blue plate
+   * spots, head + four stubby feet poking out, ground shadow underneath.
+   */
+  private drawBogTortoiseTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 40;
+    const h = 32;
+    const cx = w / 2;
+    const cy = h / 2;
+    g.clear();
+
+    // Ground shadow
+    this.groundShadow(g, cx, h - 4, 14, 3, 0.55);
+
+    // Feet (four stubby legs)
+    const foot = (sx: number, sy: number): void => {
+      g.fillStyle(0x080410, 1);
+      g.fillEllipse(sx, sy, 6, 4);
+      g.fillStyle(0x2c3e58, 1);
+      g.fillEllipse(sx, sy, 4, 3);
+    };
+    foot(cx - 12, cy + 6);
+    foot(cx + 12, cy + 6);
+    foot(cx - 9, cy + 8);
+    foot(cx + 9, cy + 8);
+
+    // Head — peeks out left side
+    g.fillStyle(0x080410, 1);
+    g.fillEllipse(cx - 14, cy, 8, 6);
+    g.fillStyle(0x2a4a3a, 1);
+    g.fillEllipse(cx - 14, cy, 6, 5);
+    // Eye
+    g.fillStyle(0x111111, 1);
+    g.fillCircle(cx - 16, cy - 1, 1.3);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(cx - 16, cy - 2, 1, 1);
+
+    // Shell — dark purple dome with outline
+    g.fillStyle(0x0a0410, 1);
+    g.fillEllipse(cx, cy - 2, 26, 18);
+    g.fillStyle(0x3a1a5a, 1);
+    g.fillEllipse(cx, cy - 2, 24, 16);
+    // Shell highlight strip
+    g.fillStyle(0x6a3aa0, 1);
+    g.fillEllipse(cx - 4, cy - 6, 10, 4);
+
+    // Sapphire shell plates — six glowing spots
+    const plate = (sx: number, sy: number): void => {
+      g.fillStyle(0x080410, 1);
+      g.fillCircle(sx, sy, 2.6);
+      g.fillStyle(0x4ad8ff, 1);
+      g.fillCircle(sx, sy, 1.8);
+      g.fillStyle(0xffffff, 0.85);
+      g.fillRect(sx - 1, sy - 1, 1, 1);
+    };
+    plate(cx - 7, cy - 4);
+    plate(cx, cy - 5);
+    plate(cx + 7, cy - 4);
+    plate(cx - 5, cy + 1);
+    plate(cx + 5, cy + 1);
+    plate(cx, cy + 3);
+
+    g.generateTexture(TextureKeys.BogTortoise, w, h);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Boss: Toad Sovereign (Sapphire Swamp)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Toad Sovereign — beefier swamp-frog silhouette with a gold crown + sapphire
+   * gemstone, four bright eyes (boss-y), darker teal body. Same canvas as the
+   * mob's so the boss reads as "same shape, more menacing".
+   */
+  private drawBossToadSovereignTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 48;
+    const h = 44;
+    const cx = w / 2;
+    const cy = h / 2;
+    g.clear();
+
+    g.fillStyle(0x4ad8ff, 0.18);
+    g.fillEllipse(cx, cy + 2, w - 6, h - 8);
+
+    this.groundShadow(g, cx, h - 4, 16, 3, 0.55);
+
+    // Body
+    g.fillStyle(0x06160e, 1);
+    g.fillEllipse(cx, cy + 5, 36, 26);
+    g.fillStyle(0x1f5a36, 1);
+    g.fillEllipse(cx, cy + 5, 34, 24);
+    g.fillStyle(0x4ea66a, 1);
+    g.fillEllipse(cx - 6, cy + 1, 14, 8);
+    g.fillStyle(0x7eccaa, 0.7);
+    g.fillEllipse(cx, cy + 10, 24, 8);
+
+    // Spots
+    g.fillStyle(0x103022, 1);
+    g.fillCircle(cx + 7, cy + 1, 1.8);
+    g.fillCircle(cx - 8, cy + 7, 1.8);
+    g.fillCircle(cx + 9, cy + 7, 1.6);
+    g.fillCircle(cx - 3, cy + 3, 1.4);
+
+    // Eye sockets — 4 eyes for a boss feel (two paired top, two below)
+    const eye = (sx: number, sy: number, r: number): void => {
+      g.fillStyle(0x06160e, 1);
+      g.fillCircle(sx, sy, r + 1);
+      g.fillStyle(0x4ea66a, 1);
+      g.fillCircle(sx, sy, r);
+      g.fillStyle(0xfff0a0, 1);
+      g.fillCircle(sx, sy, r - 1);
+      g.fillStyle(0x111111, 1);
+      g.fillCircle(sx, sy, r * 0.55);
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(sx - 1, sy - 1, 1, 1);
+    };
+    eye(cx - 7, cy - 6, 3);
+    eye(cx + 7, cy - 6, 3);
+    eye(cx - 11, cy - 1, 2);
+    eye(cx + 11, cy - 1, 2);
+
+    // Mouth + tongue tip
+    g.fillStyle(0x111111, 1);
+    g.fillRect(cx - 6, cy + 2, 12, 1);
+    g.fillStyle(0xff7aa0, 1);
+    g.fillRect(cx - 1, cy + 2, 2, 2);
+
+    // Gold crown with sapphire gem
+    const crownY = cy - 13;
+    g.fillStyle(0x080404, 1);
+    g.fillRect(cx - 9, crownY, 18, 6);
+    g.fillStyle(0x7a5a1a, 1);
+    g.fillRect(cx - 8, crownY + 1, 16, 5);
+    g.fillStyle(0xffd84a, 1);
+    g.fillRect(cx - 8, crownY + 1, 16, 3);
+    // Crown peaks (3 triangular bumps)
+    const peak = (px: number, ph: number): void => {
+      g.fillStyle(0x080404, 1);
+      g.fillRect(px - 1, crownY - ph - 1, 4, ph + 1);
+      g.fillStyle(0xffd84a, 1);
+      g.fillRect(px, crownY - ph, 2, ph);
+    };
+    peak(cx - 6, 3);
+    peak(cx - 1, 4);
+    peak(cx + 4, 3);
+    // Center sapphire gem
+    g.fillStyle(0x080404, 1);
+    g.fillCircle(cx, crownY + 3, 2.4);
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(cx, crownY + 3, 1.8);
+    g.fillStyle(0xffffff, 0.85);
+    g.fillRect(cx - 1, crownY + 2, 1, 1);
+
+    g.generateTexture(TextureKeys.BossToadSovereign, w, h);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Boss: Bloomheart (Sapphire Swamp)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Bloomheart — bigger snapper-bloom variant. Wider mouth with more teeth,
+   * darker violet petals, sapphire-glowing throat, multiple side fronds.
+   */
+  private drawBossBloomheartTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 56;
+    const h = 64;
+    const cx = w / 2;
+    g.clear();
+
+    this.groundShadow(g, cx, h - 4, 14, 3, 0.55);
+
+    // Root mound
+    g.fillStyle(0x040810, 1);
+    g.fillEllipse(cx, h - 6, 32, 14);
+    g.fillStyle(0x1a2230, 1);
+    g.fillEllipse(cx, h - 6, 30, 12);
+    g.fillStyle(0x2c3e58, 1);
+    g.fillEllipse(cx - 5, h - 8, 10, 3);
+
+    // Stem (thicker than the mob)
+    g.fillStyle(0x040810, 1);
+    g.fillRect(cx - 5, h - 30, 10, 24);
+    g.fillStyle(0x1f3848, 1);
+    g.fillRect(cx - 4, h - 30, 8, 24);
+    g.fillStyle(0x3a607a, 1);
+    g.fillRect(cx - 4, h - 30, 2, 24);
+
+    // 4 fronds (paired sides)
+    const frond = (sx: number, sy: number, rx: number, ry: number): void => {
+      g.fillStyle(0x040810, 1);
+      g.fillEllipse(sx, sy, rx + 2, ry + 2);
+      g.fillStyle(0x2c6e6e, 1);
+      g.fillEllipse(sx, sy, rx, ry);
+      g.fillStyle(0x4ad8ff, 0.6);
+      g.fillEllipse(sx - 1, sy - 1, rx * 0.4, ry * 0.4);
+    };
+    frond(cx - 13, h - 22, 9, 4);
+    frond(cx + 13, h - 24, 9, 4);
+    frond(cx - 11, h - 14, 7, 3);
+    frond(cx + 11, h - 12, 7, 3);
+
+    // Bulb / head — bigger
+    const headY = h - 38;
+    g.fillStyle(0x0a0410, 1);
+    g.fillEllipse(cx, headY, 36, 30);
+    g.fillStyle(0x5a1f7a, 1);
+    g.fillEllipse(cx, headY, 33, 27);
+    g.fillStyle(0x7a3fbe, 1);
+    g.fillEllipse(cx - 5, headY - 4, 14, 8);
+
+    // Mouth — wide with teeth
+    g.fillStyle(0x14040a, 1);
+    g.fillEllipse(cx, headY + 1, 24, 12);
+    g.fillStyle(0xff5aa8, 1);
+    g.fillEllipse(cx, headY + 1, 21, 9);
+
+    // Teeth ring (10 small white pixels)
+    g.fillStyle(0xffffff, 1);
+    const teeth = [-9, -6, -3, 0, 3, 6, 9];
+    for (const tx of teeth) {
+      g.fillRect(cx + tx, headY - 4, 1, 3);
+      g.fillRect(cx + tx, headY + 5, 1, 3);
+    }
+
+    // Glowing sapphire throat
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(cx, headY + 1, 2.4);
+    g.fillStyle(0xffffff, 0.85);
+    g.fillRect(cx - 1, headY, 1, 1);
+
+    g.generateTexture(TextureKeys.BossBloomheart, w, h);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Boss: Damselfly Empress (Sapphire Swamp)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Damselfly Empress — bigger dragonfly with 4 large translucent wings,
+   * elongated segmented abdomen, oversized compound eye + tiny gold crown.
+   */
+  private drawBossDamselflyEmpressTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 64;
+    const h = 40;
+    const cx = w / 2;
+    const cy = h / 2;
+    g.clear();
+
+    g.fillStyle(0x4ad8ff, 0.18);
+    g.fillEllipse(cx, cy, w - 6, h - 6);
+
+    // Wings — 4 (paired top + bottom), bigger than the mob's
+    const wing = (sx: number, sy: number, rx: number, ry: number): void => {
+      g.fillStyle(0xc0e8ff, 0.55);
+      g.fillEllipse(sx, sy, rx * 2, ry * 2);
+      g.lineStyle(1, 0x4080a0, 0.7);
+      g.strokeEllipse(sx, sy, rx * 2, ry * 2);
+    };
+    wing(cx - 9, cy - 9, 10, 5);
+    wing(cx + 9, cy - 9, 10, 5);
+    wing(cx - 11, cy + 7, 10, 5);
+    wing(cx + 11, cy + 7, 10, 5);
+
+    // Body — long segmented capsule
+    g.fillStyle(0x081a28, 1);
+    g.fillEllipse(cx, cy, 42, 9);
+    g.fillStyle(0x1f5e7a, 1);
+    g.fillEllipse(cx, cy, 40, 7);
+    // Segment bands
+    g.fillStyle(0x4ad8ff, 1);
+    for (const tx of [-12, -6, 0, 6, 12]) {
+      g.fillRect(cx + tx, cy - 2, 1, 4);
+    }
+
+    // Head bulb (bigger)
+    g.fillStyle(0x081a28, 1);
+    g.fillCircle(cx - 19, cy, 6);
+    g.fillStyle(0x1f5e7a, 1);
+    g.fillCircle(cx - 19, cy, 5);
+    // Big compound eye
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(cx - 21, cy - 1, 2.5);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(cx - 22, cy - 2, 1, 1);
+
+    // Tiny gold crown above the head
+    g.fillStyle(0x080404, 1);
+    g.fillRect(cx - 22, cy - 8, 8, 3);
+    g.fillStyle(0xffd84a, 1);
+    g.fillRect(cx - 21, cy - 7, 6, 2);
+    g.fillStyle(0x080404, 1);
+    g.fillRect(cx - 20, cy - 9, 1, 1);
+    g.fillRect(cx - 18, cy - 10, 1, 2);
+    g.fillRect(cx - 16, cy - 9, 1, 1);
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillRect(cx - 18, cy - 8, 1, 1);
+
+    // Tail glow
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillRect(cx + 19, cy - 1, 3, 2);
+    g.fillStyle(0xffffff, 0.7);
+    g.fillRect(cx + 21, cy - 1, 1, 1);
+
+    g.generateTexture(TextureKeys.BossDamselflyEmpress, w, h);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Boss: Bog Colossus (Sapphire Swamp)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Bog Colossus — gigantic shelled tortoise with a ringed crown of sapphire
+   * shell crystals, four chunky stub legs, a thicker neck/head poking out of
+   * the front, and a heavy ground shadow.
+   */
+  private drawBossBogColossusTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 64;
+    const h = 56;
+    const cx = w / 2;
+    const cy = h / 2;
+    g.clear();
+
+    this.groundShadow(g, cx, h - 5, 24, 5, 0.6);
+
+    // Feet (chunky)
+    const foot = (sx: number, sy: number): void => {
+      g.fillStyle(0x080410, 1);
+      g.fillEllipse(sx, sy, 9, 6);
+      g.fillStyle(0x2c3e58, 1);
+      g.fillEllipse(sx, sy, 7, 4);
+    };
+    foot(cx - 18, cy + 12);
+    foot(cx + 18, cy + 12);
+    foot(cx - 14, cy + 14);
+    foot(cx + 14, cy + 14);
+
+    // Neck + head (peeks left)
+    g.fillStyle(0x080410, 1);
+    g.fillEllipse(cx - 22, cy + 3, 14, 10);
+    g.fillStyle(0x2a4a3a, 1);
+    g.fillEllipse(cx - 22, cy + 3, 12, 8);
+    // Eye + sparkle
+    g.fillStyle(0x111111, 1);
+    g.fillCircle(cx - 26, cy + 1, 2);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(cx - 26, cy, 1, 1);
+    // Snout
+    g.fillStyle(0x080410, 1);
+    g.fillRect(cx - 30, cy + 3, 3, 2);
+    g.fillStyle(0x2a4a3a, 1);
+    g.fillRect(cx - 30, cy + 3, 2, 1);
+
+    // Shell — wide dome with bands
+    g.fillStyle(0x0a0410, 1);
+    g.fillEllipse(cx, cy - 2, 44, 30);
+    g.fillStyle(0x3a1a5a, 1);
+    g.fillEllipse(cx, cy - 2, 41, 27);
+    g.fillStyle(0x6a3aa0, 1);
+    g.fillEllipse(cx - 7, cy - 8, 16, 6);
+
+    // Sapphire shell plates — bigger ring + crown plates
+    const plate = (sx: number, sy: number, r: number): void => {
+      g.fillStyle(0x080410, 1);
+      g.fillCircle(sx, sy, r + 1);
+      g.fillStyle(0x4ad8ff, 1);
+      g.fillCircle(sx, sy, r);
+      g.fillStyle(0xffffff, 0.85);
+      g.fillRect(sx - 1, sy - 1, 1, 1);
+    };
+    // Ring of plates
+    plate(cx - 12, cy - 6, 3);
+    plate(cx, cy - 8, 3);
+    plate(cx + 12, cy - 6, 3);
+    plate(cx - 9, cy + 1, 2.5);
+    plate(cx + 9, cy + 1, 2.5);
+    plate(cx, cy + 5, 2.5);
+
+    // Crown crystals (top of shell, sticking up)
+    const crystal = (sx: number, sy: number, ph: number): void => {
+      g.fillStyle(0x080410, 1);
+      g.fillRect(sx - 1, sy - ph - 1, 4, ph + 1);
+      g.fillStyle(0x4ad8ff, 1);
+      g.fillRect(sx, sy - ph, 2, ph);
+      g.fillStyle(0xb0e8ff, 1);
+      g.fillRect(sx, sy - ph, 1, 1);
+    };
+    crystal(cx - 8, cy - 14, 5);
+    crystal(cx - 1, cy - 16, 7);
+    crystal(cx + 6, cy - 14, 5);
+
+    g.generateTexture(TextureKeys.BossBogColossus, w, h);
   }
 
   // ---------------------------------------------------------------------------
@@ -2043,6 +3062,68 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------------
+  // Stairs / trapdoor — spawned after a boss kill, walks player to next floor.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Top-down view of stone stairs descending into a dark pit. A faint
+   * white rim glow telegraphs "you can interact with this". Floor-agnostic
+   * (no theme palette) so the same sprite works on every floor.
+   */
+  private drawStairsTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 44;
+    const h = 44;
+    const cx = w / 2;
+    const cy = h / 2;
+    g.clear();
+
+    // Glow halo (cyan-white) so the player's eye snaps to it.
+    g.fillStyle(0x9ad8ff, 0.18);
+    g.fillCircle(cx, cy, w / 2);
+    g.fillStyle(0xb0e8ff, 0.28);
+    g.fillCircle(cx, cy, w / 2 - 4);
+
+    // Stone frame (dark grey)
+    g.fillStyle(0x14161e, 1);
+    g.fillRect(4, 4, w - 8, h - 8);
+    g.fillStyle(0x2c303a, 1);
+    g.fillRect(6, 6, w - 12, h - 12);
+    // Frame highlight + shadow strips (chiseled feel)
+    g.fillStyle(0x4a4e58, 1);
+    g.fillRect(4, 4, w - 8, 2);
+    g.fillRect(4, 4, 2, h - 8);
+    g.fillStyle(0x080a10, 1);
+    g.fillRect(4, h - 6, w - 8, 2);
+    g.fillRect(w - 6, 4, 2, h - 8);
+
+    // Pit darkness — pure black inset rectangle the steps "descend" into
+    g.fillStyle(0x000000, 1);
+    g.fillRect(8, 8, w - 16, h - 16);
+
+    // Stone step bands receding into the pit (top edge is widest = nearest
+    // to the player; subsequent bands narrower + darker = deeper).
+    const stepOuter = 8;
+    const drawStep = (inset: number, color: number, depthY: number): void => {
+      g.fillStyle(color, 1);
+      g.fillRect(stepOuter + inset, stepOuter + depthY, w - 16 - inset * 2, 3);
+    };
+    drawStep(0, 0x6a6e7a, 0);  // top step (lightest, nearest)
+    drawStep(2, 0x4a4e58, 4);
+    drawStep(4, 0x2c303a, 8);
+    drawStep(6, 0x14161e, 12); // deepest step (darkest, fades into the pit)
+
+    // Glow rim along the top edge of the pit (inviting "step in" beat).
+    g.fillStyle(0x9ad8ff, 0.55);
+    g.fillRect(stepOuter + 1, stepOuter + 1, w - 16 - 2, 1);
+
+    // Outline
+    g.lineStyle(2, 0x000000, 1);
+    g.strokeRect(0, 0, w, h);
+
+    g.generateTexture(TextureKeys.Stairs, w, h);
+  }
+
+  // ---------------------------------------------------------------------------
   // Item pedestal (Treasure-room altar)
   // ---------------------------------------------------------------------------
 
@@ -2571,6 +3652,201 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(6, 7, 1, 1);
 
     g.generateTexture(TextureKeys.ItemWitheredFang, w, h);
+  }
+
+  /**
+   * Spyglass — pixel telescope with brass barrel + bright lens. 14×14 to
+   * match the rest of the item icon family.
+   */
+  private drawItemSpyglassTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    g.clear();
+    const OUT = 0x080604;
+    const BARREL_DARK = 0x6a4a14;
+    const BARREL = 0xc89a3a;
+    const BARREL_HI = 0xffd84a;
+    const LENS = 0x9ad8ff;
+    const LENS_HI = 0xffffff;
+
+    // Diagonal barrel from top-left to bottom-right.
+    g.fillStyle(OUT, 1);
+    g.fillRect(2, 3, 10, 1);
+    g.fillRect(1, 4, 12, 1);
+    g.fillRect(1, 9, 12, 1);
+    g.fillRect(2, 10, 10, 1);
+    g.fillRect(0, 4, 1, 5);
+    g.fillRect(13, 4, 1, 5);
+
+    g.fillStyle(BARREL_DARK, 1);
+    g.fillRect(2, 4, 10, 6);
+    g.fillStyle(BARREL, 1);
+    g.fillRect(2, 5, 10, 4);
+    g.fillStyle(BARREL_HI, 1);
+    g.fillRect(2, 5, 10, 1);
+
+    // Eyepiece flange (left)
+    g.fillStyle(OUT, 1);
+    g.fillRect(0, 3, 3, 7);
+    g.fillStyle(BARREL_DARK, 1);
+    g.fillRect(1, 4, 2, 5);
+    g.fillStyle(BARREL, 1);
+    g.fillRect(1, 5, 1, 3);
+
+    // Lens flare (right end)
+    g.fillStyle(LENS, 1);
+    g.fillRect(11, 5, 2, 4);
+    g.fillStyle(LENS_HI, 1);
+    g.fillRect(11, 5, 1, 1);
+    g.fillRect(12, 6, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemSpyglass, w, h);
+  }
+
+  /**
+   * Lily Diadem — small sapphire-gem crown sitting on lily petals. Boss-
+   * pool drop themed for Sapphire bosses.
+   */
+  private drawItemLilyDiademTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    g.clear();
+    const OUT = 0x080410;
+    const PETAL = 0xffffff;
+    const PETAL_PINK = 0xffd0e0;
+    const STAMEN = 0xffd84a;
+    const GOLD = 0xffd84a;
+    const GOLD_DARK = 0x7a5a1a;
+    const GEM = 0x4ad8ff;
+    const GEM_HI = 0xb0e8ff;
+
+    // Lily petal base (4 petals visible from above)
+    g.fillStyle(OUT, 1);
+    g.fillRect(3, 7, 8, 4);
+    g.fillStyle(PETAL, 1);
+    g.fillRect(4, 8, 6, 2);
+    g.fillStyle(PETAL_PINK, 1);
+    g.fillRect(4, 9, 6, 1);
+    g.fillStyle(STAMEN, 1);
+    g.fillRect(6, 8, 2, 1);
+
+    // Crown band
+    g.fillStyle(OUT, 1);
+    g.fillRect(3, 4, 8, 4);
+    g.fillStyle(GOLD_DARK, 1);
+    g.fillRect(4, 5, 6, 3);
+    g.fillStyle(GOLD, 1);
+    g.fillRect(4, 5, 6, 2);
+
+    // Crown peaks (3 points)
+    g.fillStyle(OUT, 1);
+    g.fillRect(3, 3, 1, 2);
+    g.fillRect(6, 1, 1, 4);
+    g.fillRect(7, 1, 1, 4);
+    g.fillRect(10, 3, 1, 2);
+    g.fillStyle(GOLD, 1);
+    g.fillRect(6, 2, 2, 2);
+
+    // Center sapphire gem
+    g.fillStyle(OUT, 1);
+    g.fillRect(6, 5, 2, 2);
+    g.fillStyle(GEM, 1);
+    g.fillRect(6, 5, 2, 2);
+    g.fillStyle(GEM_HI, 1);
+    g.fillRect(6, 5, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemLilyDiadem, w, h);
+  }
+
+  /**
+   * Mire Pearl — sapphire pearl on a swamp-stem. Range-up themed item.
+   */
+  private drawItemMirePearlTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    const cx = w / 2;
+    g.clear();
+    const OUT = 0x040810;
+    const PEARL_OUT = 0x183040;
+    const PEARL = 0x4ad8ff;
+    const PEARL_HI = 0xeaf8ff;
+    const STEM = 0x1f3848;
+    const STEM_HI = 0x3a607a;
+
+    // Stem
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 1, 8, 2, 5);
+    g.fillStyle(STEM, 1);
+    g.fillRect(cx - 1, 9, 2, 3);
+    g.fillStyle(STEM_HI, 1);
+    g.fillRect(cx - 1, 9, 1, 3);
+    // Stem leaves
+    g.fillStyle(OUT, 1);
+    g.fillRect(2, 10, 3, 1);
+    g.fillRect(9, 11, 3, 1);
+    g.fillStyle(STEM, 1);
+    g.fillRect(2, 10, 2, 1);
+    g.fillRect(10, 11, 2, 1);
+
+    // Pearl orb
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx, 5, 4);
+    g.fillStyle(PEARL_OUT, 1);
+    g.fillCircle(cx, 5, 3.4);
+    g.fillStyle(PEARL, 1);
+    g.fillCircle(cx, 5, 2.8);
+    g.fillStyle(PEARL_HI, 1);
+    g.fillCircle(cx - 1, 4, 1.4);
+
+    g.generateTexture(TextureKeys.ItemMirePearl, w, h);
+  }
+
+  /**
+   * Frog's Tongue — pink coiled tongue + tiny gold tip. Aggressive damage +
+   * fire-rate item from the Sapphire boss pool.
+   */
+  private drawItemFrogTongueTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    g.clear();
+    const OUT = 0x4a0820;
+    const TONGUE_DARK = 0xa83458;
+    const TONGUE = 0xff7aa0;
+    const TONGUE_HI = 0xffc0d8;
+    const TIP = 0xffd84a;
+
+    // Coiled tongue (S-shape)
+    g.fillStyle(OUT, 1);
+    g.fillRect(2, 4, 8, 1);
+    g.fillRect(2, 5, 1, 4);
+    g.fillRect(2, 8, 8, 1);
+    g.fillRect(9, 9, 1, 3);
+    g.fillRect(2, 11, 8, 1);
+
+    g.fillStyle(TONGUE_DARK, 1);
+    g.fillRect(3, 5, 7, 3);
+    g.fillRect(3, 9, 7, 3);
+
+    g.fillStyle(TONGUE, 1);
+    g.fillRect(3, 5, 7, 2);
+    g.fillRect(3, 9, 7, 2);
+    g.fillStyle(TONGUE_HI, 1);
+    g.fillRect(4, 5, 5, 1);
+    g.fillRect(4, 9, 5, 1);
+
+    // Stem connecting top + bottom (left edge)
+    g.fillStyle(OUT, 1);
+    g.fillRect(2, 6, 2, 4);
+    g.fillStyle(TONGUE_DARK, 1);
+    g.fillRect(3, 7, 1, 2);
+
+    // Gold tongue-tip drop on right
+    g.fillStyle(OUT, 1);
+    g.fillRect(11, 4, 2, 2);
+    g.fillStyle(TIP, 1);
+    g.fillRect(11, 4, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemFrogTongue, w, h);
   }
 
   /**

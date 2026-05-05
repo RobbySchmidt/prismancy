@@ -54,11 +54,20 @@ export interface FloorDecorationDensities {
   tree: number;
 }
 
+/**
+ * Picks the silhouette set used for ground decorations on a floor. Forest
+ * floors get tree + rock + glowing-mushroom; swamp floors swap the tree
+ * for a lily pad and the rock for a tangled mangrove-root cluster (the
+ * mushroom stays since the palette swap already reads as swamp-y fungi).
+ */
+export type DecorationStyle = 'forest' | 'swamp';
+
 export interface FloorTheme {
   id: string;
   displayName: string;
   palette: FloorPalette;
   decorationDensities: FloorDecorationDensities;
+  decorationStyle: DecorationStyle;
   /**
    * Weighted enemy roster — the spawner picks `enemySpawnCount` enemies per
    * room from this list. Generic `id: string` so this type can sit in
@@ -206,6 +215,13 @@ export interface ItemDefinition {
    * already filled. Used by HP-up items (Heart Container, Ancient Heart).
    */
   maxHealthBonus?: number;
+  /**
+   * Optional floor affinity. Currently only enforced for boss-pool picks —
+   * a Sapphire boss won't drop a Crown of the Vine and vice versa. Treasure
+   * + shop pools ignore this field (those items are floor-agnostic). Plain
+   * `string` to avoid a circular import with `data/floors.ts`.
+   */
+  floor?: string;
 }
 
 export interface DropTableEntry {

@@ -49,4 +49,36 @@ export class ItemSystem {
   getPickedIds(): ReadonlySet<string> {
     return this.picked;
   }
+
+  /**
+   * Re-apply the effects from a list of previously-picked item ids without
+   * emitting `item:picked`. Used by the floor-transition carry-over flow
+   * to restore the run's item state on a fresh GameScene without firing
+   * toast / SFX / UI updates the player has already seen. `lookup`
+   * resolves an id to its full ItemDefinition (typically from `data/items`);
+   * ids missing from it are silently skipped (resilient to data drift).
+   *
+   * `maxHealthBonus` items intentionally DO bump max HP here — without
+   * that, an HP-up item picked on Floor 1 would shrink the player's max HP
+   * back to baseline on Floor 2.
+   */
+  hydrate(
+    itemIds: ReadonlyArray<string>,
+    lookup: (id: string) => ItemDefinition | undefined,
+  ): void {
+    for (const id of itemIds) {
+      const item = lookup(id);
+      if (!item) continue;
+      const modifier: ItemModifier = {
+        itemId: item.id,
+        effects: item.effects,
+        ...(item.missileTint !== undefined ? { missileTint: item.missileTint } : {}),
+      };
+      this.stats.applyModifier(modifier);
+      if (item.maxHealthBonus !== undefined && item.maxHealthBonus > 0) {
+        this.playerHealth?.addMaxHealth(item.maxHealthBonus);
+      }
+      this.picked.add(item.id);
+    }
+  }
 }

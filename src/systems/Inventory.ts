@@ -80,6 +80,21 @@ export class Inventory {
     return this.gems;
   }
 
+  /**
+   * Restore inventory state from a snapshot (floor-transition carry-over).
+   * Bypasses the addCoins / addKeys / addGem event-emit paths so the next
+   * scene's HUD doesn't see toast-style "+N coins" notifications for state
+   * the player already had. One `inventory:changed` is fired at the end so
+   * the HUD repaints with the final values.
+   */
+  hydrate(snapshot: { coins: number; keys: number; gems: ReadonlyArray<string> }): void {
+    this.coins = Math.max(0, snapshot.coins);
+    this.keys = Math.max(0, snapshot.keys);
+    this.gems.clear();
+    for (const floorId of snapshot.gems) this.gems.add(floorId);
+    this.emitChange();
+  }
+
   private emitChange(): void {
     EventBus.emit('inventory:changed', { coins: this.coins, keys: this.keys });
   }

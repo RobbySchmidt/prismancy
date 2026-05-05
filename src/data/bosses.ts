@@ -19,6 +19,14 @@ export const BOSSES: Record<string, BossRosterEntry> = {
   'boss-mossy-behemoth': { id: 'boss-mossy-behemoth', weight: 1, floor: 'emerald-forest' },
   'boss-pixie-queen': { id: 'boss-pixie-queen', weight: 1, floor: 'emerald-forest' },
   'boss-forest-heart': { id: 'boss-forest-heart', weight: 1, floor: 'emerald-forest' },
+  'boss-toad-sovereign': { id: 'boss-toad-sovereign', weight: 1, floor: 'sapphire-swamp' },
+  'boss-bloomheart': { id: 'boss-bloomheart', weight: 1, floor: 'sapphire-swamp' },
+  'boss-damselfly-empress': {
+    id: 'boss-damselfly-empress',
+    weight: 1,
+    floor: 'sapphire-swamp',
+  },
+  'boss-bog-colossus': { id: 'boss-bog-colossus', weight: 1, floor: 'sapphire-swamp' },
 };
 
 /**
