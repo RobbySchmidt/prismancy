@@ -1073,8 +1073,12 @@ export class GameScene extends Phaser.Scene {
           EventBus.emit('pickup:collected', { kind: pickup.kind });
 
           // Pedestal items mark the room looted so re-entry doesn't respawn
-          // them (we don't snapshot Items into pendingPickups).
-          if (pickup.kind === PickupKind.Item) {
+          // them (we don't snapshot Items into pendingPickups). Shop-slot
+          // items are EXCLUDED here — they're tracked per-slot via
+          // `purchasedShopSlots`, and flipping `looted` would make the
+          // ShopRoomBuilder skip the entire shop on re-entry instead of
+          // just the bought slot.
+          if (pickup.kind === PickupKind.Item && pickup.shopSlotIndex === undefined) {
             const desc = this.layout.rooms.get(this.currentRoomId);
             if (desc) desc.looted = true;
           }
