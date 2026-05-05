@@ -124,6 +124,10 @@ export const PIXIE_IDEAL_DISTANCE = 180;
 export const PIXIE_RADIAL_GAIN = 1.6;
 /** Tangential strafing component (kept slightly below 1 so the radial pull always wins long-term). */
 export const PIXIE_TANGENT_RATIO = 0.85;
+/** Cooldown between thorn shots — slow because the pixie is also a contact-damage threat. */
+export const PIXIE_FIRE_INTERVAL_MS = 2400;
+/** Initial delay before the first shot so the player can read the spawn before getting peppered. */
+export const PIXIE_FIRE_INITIAL_DELAY_MS = 1200;
 
 // --- Mossy Behemoth (boss) ---------------------------------------------------
 
@@ -165,7 +169,7 @@ export const PIXIE_QUEEN_VISUAL_SCALE = 1.4;
 /** Phase-change tint flash duration. */
 export const PIXIE_QUEEN_PHASE_FLASH_MS = 200;
 /** Min distance (px) the random fallback teleport keeps from the player. */
-export const PIXIE_QUEEN_FALLBACK_MIN_DISTANCE = 2 * 64;
+export const PIXIE_QUEEN_FALLBACK_MIN_DISTANCE = 3 * 64;
 
 // --- Forest Heart (boss) -----------------------------------------------------
 

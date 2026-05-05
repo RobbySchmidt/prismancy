@@ -17,6 +17,12 @@ export interface EnemyDefinition {
    * concrete IDs come from `FloorId` in `data/floors.ts`.
    */
   floor: string;
+  /**
+   * Per-kill probability (0..1) that this enemy drops a single coin on death.
+   * 0 = never drops (used for bosses, which have their own reward flow). The
+   * roll fires from BaseEnemy.die() before the death tween.
+   */
+  coinDropChance: number;
 }
 
 /**
@@ -33,6 +39,7 @@ export const ENEMIES = {
     moveSpeed: 110,
     hitboxRadius: 12,
     floor: 'emerald-forest',
+    coinDropChance: 0.15,
   },
   'mossy-slime': {
     id: 'mossy-slime',
@@ -44,6 +51,7 @@ export const ENEMIES = {
     moveSpeed: 280,
     hitboxRadius: 14,
     floor: 'emerald-forest',
+    coinDropChance: 0.25,
   },
   'vine-sprout': {
     id: 'vine-sprout',
@@ -56,6 +64,7 @@ export const ENEMIES = {
     moveSpeed: 0,
     hitboxRadius: 14,
     floor: 'emerald-forest',
+    coinDropChance: 0.3,
   },
   'pixie-dancer': {
     id: 'pixie-dancer',
@@ -67,6 +76,7 @@ export const ENEMIES = {
     moveSpeed: 140,
     hitboxRadius: 10,
     floor: 'emerald-forest',
+    coinDropChance: 0.2,
   },
   'boss-vine-lord': {
     id: 'boss-vine-lord',
@@ -84,6 +94,7 @@ export const ENEMIES = {
     /** Visual is 2.5× scaled, so the hitbox is bumped to match (set in the class). */
     hitboxRadius: 14,
     floor: 'emerald-forest',
+    coinDropChance: 0,
   },
   'boss-mossy-behemoth': {
     id: 'boss-mossy-behemoth',
@@ -95,6 +106,7 @@ export const ENEMIES = {
     moveSpeed: 60,
     hitboxRadius: 30,
     floor: 'emerald-forest',
+    coinDropChance: 0,
   },
   'boss-pixie-queen': {
     id: 'boss-pixie-queen',
@@ -107,6 +119,7 @@ export const ENEMIES = {
     moveSpeed: 0,
     hitboxRadius: 22,
     floor: 'emerald-forest',
+    coinDropChance: 0,
   },
   'boss-forest-heart': {
     id: 'boss-forest-heart',
@@ -119,6 +132,7 @@ export const ENEMIES = {
     moveSpeed: 0,
     hitboxRadius: 28,
     floor: 'emerald-forest',
+    coinDropChance: 0,
   },
 } as const satisfies Record<string, EnemyDefinition>;
 

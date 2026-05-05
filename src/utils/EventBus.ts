@@ -6,6 +6,7 @@ export interface GameEvents {
   'player:died': void;
   'player:healthChanged': { current: number; max: number };
   'enemy:killed': { x: number; y: number };
+  'enemy:droppedCoin': { x: number; y: number };
   'room:cleared': void;
   'missile:fired': { x: number; y: number };
   'floor:roomEntered': { roomId: string };

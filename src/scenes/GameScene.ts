@@ -117,6 +117,9 @@ export class GameScene extends Phaser.Scene {
 
   private readonly playerDiedHandler = (): void => this.handlePlayerDied();
   private readonly enemyKilledHandler = (): void => this.checkRoomClearedSoon();
+  private readonly enemyDroppedCoinHandler = (payload: { x: number; y: number }): void => {
+    this.spawnPickup(PickupKind.Coin, payload.x, payload.y);
+  };
   private readonly mapOpenedHandler = (): void => {
     if (!this.scene.isPaused()) this.scene.pause();
   };
@@ -220,6 +223,7 @@ export class GameScene extends Phaser.Scene {
 
     EventBus.on('player:died', this.playerDiedHandler);
     EventBus.on('enemy:killed', this.enemyKilledHandler);
+    EventBus.on('enemy:droppedCoin', this.enemyDroppedCoinHandler);
     EventBus.on('map:opened', this.mapOpenedHandler);
     EventBus.on('map:closed', this.mapClosedHandler);
     EventBus.on('map:teleport', this.mapTeleportHandler);
@@ -229,6 +233,7 @@ export class GameScene extends Phaser.Scene {
       this.dropSystem.detach();
       EventBus.off('player:died', this.playerDiedHandler);
       EventBus.off('enemy:killed', this.enemyKilledHandler);
+      EventBus.off('enemy:droppedCoin', this.enemyDroppedCoinHandler);
       EventBus.off('map:opened', this.mapOpenedHandler);
       EventBus.off('map:closed', this.mapClosedHandler);
       EventBus.off('map:teleport', this.mapTeleportHandler);
@@ -245,6 +250,15 @@ export class GameScene extends Phaser.Scene {
         stats: () => this.stats,
         itemSystem: () => this.itemSystem,
         simulateFloor2: () => this.simulateFloor2(),
+        /**
+         * Force-spawn a specific boss in the current room. Bypasses the
+         * `pickBossForFloor` weighted roll — handy for testing a boss whose
+         * 25% chance per run hasn't come up. Pass the EnemyId
+         * (`'boss-pixie-queen'`, `'boss-mossy-behemoth'`, `'boss-vine-lord'`,
+         * `'boss-forest-heart'`). Run `__wiz.spawnBoss('boss-pixie-queen')`
+         * in the browser console while standing in any room.
+         */
+        spawnBoss: (bossId: string) => this.devSpawnBoss(bossId),
       };
     }
   }
@@ -707,6 +721,36 @@ export class GameScene extends Phaser.Scene {
     this.bossNoHitInProgress = true;
     this.registry.set('bossNoHitInProgress', true);
     EventBus.emit('boss:spawned', { name: boss.displayName, maxHp: boss.maxHp });
+  }
+
+  /**
+   * DEV-only: force-spawn a boss in the current room, regardless of room kind
+   * or whether a boss already exists. Removes any previous active boss + the
+   * room's enemies first so encounters don't stack. Useful when a specific
+   * boss's 25% roll never lines up.
+   */
+  private devSpawnBoss(bossId: string): void {
+    if (!this.currentRoom) {
+      // eslint-disable-next-line no-console
+      console.warn('[__wiz.spawnBoss] No active room.');
+      return;
+    }
+    if (this.activeBoss) {
+      this.activeBoss.destroy();
+      this.activeBoss = null;
+    }
+    this.enemies.clear(true, true);
+    const center = this.currentRoom.getCenter();
+    const boss = this.constructBossById(bossId, center.x, center.y);
+    if (!boss) return;
+    this.enemies.add(boss);
+    this.activeBoss = boss;
+    this.bossNoHitInProgress = true;
+    this.registry.set('bossNoHitInProgress', true);
+    EventBus.emit('boss:spawned', { name: boss.displayName, maxHp: boss.maxHp });
+    this.currentRoom.closeAllDoors();
+    // eslint-disable-next-line no-console
+    console.log(`[__wiz.spawnBoss] Spawned ${boss.displayName}.`);
   }
 
   /**

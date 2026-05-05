@@ -78,7 +78,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (!dir) return;
     const fireRate = this.stats.getEffective('fireRate');
     const interval = fireRate > 0 ? MISSILE_FIRE_INTERVAL_MS / fireRate : MISSILE_FIRE_INTERVAL_MS;
-    this.missilePool.fire(this.x, this.y, dir, {
+    // Spawn from the body's world centre, not the texture origin. The hitbox
+    // sits +12 px below the texture centre (so the robe is the hitbox, not the
+    // hat) — when the player presses up against the top wall, the texture
+    // origin ends up *inside* the wall body, which would spawn the missile
+    // overlapping the wall and instantly deactivate it. Body centre is always
+    // inside the playable area because that's what the wall collider stops.
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    this.missilePool.fire(body.center.x, body.center.y, dir, {
       speed: this.stats.getEffective('missileSpeed'),
       lifetime: MISSILE_LIFETIME_MS * this.stats.getEffective('range'),
       damage: this.stats.getEffective('damage'),

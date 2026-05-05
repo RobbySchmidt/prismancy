@@ -39,7 +39,7 @@ export function createEnemy(
     case 'vine-sprout':
       return new VineSprout(ctx.scene, x, y, ctx.target, ctx.enemyProjectilePool);
     case 'pixie-dancer':
-      return new PixieDancer(ctx.scene, x, y, ctx.target);
+      return new PixieDancer(ctx.scene, x, y, ctx.target, ctx.enemyProjectilePool);
     case 'boss-vine-lord':
     case 'boss-mossy-behemoth':
     case 'boss-pixie-queen':

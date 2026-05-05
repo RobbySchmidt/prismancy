@@ -86,9 +86,12 @@ export class PixieQueen extends BossEnemy {
    * (or random safe spot), fade back in, fire a thorn pattern. The body is
    * left active throughout — the brief invisibility is purely visual so the
    * player can still tell where she is between flashes.
+   *
+   * The target is picked AT THE END of the fade-out, not the start, so the
+   * player can't predict-and-walk into the destination during the 200 ms fade
+   * (which used to drop the boss right on top of the player).
    */
   private startTeleport(time: number): void {
-    const targetPos = this.pickTeleportTarget();
     this.spawnTeleportSparkles(this.x, this.y);
 
     this.scene.tweens.add({
@@ -98,6 +101,7 @@ export class PixieQueen extends BossEnemy {
       ease: 'Sine.In',
       onComplete: () => {
         if (!this.active) return;
+        const targetPos = this.pickTeleportTarget();
         this.setPosition(targetPos.x, targetPos.y);
         const body = this.body as Phaser.Physics.Arcade.Body | null;
         body?.reset(targetPos.x, targetPos.y);

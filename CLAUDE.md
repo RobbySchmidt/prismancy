@@ -274,7 +274,21 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 
 **Boss-Knockback:** `BossEnemy.takeDamage` ignoriert den `knockback`-Parameter — andernfalls verlängert jeder Treffer `knockbackUntil` und die Boss-AI bleibt unter Sustained Fire dauerhaft gelockt (Bug: Mossy Behemoth wurde in die Ecke geschoben und blieb inaktiv). Hits flashen + applizieren Damage wie gehabt, Bosse bewegen sich aber ausschließlich durch ihre eigene AI.
 
-**DEV-Hooks:** `__wiz.spawnTreasure()`, `__wiz.simulateFloor2()` (markiert Treasure/Shop-Türen als locked zum Lock-Test), `__wiz.stats()`, `__wiz.itemSystem()` — nur in `import.meta.env.DEV`. **`STARTING_COINS = 50`** als Test-Konstante in GameConfig.ts (Standard wird später 0 oder Meta-Progression).
+**Pixie Queen Teleport:** Ziel wird in `onComplete` des Fade-Out-Tweens gepickt (nicht beim Start), und `PIXIE_QUEEN_FALLBACK_MIN_DISTANCE = 3 * 64` (war 2 * 64 = 128 px) — sonst kann der Spieler während der 200 ms Fade ins Ziel reinlaufen und die Queen materialisiert direkt auf ihm.
+
+**Pixie Dancer Projektile:** `PixieDancer.tickAI` feuert alle `PIXIE_FIRE_INTERVAL_MS = 2400` ms einen aimed Thorn entlang der Sichtlinie zum Spieler. Initial-Delay `PIXIE_FIRE_INITIAL_DELAY_MS = 1200`. Factory in `entities/enemies/index.ts` reicht den `enemyProjectilePool` durch (gleicher Mechanismus wie Vine Sprout).
+
+**Missile-Spawn-Position:** `Player.handleShooting` spawnt Missiles am `body.center` (= +12 px unter `this.y`), nicht am Texture-Center. Hintergrund: die Hitbox-Tuning-Verschiebung des Body nach unten heißt, dass `this.y` an der Top-Wall *innerhalb* der Wand liegt — Missile-Spawn dort kollidiert sofort mit der Wand und wird deaktiviert.
+
+**Coin Drops von Gegnern:** `EnemyDefinition.coinDropChance` (0..1) wird in `BaseEnemy.die()` per `Math.random()` gerollt. Bei Erfolg fired `enemy:droppedCoin` Event mit `{x, y}`; GameScene-Listener spawnt einen Coin-Pickup. Aktuelle Werte: forest-sprite 0.15, pixie-dancer 0.20, mossy-slime 0.25, vine-sprout 0.30, alle Bosse 0 (haben eigenen Reward-Flow). Im Schnitt ~1 Coin/Raum bei 3-5 Gegnern.
+
+**DEV-Hooks** (nur `import.meta.env.DEV`):
+- `__wiz.spawnTreasure()` — Treasure-Pedestal im aktuellen Raum
+- `__wiz.simulateFloor2()` — markiert Treasure/Shop-Türen als locked zum Lock-Test
+- `__wiz.spawnBoss(id)` — force-spawnt Boss im aktuellen Raum, schließt Türen, killt vorhandene Enemies. IDs: `'boss-vine-lord'`, `'boss-mossy-behemoth'`, `'boss-pixie-queen'`, `'boss-forest-heart'`
+- `__wiz.stats()`, `__wiz.itemSystem()` — Inspect
+
+**`STARTING_COINS = 50`** als Test-Konstante in GameConfig.ts (Standard wird später 0 oder Meta-Progression).
 
 **Geplante Progression:**
 1. **Emerald Forest** (Floor 1) — implementiert inkl. 4 Bosse (Vine Lord, Mossy Behemoth, Pixie Queen, Forest Heart, random pick).

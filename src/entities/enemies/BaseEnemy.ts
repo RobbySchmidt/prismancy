@@ -86,6 +86,14 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
    */
   protected die(): void {
     EventBus.emit('enemy:killed', { x: this.x, y: this.y });
+    // Roll the per-enemy coin drop. Bosses set chance=0, so this is a no-op
+    // for them — boss rewards go through the dedicated `boss:killed` flow.
+    if (
+      this.definition.coinDropChance > 0 &&
+      Math.random() < this.definition.coinDropChance
+    ) {
+      EventBus.emit('enemy:droppedCoin', { x: this.x, y: this.y });
+    }
     this.disableBody(true, false);
 
     // Sparkle burst — small glow particles flying outward.
