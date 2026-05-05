@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Prismancy — Grafik-Mockup</title>
+<style>
+  body { margin: 0; background: #181820; color: #e0e0e0; font-family: 'Courier New', Consolas, monospace; padding: 24px; }
+  h1 { color: #6effa0; margin: 0 0 8px; }
+  h2 { color: #aaaaaa; margin: 24px 0 12px; font-size: 16px; font-weight: normal; text-transform: uppercase; letter-spacing: 2px; }
+  p.intro { max-width: 720px; line-height: 1.6; color: #cccccc; }
+  .row { display: flex; gap: 24px; margin-bottom: 32px; flex-wrap: wrap; }
+  .cell { background: #0a0a0a; padding: 16px; border-radius: 6px; border: 1px solid #222; }
+  .label { font-size: 11px; margin-bottom: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+  .label .new { color: #6effa0; }
+  .label .old { color: #cc6677; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  ul.changes { color: #aaaaaa; font-size: 13px; line-height: 1.7; max-width: 300px; padding-left: 18px; }
+  ul.changes li::marker { color: #6effa0; }
+  .scene-canvas { background: #0a0a0a; }
+</style>
+</head>
+<body>
+<h1>Prismancy — Sprite Polish Mockup</h1>
+<p class="intro">
+  Vergleich: aktuelle prozedurale Sprites (links) gegen verbesserte Variante mit Outlines, Mehrfarb-Shading und Detail-Pixels (rechts). Beide bleiben prozedural in <code>PreloadScene.ts</code> — keine PNG-Assets, kein Asset-Pipeline-Aufwand. Pixel werden 8&times; skaliert.
+</p>
+
+<h2>1. Wizard (Player)</h2>
+<div class="row">
+  <div class="cell">
+    <div class="label"><span class="old">aktuell</span></div>
+    <canvas id="wiz-old" width="192" height="256"></canvas>
+  </div>
+  <div class="cell">
+    <div class="label"><span class="new">neu</span></div>
+    <canvas id="wiz-new" width="192" height="256"></canvas>
+  </div>
+  <div class="cell" style="background: transparent; border: none; padding-top: 24px;">
+    <ul class="changes">
+      <li>Dunkler Outline um Silhouette</li>
+      <li>Hat mit Schatten unter Krempe + Highlight oben</li>
+      <li>Gesicht: Augen, Nase</li>
+      <li>Weißer Bart (Wizard-Identität!)</li>
+      <li>Robe mit Shadow rechts + Highlight links</li>
+      <li>Goldener Wand-Tip sichtbar</li>
+      <li>Gürtel als Akzent</li>
+    </ul>
+  </div>
+</div>
+
+<h2>2. Mossy Slime (Enemy)</h2>
+<div class="row">
+  <div class="cell">
+    <div class="label"><span class="old">aktuell</span></div>
+    <canvas id="slime-old" width="224" height="160"></canvas>
+  </div>
+  <div class="cell">
+    <div class="label"><span class="new">neu</span></div>
+    <canvas id="slime-new" width="224" height="160"></canvas>
+  </div>
+  <div class="cell" style="background: transparent; border: none; padding-top: 24px;">
+    <ul class="changes">
+      <li>Glanz-Highlight oben links (gibt Wölbung)</li>
+      <li>Augen mit weißem Sparkle-Pixel</li>
+      <li>Moospatches als unregelmäßige Flecken</li>
+      <li>Drip-Tropfen unten</li>
+      <li>Schatten unter Slime auf Boden</li>
+    </ul>
+  </div>
+</div>
+
+<h2>3. Forest Sprite (Enemy)</h2>
+<div class="row">
+  <div class="cell">
+    <div class="label"><span class="old">aktuell</span></div>
+    <canvas id="sprite-old" width="160" height="160"></canvas>
+  </div>
+  <div class="cell">
+    <div class="label"><span class="new">neu</span></div>
+    <canvas id="sprite-new" width="160" height="160"></canvas>
+  </div>
+  <div class="cell" style="background: transparent; border: none; padding-top: 24px;">
+    <ul class="changes">
+      <li>Glow-Aura um den Sprite</li>
+      <li>Gesicht: Augen + Mund</li>
+      <li>Flügel-Andeutung links/rechts</li>
+      <li>Inner-Body-Highlight für Tiefe</li>
+    </ul>
+  </div>
+</div>
+
+<h2>4. Floor + Wall + Decoration (in-context)</h2>
+<div class="row">
+  <div class="cell scene-canvas">
+    <div class="label"><span class="old">aktuell</span></div>
+    <canvas id="scene-old" width="384" height="320"></canvas>
+  </div>
+  <div class="cell scene-canvas">
+    <div class="label"><span class="new">neu</span></div>
+    <canvas id="scene-new" width="384" height="320"></canvas>
+  </div>
+</div>
+<ul class="changes" style="max-width: 640px;">
+  <li><b>Floor:</b> Grass-Tufts (kleine grüne 1-2px Striche), gelegentliche dunkle Erd-Sprenkel, mehr Tile-Variation</li>
+  <li><b>Wall:</b> Stein-Mauerwerk mit Fugen, mossige Highlights, Glow-Risse mit emerald-grünem Schein</li>
+  <li><b>Mushroom:</b> Stem-Highlight, Pilzkappe mit dunklem Rand und hellen Spots</li>
+</ul>
+
+<h2>Andere Richtungen</h2>
+<p style="color: #aaa; max-width: 640px; line-height: 1.7;">
+  <b style="color: #e0e0e0;">A) Procedural Polish</b> — was du oben siehst. Kein Asset-Pipeline, schnell umsetzbar. Konsistente Optik mit dem aktuellen Stil, nur deutlich detaillierter.<br><br>
+  <b style="color: #e0e0e0;">B) Kenney.nl Asset Pack</b> — kostenlose, professionelle 16&times;16 oder 32&times;32 Sprites einbinden. Z.B. <code>1-Bit Pack</code>, <code>Tiny Town</code>, <code>Tiny Dungeon</code>. Polierter Look, aber Asset-Pipeline aufbauen + andere Proportionen erfordern Tile-Anpassungen.<br><br>
+  <b style="color: #e0e0e0;">C) Eigene Pixel-Art / AI-generiert</b> — größter custom Look, aber langwierig. Eher nach Phase 6.
+</p>
+
+<script>
+const SCALE = 8;
+const getCtx = (id) => document.getElementById(id).getContext('2d');
+
+function rect(ctx, x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * SCALE, y * SCALE, w * SCALE, h * SCALE);
+}
+function px(ctx, x, y, color) { rect(ctx, x, y, 1, 1, color); }
+
+// ---------------------------------------------------------------- Wizard
+
+function drawWizardOld(c) {
+  c.fillStyle = '#0d1810'; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+  // Hat (triangle approximation, current style)
+  rect(c, 11, 5, 2, 1, '#3b1d6e');
+  rect(c, 10, 6, 4, 1, '#3b1d6e');
+  rect(c, 9, 7, 6, 1, '#3b1d6e');
+  rect(c, 8, 8, 8, 1, '#3b1d6e');
+  rect(c, 7, 9, 10, 1, '#3b1d6e');
+  // Face
+  rect(c, 9, 10, 6, 3, '#f0c89a');
+  // Robe (purple rect)
+  rect(c, 8, 13, 8, 8, '#7a2cb8');
+  // feet
+  rect(c, 9, 21, 2, 2, '#2a1a0d');
+  rect(c, 13, 21, 2, 2, '#2a1a0d');
+}
+
+function drawWizardNew(c) {
+  c.fillStyle = '#0d1810'; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+  const OUT = '#1a0828';
+  const HAT = '#5a1f9a';
+  const HAT_DARK = '#3a0f70';
+  const HAT_HI = '#7a3fbe';
+  const SKIN = '#f0c89a';
+  const SKIN_SHADOW = '#c89a6c';
+  const ROBE = '#7a2cb8';
+  const ROBE_HI = '#9a4cd8';
+  const ROBE_SHADOW = '#5a1c98';
+  const BEARD = '#e8e8e8';
+  const BEARD_SHADOW = '#a8a8a8';
+  const BUCKLE = '#ffd84a';
+  const WAND = '#c89758';
+  const TIP = '#ffd84a';
+
+  // Hat
+  rect(c, 12, 4, 1, 1, OUT);
+  rect(c, 11, 5, 2, 1, OUT);
+  // hat tip (gold orb)
+  rect(c, 11, 5, 2, 1, TIP);
+  rect(c, 11, 6, 1, 1, OUT);
+  rect(c, 10, 6, 1, 1, OUT);
+  rect(c, 11, 6, 2, 1, HAT_DARK);
+  rect(c, 10, 7, 4, 1, OUT);
+  rect(c, 10, 7, 4, 1, HAT_DARK);
+  rect(c, 11, 7, 2, 1, HAT_HI);
+  rect(c, 9, 8, 6, 1, OUT);
+  rect(c, 9, 8, 1, 1, OUT);
+  rect(c, 14, 8, 1, 1, OUT);
+  rect(c, 10, 8, 4, 1, HAT);
+  rect(c, 11, 8, 1, 1, HAT_HI);
+  rect(c, 8, 9, 8, 1, OUT);
+  rect(c, 8, 9, 1, 1, OUT);
+  rect(c, 15, 9, 1, 1, OUT);
+  rect(c, 9, 9, 6, 1, HAT);
+  rect(c, 10, 9, 1, 1, HAT_HI);
+  // hat brim
+  rect(c, 7, 10, 10, 1, OUT);
+  rect(c, 8, 10, 8, 1, HAT_DARK);
+  // shadow under brim
+  rect(c, 8, 11, 8, 1, '#3a2a4a');
+
+  // Face
+  rect(c, 9, 11, 6, 1, OUT);
+  rect(c, 9, 11, 1, 1, OUT);
+  rect(c, 14, 11, 1, 1, OUT);
+  rect(c, 8, 12, 1, 1, OUT);
+  rect(c, 15, 12, 1, 1, OUT);
+  rect(c, 9, 12, 6, 1, SKIN);
+  px(c, 10, 12, '#222'); // left eye
+  px(c, 13, 12, '#222'); // right eye
+  // Nose
+  px(c, 11, 13, SKIN_SHADOW);
+  px(c, 12, 13, SKIN_SHADOW);
+  rect(c, 8, 13, 1, 1, OUT);
+  rect(c, 15, 13, 1, 1, OUT);
+  rect(c, 9, 13, 6, 1, SKIN);
+
+  // Beard
+  rect(c, 9, 14, 6, 1, OUT);
+  rect(c, 8, 14, 1, 1, OUT);
+  rect(c, 15, 14, 1, 1, OUT);
+  rect(c, 9, 14, 6, 1, BEARD);
+  px(c, 10, 14, BEARD_SHADOW);
+  px(c, 13, 14, BEARD_SHADOW);
+  rect(c, 9, 15, 6, 1, BEARD);
+  rect(c, 8, 15, 1, 1, OUT);
+  rect(c, 15, 15, 1, 1, OUT);
+  px(c, 11, 15, BEARD_SHADOW);
+  px(c, 12, 15, BEARD_SHADOW);
+  rect(c, 10, 16, 4, 1, BEARD);
+  rect(c, 9, 16, 1, 1, OUT);
+  rect(c, 14, 16, 1, 1, OUT);
+
+  // Robe
+  rect(c, 8, 17, 8, 1, OUT);
+  rect(c, 9, 17, 6, 1, ROBE);
+  px(c, 9, 17, ROBE_HI);
+  px(c, 14, 17, ROBE_SHADOW);
+  rect(c, 7, 18, 1, 1, OUT);
+  rect(c, 16, 18, 1, 1, OUT);
+  rect(c, 8, 18, 8, 1, ROBE);
+  px(c, 8, 18, ROBE_HI);
+  rect(c, 14, 18, 2, 1, ROBE_SHADOW);
+  rect(c, 7, 19, 1, 1, OUT);
+  rect(c, 16, 19, 1, 1, OUT);
+  rect(c, 8, 19, 8, 1, ROBE);
+  px(c, 8, 19, ROBE_HI);
+  rect(c, 14, 19, 2, 1, ROBE_SHADOW);
+  // belt
+  rect(c, 7, 20, 1, 1, OUT);
+  rect(c, 16, 20, 1, 1, OUT);
+  rect(c, 8, 20, 8, 1, '#2a1a0d');
+  px(c, 11, 20, BUCKLE);
+  px(c, 12, 20, BUCKLE);
+  // robe lower
+  rect(c, 7, 21, 1, 1, OUT);
+  rect(c, 16, 21, 1, 1, OUT);
+  rect(c, 8, 21, 8, 1, ROBE);
+  px(c, 8, 21, ROBE_HI);
+  rect(c, 14, 21, 2, 1, ROBE_SHADOW);
+  rect(c, 6, 22, 1, 1, OUT);
+  rect(c, 17, 22, 1, 1, OUT);
+  rect(c, 7, 22, 10, 1, ROBE);
+  px(c, 7, 22, ROBE_HI);
+  rect(c, 14, 22, 3, 1, ROBE_SHADOW);
+  rect(c, 6, 23, 12, 1, OUT);
+  rect(c, 7, 23, 10, 1, ROBE_SHADOW);
+
+  // Wand peeking out (right side)
+  rect(c, 17, 17, 1, 1, OUT);
+  rect(c, 18, 16, 1, 1, OUT);
+  px(c, 17, 17, WAND);
+  px(c, 18, 16, WAND);
+  rect(c, 19, 14, 1, 2, OUT);
+  rect(c, 19, 14, 1, 2, TIP);
+  px(c, 18, 13, '#fff8c0');
+
+  // Feet
+  rect(c, 9, 24, 2, 1, OUT);
+  rect(c, 13, 24, 2, 1, OUT);
+  rect(c, 9, 24, 2, 1, '#2a1a0d');
+  rect(c, 13, 24, 2, 1, '#2a1a0d');
+  px(c, 9, 24, '#4a3a2d');
+  px(c, 13, 24, '#4a3a2d');
+
+  // ground shadow
+  c.fillStyle = 'rgba(0,0,0,0.4)';
+  c.beginPath(); c.ellipse(12 * SCALE, 25.5 * SCALE, 4 * SCALE, 1.2 * SCALE, 0, 0, Math.PI * 2); c.fill();
+}
+
+// ---------------------------------------------------------------- Slime
+
+function drawSlimeOld(c) {
+  c.fillStyle = '#142818'; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+  // squat green dome
+  rect(c, 7, 10, 14, 6, '#3a7a3a');
+  rect(c, 8, 8, 12, 2, '#3a7a3a');
+  rect(c, 10, 7, 8, 1, '#3a7a3a');
+}
+
+function drawSlimeNew(c) {
+  c.fillStyle = '#142818'; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+  const OUT = '#0e2a14';
+  const BODY = '#3a7a3a';
+  const HI = '#6cc06c';
+  const SHADOW = '#244a26';
+  const MOSS = '#2a5e2a';
+  const MOSS_HI = '#56a04e';
+
+  // ground shadow
+  c.fillStyle = 'rgba(0,0,0,0.45)';
+  c.beginPath(); c.ellipse(14 * SCALE, 16.5 * SCALE, 7 * SCALE, 1.3 * SCALE, 0, 0, Math.PI * 2); c.fill();
+
+  // dome silhouette
+  rect(c, 11, 6, 6, 1, OUT);
+  rect(c, 9, 7, 10, 1, OUT);
+  rect(c, 8, 8, 12, 1, OUT);
+  rect(c, 7, 9, 14, 1, OUT);
+  rect(c, 7, 10, 14, 1, OUT);
+  rect(c, 7, 11, 14, 1, OUT);
+  rect(c, 7, 12, 14, 1, OUT);
+  rect(c, 7, 13, 14, 1, OUT);
+  rect(c, 7, 14, 14, 1, OUT);
+  rect(c, 6, 15, 16, 1, OUT);
+  // body fill
+  rect(c, 11, 6, 6, 1, BODY);
+  rect(c, 10, 7, 8, 1, BODY);
+  rect(c, 9, 8, 10, 1, BODY);
+  rect(c, 8, 9, 12, 1, BODY);
+  rect(c, 8, 10, 12, 1, BODY);
+  rect(c, 8, 11, 12, 1, BODY);
+  rect(c, 8, 12, 12, 1, BODY);
+  rect(c, 8, 13, 12, 1, BODY);
+  rect(c, 8, 14, 12, 1, BODY);
+  rect(c, 7, 15, 14, 1, BODY);
+  // bottom darker (shadow)
+  rect(c, 8, 14, 12, 1, SHADOW);
+  rect(c, 7, 15, 14, 1, SHADOW);
+  // top highlight (curve)
+  rect(c, 12, 7, 3, 1, HI);
+  rect(c, 11, 8, 4, 1, HI);
+  rect(c, 10, 9, 3, 1, HI);
+  rect(c, 9, 10, 2, 1, HI);
+  px(c, 12, 7, '#a0e0a0');
+  px(c, 11, 8, '#a0e0a0');
+  // moss patches
+  px(c, 14, 9, MOSS);
+  rect(c, 15, 9, 2, 1, MOSS);
+  px(c, 15, 8, MOSS);
+  px(c, 16, 9, MOSS_HI);
+  rect(c, 17, 11, 2, 1, MOSS);
+  px(c, 18, 11, MOSS_HI);
+  rect(c, 8, 13, 2, 1, MOSS);
+  px(c, 9, 13, MOSS_HI);
+  // eyes
+  rect(c, 11, 11, 2, 2, '#1a1a1a');
+  rect(c, 15, 11, 2, 2, '#1a1a1a');
+  px(c, 11, 11, '#fff');
+  px(c, 15, 11, '#fff');
+  // mouth
+  rect(c, 12, 13, 4, 1, '#1a1a1a');
+  px(c, 13, 14, '#1a1a1a');
+  px(c, 14, 14, '#1a1a1a');
+  // drip
+  px(c, 17, 16, OUT);
+  px(c, 17, 17, OUT);
+  px(c, 17, 16, BODY);
+  px(c, 17, 17, BODY);
+  px(c, 17, 18, OUT);
+}
+
+// ---------------------------------------------------------------- Forest Sprite
+
+function drawSpriteOld(c) {
+  c.fillStyle = '#142818'; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+  rect(c, 8, 8, 4, 4, '#a8e08a');
+  rect(c, 9, 7, 2, 1, '#a8e08a');
+  rect(c, 9, 12, 2, 1, '#a8e08a');
+  rect(c, 7, 9, 1, 2, '#a8e08a');
+  rect(c, 12, 9, 1, 2, '#a8e08a');
+}
+
+function drawSpriteNew(c) {
+  c.fillStyle = '#142818'; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+  // glow halo
+  c.fillStyle = 'rgba(110, 255, 160, 0.18)';
+  c.beginPath(); c.arc(10 * SCALE, 10 * SCALE, 6 * SCALE, 0, Math.PI * 2); c.fill();
+  c.fillStyle = 'rgba(110, 255, 160, 0.30)';
+  c.beginPath(); c.arc(10 * SCALE, 10 * SCALE, 4.5 * SCALE, 0, Math.PI * 2); c.fill();
+
+  const OUT = '#1e4022';
+  const BODY = '#7ad068';
+  const HI = '#b8f098';
+  const WING = '#c0e0a0';
+  // wings
+  rect(c, 5, 8, 2, 1, OUT);
+  rect(c, 5, 8, 2, 1, WING);
+  rect(c, 5, 9, 1, 1, OUT);
+  rect(c, 13, 8, 2, 1, OUT);
+  rect(c, 13, 8, 2, 1, WING);
+  rect(c, 14, 9, 1, 1, OUT);
+
+  // body silhouette
+  rect(c, 8, 6, 4, 1, OUT);
+  rect(c, 7, 7, 6, 1, OUT);
+  rect(c, 7, 8, 6, 1, OUT);
+  rect(c, 7, 9, 6, 1, OUT);
+  rect(c, 7, 10, 6, 1, OUT);
+  rect(c, 7, 11, 6, 1, OUT);
+  rect(c, 8, 12, 4, 1, OUT);
+  // body fill
+  rect(c, 8, 6, 4, 1, BODY);
+  rect(c, 8, 7, 5, 1, BODY);
+  rect(c, 8, 8, 5, 1, BODY);
+  rect(c, 8, 9, 5, 1, BODY);
+  rect(c, 8, 10, 5, 1, BODY);
+  rect(c, 8, 11, 5, 1, BODY);
+  rect(c, 8, 12, 4, 1, BODY);
+  // highlight
+  px(c, 9, 7, HI);
+  px(c, 8, 8, HI);
+  // eyes
+  px(c, 9, 9, '#0a0a0a');
+  px(c, 11, 9, '#0a0a0a');
+  // mouth
+  px(c, 10, 10, '#0a0a0a');
+  px(c, 9, 10, '#0a0a0a');
+  px(c, 11, 10, '#0a0a0a');
+}
+
+// ---------------------------------------------------------------- Scene (floor + wall + deco)
+
+function drawSceneOld(c) {
+  // wall band (top 8 px)
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 48; x++) {
+      const v = (x + y) % 2 === 0 ? '#1a2818' : '#2d4220';
+      c.fillStyle = v;
+      c.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+    }
+  }
+  // floor
+  for (let y = 8; y < 40; y++) {
+    for (let x = 0; x < 48; x++) {
+      const r = (x * 13 + y * 7) % 7;
+      const v = r < 4 ? '#142818' : (r < 6 ? '#1f3a24' : '#1a3220');
+      c.fillStyle = v;
+      c.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+    }
+  }
+  // mushroom (current style)
+  rect(c, 22, 28, 4, 2, '#6effa0');
+  rect(c, 23, 30, 2, 2, '#cccccc');
+  // rock
+  rect(c, 12, 32, 6, 3, '#3a3a3a');
+}
+
+function drawSceneNew(c) {
+  // wall: stone bricks with mortar + glow cracks
+  const WALL_BASE = '#1a2818';
+  const WALL_HI = '#2d4220';
+  const WALL_DARK = '#0e1a0c';
+  const MORTAR = '#0a140a';
+  const GLOW = '#6effa0';
+  const MOSS = '#56a04e';
+
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 48; x++) {
+      c.fillStyle = WALL_BASE;
+      c.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+    }
+  }
+  // brick pattern: rows of 6-wide bricks with offset
+  function brick(bx, by, w, h, offset) {
+    // mortar
+    for (let i = 0; i < w; i++) c.fillStyle = MORTAR, c.fillRect((bx + i) * SCALE, (by + h - 1) * SCALE, SCALE, SCALE);
+    c.fillStyle = MORTAR; c.fillRect((bx + w - 1) * SCALE, by * SCALE, SCALE, h * SCALE);
+    // brick face
+    for (let i = 0; i < w - 1; i++) for (let j = 0; j < h - 1; j++) {
+      c.fillStyle = WALL_BASE; c.fillRect((bx + i) * SCALE, (by + j) * SCALE, SCALE, SCALE);
+    }
+    // top highlight
+    for (let i = 0; i < w - 1; i++) { c.fillStyle = WALL_HI; c.fillRect((bx + i) * SCALE, by * SCALE, SCALE, SCALE); }
+    // dark bottom (under top hi)
+    for (let i = 0; i < w - 2; i++) { c.fillStyle = WALL_DARK; c.fillRect((bx + i + 1) * SCALE, (by + h - 2) * SCALE, SCALE, SCALE); }
+  }
+  // row 1
+  for (let bx = -2; bx < 50; bx += 6) brick(bx, 0, 6, 4, 0);
+  // row 2 offset
+  for (let bx = 1; bx < 50; bx += 6) brick(bx, 4, 6, 4, 1);
+
+  // moss patches on wall
+  c.fillStyle = MOSS;
+  c.fillRect(8 * SCALE, 1 * SCALE, SCALE, SCALE);
+  c.fillRect(9 * SCALE, 1 * SCALE, SCALE, SCALE);
+  c.fillRect(8 * SCALE, 2 * SCALE, SCALE, SCALE);
+  c.fillRect(28 * SCALE, 5 * SCALE, SCALE, SCALE);
+  c.fillRect(29 * SCALE, 5 * SCALE, SCALE, SCALE);
+  c.fillRect(40 * SCALE, 2 * SCALE, SCALE, SCALE);
+
+  // glow crack
+  c.fillStyle = GLOW;
+  c.fillRect(18 * SCALE, 1 * SCALE, SCALE, SCALE);
+  c.fillRect(18 * SCALE, 2 * SCALE, SCALE, SCALE);
+  c.fillRect(19 * SCALE, 2 * SCALE, SCALE, SCALE);
+  c.fillRect(19 * SCALE, 3 * SCALE, SCALE, SCALE);
+  c.fillRect(20 * SCALE, 4 * SCALE, SCALE, SCALE);
+  c.fillStyle = '#a0ffc0';
+  c.fillRect(18 * SCALE, 1 * SCALE, SCALE, SCALE);
+
+  // floor: dark base + grass tufts + sparkle
+  const FLOOR_BASE = '#142818';
+  const FLOOR_ACC = '#1f3a24';
+  const FLOOR_DARK = '#0c1a0e';
+  const GRASS = '#3e7048';
+  const GRASS_HI = '#6cc06c';
+
+  for (let y = 8; y < 40; y++) {
+    for (let x = 0; x < 48; x++) {
+      const r = (x * 17 + y * 11 + 3) % 9;
+      const v = r < 5 ? FLOOR_BASE : (r < 7 ? FLOOR_ACC : FLOOR_DARK);
+      c.fillStyle = v;
+      c.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+    }
+  }
+  // grass tufts (deterministic positions)
+  const tufts = [[5,12],[9,14],[14,18],[20,22],[26,15],[30,28],[34,11],[38,24],[44,16],[8,32],[18,35],[28,33],[36,30]];
+  for (const [tx, ty] of tufts) {
+    c.fillStyle = GRASS; c.fillRect(tx * SCALE, ty * SCALE, SCALE, SCALE);
+    c.fillStyle = GRASS_HI; c.fillRect(tx * SCALE, ty * SCALE, SCALE, SCALE * 0.4);
+  }
+  // sparkle dots (glow particles)
+  c.fillStyle = '#6effa0';
+  const sparkles = [[11,16],[24,20],[33,18],[7,26],[42,29]];
+  for (const [sx, sy] of sparkles) {
+    c.globalAlpha = 0.6;
+    c.fillRect(sx * SCALE + SCALE * 0.3, sy * SCALE + SCALE * 0.3, SCALE * 0.4, SCALE * 0.4);
+    c.globalAlpha = 1;
+  }
+
+  // mushroom (improved)
+  // ground shadow
+  c.fillStyle = 'rgba(0,0,0,0.5)';
+  c.beginPath(); c.ellipse(24 * SCALE, 31 * SCALE, 3.5 * SCALE, 0.8 * SCALE, 0, 0, Math.PI * 2); c.fill();
+  // stem
+  rect(c, 23, 28, 2, 3, '#1a0828');
+  rect(c, 23, 28, 2, 3, '#d8c8e8');
+  rect(c, 23, 28, 1, 3, '#e8d8f8');
+  // cap
+  rect(c, 21, 25, 6, 1, '#1a0828');
+  rect(c, 20, 26, 8, 1, '#1a0828');
+  rect(c, 21, 27, 6, 1, '#1a0828');
+  rect(c, 21, 26, 6, 1, '#6effa0');
+  rect(c, 20, 27, 1, 1, '#1a0828'); rect(c, 27, 27, 1, 1, '#1a0828');
+  rect(c, 21, 27, 6, 1, '#3aa86a');
+  // cap highlights/spots
+  c.fillStyle = '#a0ffc0'; c.fillRect(22 * SCALE, 25 * SCALE, SCALE, SCALE);
+  c.fillStyle = '#fff'; c.fillRect(23 * SCALE, 26 * SCALE, SCALE, SCALE); c.fillRect(25 * SCALE, 27 * SCALE, SCALE, SCALE);
+  // glow under
+  c.fillStyle = 'rgba(110,255,160,0.25)';
+  c.beginPath(); c.arc(24 * SCALE, 28 * SCALE, 5 * SCALE, 0, Math.PI * 2); c.fill();
+
+  // rock (improved)
+  c.fillStyle = 'rgba(0,0,0,0.45)';
+  c.beginPath(); c.ellipse(15 * SCALE, 35 * SCALE, 4 * SCALE, 0.8 * SCALE, 0, 0, Math.PI * 2); c.fill();
+  rect(c, 12, 32, 6, 1, '#0a0a0a');
+  rect(c, 11, 33, 8, 1, '#0a0a0a');
+  rect(c, 11, 34, 8, 1, '#0a0a0a');
+  rect(c, 12, 32, 6, 1, '#5a5a5a');
+  rect(c, 11, 33, 8, 1, '#4a4a4a');
+  rect(c, 11, 34, 8, 1, '#3a3a3a');
+  // rock highlights
+  px(c, 13, 32, '#7a7a7a');
+  px(c, 14, 33, '#6a6a6a');
+  // moss on rock
+  px(c, 16, 32, MOSS);
+  px(c, 17, 32, MOSS);
+  px(c, 17, 33, MOSS);
+}
+
+// Run
+drawWizardOld(getCtx('wiz-old'));
+drawWizardNew(getCtx('wiz-new'));
+drawSlimeOld(getCtx('slime-old'));
+drawSlimeNew(getCtx('slime-new'));
+drawSpriteOld(getCtx('sprite-old'));
+drawSpriteNew(getCtx('sprite-new'));
+drawSceneOld(getCtx('scene-old'));
+drawSceneNew(getCtx('scene-new'));
+</script>
+</body>
+</html>
