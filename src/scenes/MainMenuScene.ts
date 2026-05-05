@@ -1,6 +1,15 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, SceneKeys } from '../config/GameConfig';
+import { GAME_HEIGHT, GAME_WIDTH, SceneKeys, TextureKeys } from '../config/GameConfig';
 
+/**
+ * Title screen styled as a key-art illustration: the wizard duels the
+ * Pixie Queen across an Emerald-Forest scene at dusk. Backdrop is painted
+ * with `Phaser.GameObjects.Graphics` (sky gradient, layered tree
+ * silhouettes, moon-pink halo, fireflies); the wizard + Pixie Queen
+ * sprites are reused from the in-game textures, scaled up 4× for poster
+ * scale. Magic missiles + pixie thorns fly between them so the moment
+ * reads as combat rather than two characters posing.
+ */
 export class MainMenuScene extends Phaser.Scene {
   constructor() {
     super({ key: SceneKeys.MainMenu });
@@ -8,29 +17,37 @@ export class MainMenuScene extends Phaser.Scene {
 
   create(): void {
     const cx = GAME_WIDTH / 2;
-    const cy = GAME_HEIGHT / 2;
 
-    this.add
-      .text(cx, cy - 80, 'Prismancy', {
-        fontSize: '56px',
-        color: '#e9d5ff',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
+    // 1) Sky + ground backdrop ------------------------------------------------
+    const bg = this.add.graphics();
+    this.paintBackdrop(bg);
 
-    this.add
-      .text(cx, cy + 10, 'Press [Space] or [Enter] to start', {
-        fontSize: '22px',
-        color: '#cccccc',
-      })
-      .setOrigin(0.5);
+    // 2) Pixie Queen (right side) — backlit by a pink halo so she pops.
+    this.paintQueenHalo();
+    const queen = this.add.image(GAME_WIDTH - 240, GAME_HEIGHT / 2 - 30, TextureKeys.BossPixieQueen);
+    queen.setScale(4);
+    queen.setRotation(0.08); // slight forward lean toward the wizard
+    // Subtle hover bob
+    this.tweens.add({
+      targets: queen,
+      y: queen.y - 8,
+      duration: 1800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+    });
 
-    this.add
-      .text(cx, cy + 60, 'Move: WASD   Cast: Arrow Keys', {
-        fontSize: '16px',
-        color: '#888888',
-      })
-      .setOrigin(0.5);
+    // 3) Wizard (left side) — heroic stance with magic glow underfoot.
+    this.paintWizardAura();
+    const wizard = this.add.image(240, GAME_HEIGHT / 2 + 60, TextureKeys.Player);
+    wizard.setScale(4);
+    wizard.setRotation(-0.08);
+
+    // 4) Action effects between them — wizard's missile streak + queen's thorn volley.
+    this.paintActionEffects();
+
+    // 5) Title + subtitle on top of everything ------------------------------
+    this.paintTitle(cx);
 
     const startGame = (): void => {
       this.scene.start(SceneKeys.Game);
@@ -41,4 +58,285 @@ export class MainMenuScene extends Phaser.Scene {
     this.input.keyboard?.once('keydown-ENTER', startGame);
     this.input.once('pointerdown', startGame);
   }
+
+  // ---------------------------------------------------------------------------
+  // Painters
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Sky gradient (dark purple → deep teal-green), distant + mid forest
+   * silhouettes, mossy ground curve, mist bands, scattered fireflies.
+   * Painted with primitive shapes — no atlas fetching, deterministic.
+   */
+  private paintBackdrop(g: Phaser.GameObjects.Graphics): void {
+    // Sky gradient — fake the gradient by stacking 12 horizontal strips.
+    const skyTop = 0x1a0c2a;
+    const skyBottom = 0x0e1a16;
+    const horizonY = GAME_HEIGHT * 0.62;
+    const strips = 16;
+    for (let i = 0; i < strips; i++) {
+      const t = i / (strips - 1);
+      const color = lerpColor(skyTop, skyBottom, t);
+      g.fillStyle(color, 1);
+      const y = (i / strips) * horizonY;
+      const h = Math.ceil(horizonY / strips) + 1;
+      g.fillRect(0, y, GAME_WIDTH, h);
+    }
+
+    // Pink moon halo behind the queen — soft ominous backlight.
+    const moonX = GAME_WIDTH - 240;
+    const moonY = GAME_HEIGHT * 0.30;
+    const haloLayers = [
+      { r: 220, alpha: 0.06, color: 0xff7ac0 },
+      { r: 170, alpha: 0.1, color: 0xff7ac0 },
+      { r: 120, alpha: 0.16, color: 0xffaad8 },
+      { r: 80, alpha: 0.22, color: 0xffd0e8 },
+      { r: 50, alpha: 0.4, color: 0xffeaf2 },
+    ];
+    for (const layer of haloLayers) {
+      g.fillStyle(layer.color, layer.alpha);
+      g.fillCircle(moonX, moonY, layer.r);
+    }
+
+    // Distant forest silhouette layer (back) — small jagged triangle band
+    // running across the horizon.
+    g.fillStyle(0x040a0a, 1);
+    g.fillRect(0, horizonY - 4, GAME_WIDTH, 6);
+    for (let x = 0; x < GAME_WIDTH; x += 18) {
+      const h = 14 + ((x * 7919) % 18); // pseudo-random, deterministic
+      g.fillTriangle(x - 4, horizonY, x + 12, horizonY, x + 4, horizonY - h);
+    }
+
+    // Mid forest silhouette layer (closer) — larger, denser trees.
+    g.fillStyle(0x081210, 1);
+    g.fillRect(0, horizonY + 6, GAME_WIDTH, 22);
+    for (let x = -10; x < GAME_WIDTH + 10; x += 36) {
+      const h = 36 + ((x * 4421) % 28);
+      // Trunk
+      g.fillRect(x + 14, horizonY + 6, 4, h * 0.45);
+      // Foliage — overlapping circles
+      g.fillStyle(0x0a1a18, 1);
+      g.fillCircle(x + 16, horizonY + 6 - h * 0.2, h * 0.28);
+      g.fillCircle(x + 6, horizonY + 6 - h * 0.05, h * 0.22);
+      g.fillCircle(x + 26, horizonY + 6, h * 0.24);
+      g.fillStyle(0x081210, 1);
+    }
+
+    // Mossy ground curve — fills below horizon, slightly arched.
+    g.fillStyle(0x0e2a22, 1);
+    g.fillRect(0, horizonY + 20, GAME_WIDTH, GAME_HEIGHT - horizonY);
+    g.fillStyle(0x14361a, 1);
+    g.fillEllipse(GAME_WIDTH / 2, GAME_HEIGHT + 60, GAME_WIDTH * 1.4, 220);
+    g.fillStyle(0x1f4a26, 1);
+    g.fillEllipse(GAME_WIDTH / 2, GAME_HEIGHT + 100, GAME_WIDTH * 1.3, 200);
+
+    // Mist bands — thin alpha strips just above the ground line.
+    g.fillStyle(0xc0eadd, 0.06);
+    g.fillRect(0, horizonY + 26, GAME_WIDTH, 14);
+    g.fillStyle(0xc0eadd, 0.08);
+    g.fillRect(0, horizonY + 44, GAME_WIDTH, 8);
+
+    // Fireflies — palette-glow specks scattered through the lower scene.
+    const fly = (x: number, y: number, size: number, color: number, alpha: number): void => {
+      g.fillStyle(0x040a05, 1);
+      g.fillCircle(x, y, size + 0.8);
+      g.fillStyle(color, alpha);
+      g.fillCircle(x, y, size);
+      g.fillStyle(0xffffff, alpha * 0.9);
+      g.fillRect(x, y - 1, 1, 1);
+    };
+    const fireflies: ReadonlyArray<readonly [number, number, number]> = [
+      [120, 220, 2],
+      [380, 180, 1.6],
+      [460, 260, 2.2],
+      [560, 200, 1.8],
+      [680, 350, 1.6],
+      [820, 240, 2],
+      [180, 380, 1.4],
+      [340, 460, 2],
+      [580, 480, 1.8],
+      [780, 460, 1.6],
+      [880, 380, 2],
+      [80, 320, 1.5],
+    ];
+    for (const [fx, fy, fr] of fireflies) {
+      fly(fx, fy, fr, 0x88c060, 1);
+    }
+    // A few pink ones near the queen for tonal cohesion.
+    fly(GAME_WIDTH - 320, 200, 1.6, 0xff7ac0, 1);
+    fly(GAME_WIDTH - 180, 240, 2, 0xff7ac0, 1);
+    fly(GAME_WIDTH - 280, 360, 1.4, 0xffaad8, 1);
+  }
+
+  /**
+   * Pink swirl behind the queen so she reads as "powered up". Layered
+   * concentric pink rings + a few orbiting sparkle pixels.
+   */
+  private paintQueenHalo(): void {
+    const g = this.add.graphics();
+    const x = GAME_WIDTH - 240;
+    const y = GAME_HEIGHT / 2 - 30;
+    g.fillStyle(0xff7ac0, 0.14);
+    g.fillCircle(x, y, 180);
+    g.fillStyle(0xff7ac0, 0.18);
+    g.fillCircle(x, y, 130);
+    g.fillStyle(0xffaad8, 0.18);
+    g.fillCircle(x, y, 90);
+  }
+
+  /** Soft green-gold glow under the wizard's feet. */
+  private paintWizardAura(): void {
+    const g = this.add.graphics();
+    const x = 240;
+    const y = GAME_HEIGHT / 2 + 60;
+    g.fillStyle(0x88c060, 0.12);
+    g.fillEllipse(x, y + 110, 220, 60);
+    g.fillStyle(0x4ea656, 0.18);
+    g.fillEllipse(x, y + 110, 160, 40);
+    g.fillStyle(0xb0e890, 0.22);
+    g.fillEllipse(x, y + 110, 100, 24);
+  }
+
+  /**
+   * Wizard's magic missile streak (left → right, arcing up) and queen's
+   * thorn volley (right → left, straighter). Drawn statically — no
+   * animation, this is a poster, not a cutscene.
+   */
+  private paintActionEffects(): void {
+    const g = this.add.graphics();
+    g.setDepth(10);
+
+    const wizardWandX = 240 + 60; // wand tip + rotation
+    const wizardWandY = GAME_HEIGHT / 2 + 60 - 50;
+    const queenChestX = GAME_WIDTH - 240 - 30;
+    const queenChestY = GAME_HEIGHT / 2 - 30 + 10;
+
+    // --- Wizard's magic missile arc ---
+    // 5 missile beads along a quadratic curve from wand → queen, fading
+    // toward the back of the trail.
+    const ctrlX = (wizardWandX + queenChestX) / 2;
+    const ctrlY = Math.min(wizardWandY, queenChestY) - 80;
+    const beads = 6;
+    for (let i = 0; i < beads; i++) {
+      const t = (i + 1) / (beads + 1);
+      const px = quadBezier(wizardWandX, ctrlX, queenChestX, t);
+      const py = quadBezier(wizardWandY, ctrlY, queenChestY, t);
+      const alpha = 0.4 + (i / (beads - 1)) * 0.55;
+      const radius = 3 + (i / (beads - 1)) * 5;
+      // Outer glow
+      g.fillStyle(0xc0eaff, alpha * 0.4);
+      g.fillCircle(px, py, radius * 1.6);
+      // Core
+      g.fillStyle(0xeaffff, alpha);
+      g.fillCircle(px, py, radius);
+      // Sparkle pixel
+      g.fillStyle(0xffffff, alpha);
+      g.fillRect(px, py - 1, 1, 1);
+    }
+
+    // --- Queen's thorn volley (3 thorns flying at the wizard) ---
+    const thorns: ReadonlyArray<readonly [number, number]> = [
+      [GAME_WIDTH - 360, GAME_HEIGHT / 2 - 80],
+      [GAME_WIDTH - 460, GAME_HEIGHT / 2 + 20],
+      [GAME_WIDTH - 560, GAME_HEIGHT / 2 + 100],
+    ];
+    for (const [tx, ty] of thorns) {
+      // Thorn body — small dark triangle pointing left toward the wizard
+      g.fillStyle(0x040408, 1);
+      g.fillTriangle(tx + 12, ty - 5, tx + 12, ty + 5, tx - 6, ty);
+      g.fillStyle(0xff7ac0, 1);
+      g.fillTriangle(tx + 10, ty - 3, tx + 10, ty + 3, tx - 4, ty);
+      // Tracer streak behind the thorn
+      g.fillStyle(0xffaad8, 0.5);
+      g.fillRect(tx + 12, ty - 1, 24, 2);
+      g.fillStyle(0xffaad8, 0.25);
+      g.fillRect(tx + 36, ty - 1, 28, 2);
+    }
+  }
+
+  private paintTitle(cx: number): void {
+    // Drop shadow for depth — drawn as a duplicate text behind the main one.
+    const titleShadow = this.add
+      .text(cx + 4, 110 + 4, 'PRISMANCY', {
+        fontSize: '88px',
+        fontStyle: 'bold',
+        color: '#000000',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.55);
+
+    const title = this.add
+      .text(cx, 110, 'PRISMANCY', {
+        fontSize: '88px',
+        fontStyle: 'bold',
+        color: '#e9d5ff',
+        stroke: '#1a0828',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5);
+
+    // Subtle title pulse so it feels alive.
+    this.tweens.add({
+      targets: [title, titleShadow],
+      scale: { from: 1, to: 1.03 },
+      duration: 2000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+    });
+
+    // Subtitle — pulsing prompt
+    const prompt = this.add
+      .text(cx, GAME_HEIGHT - 90, 'PRESS  [SPACE]  OR  [ENTER]', {
+        fontSize: '22px',
+        fontStyle: 'bold',
+        color: '#e9d5ff',
+        stroke: '#1a0828',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5);
+    this.tweens.add({
+      targets: prompt,
+      alpha: { from: 0.55, to: 1 },
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+    });
+
+    // Controls hint
+    this.add
+      .text(cx, GAME_HEIGHT - 50, 'MOVE  WASD     ·     CAST  ARROW KEYS', {
+        fontSize: '14px',
+        color: '#aab8c0',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.85);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Linear-interpolate between two RGB hex colours by `t` ∈ [0, 1]. */
+function lerpColor(a: number, b: number, t: number): number {
+  const ar = (a >> 16) & 0xff;
+  const ag = (a >> 8) & 0xff;
+  const ab = a & 0xff;
+  const br = (b >> 16) & 0xff;
+  const bg = (b >> 8) & 0xff;
+  const bb = b & 0xff;
+  const r = Math.round(ar + (br - ar) * t);
+  const gn = Math.round(ag + (bg - ag) * t);
+  const bn = Math.round(ab + (bb - ab) * t);
+  return (r << 16) | (gn << 8) | bn;
+}
+
+/** Quadratic Bézier point on axis: p0 + (p1-p0)*2t(1-t) + (p2-p0)*t². */
+function quadBezier(p0: number, p1: number, p2: number, t: number): number {
+  const u = 1 - t;
+  return u * u * p0 + 2 * u * t * p1 + t * t * p2;
 }
