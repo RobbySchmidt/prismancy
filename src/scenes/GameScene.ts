@@ -101,27 +101,19 @@ export class GameScene extends Phaser.Scene {
 
   private playerEnemyCollider: Phaser.Physics.Arcade.Collider | null = null;
   private playerWallCollider: Phaser.Physics.Arcade.Collider | null = null;
-  private playerRockCollider: Phaser.Physics.Arcade.Collider | null = null;
-  private playerTreeCollider: Phaser.Physics.Arcade.Collider | null = null;
   private playerBarrierColliders: Phaser.Physics.Arcade.Collider[] = [];
   private missileWallCollider: Phaser.Physics.Arcade.Collider | null = null;
-  private missileRockCollider: Phaser.Physics.Arcade.Collider | null = null;
-  private missileTreeCollider: Phaser.Physics.Arcade.Collider | null = null;
   private missileBarrierColliders: Phaser.Physics.Arcade.Collider[] = [];
   private missileEnemyOverlap: Phaser.Physics.Arcade.Collider | null = null;
   private playerEnemyOverlap: Phaser.Physics.Arcade.Collider | null = null;
   private playerPickupOverlap: Phaser.Physics.Arcade.Collider | null = null;
   private doorTriggerOverlaps: Phaser.Physics.Arcade.Collider[] = [];
   private enemyProjectileWallCollider: Phaser.Physics.Arcade.Collider | null = null;
-  private enemyProjectileRockCollider: Phaser.Physics.Arcade.Collider | null = null;
-  private enemyProjectileTreeCollider: Phaser.Physics.Arcade.Collider | null = null;
   private enemyProjectileBarrierColliders: Phaser.Physics.Arcade.Collider[] = [];
   private enemyProjectilePlayerOverlap: Phaser.Physics.Arcade.Collider | null = null;
   private enemyBlockerCollider: Phaser.Physics.Arcade.Collider | null = null;
   private enemyProjectileBlockerCollider: Phaser.Physics.Arcade.Collider | null = null;
   private enemyWallCollider: Phaser.Physics.Arcade.Collider | null = null;
-  private enemyRockCollider: Phaser.Physics.Arcade.Collider | null = null;
-  private enemyTreeCollider: Phaser.Physics.Arcade.Collider | null = null;
 
   private readonly playerDiedHandler = (): void => this.handlePlayerDied();
   private readonly enemyKilledHandler = (): void => this.checkRoomClearedSoon();
@@ -562,8 +554,11 @@ export class GameScene extends Phaser.Scene {
     EventBus.emit('floor:roomEntered', { roomId });
 
     // If a re-entered room had no enemies but was somehow not marked cleared,
-    // settle that now (shouldn't happen, but safe).
-    if (!desc.cleared && desc.enemySpawnCount === 0) {
+    // settle that now (shouldn't happen, but safe). Boss rooms are excluded:
+    // they always have `enemySpawnCount = 0` (the boss is spawned separately
+    // via `spawnBossForRoom`), so without this guard the doors would pop open
+    // the moment the player walks in instead of staying shut until kill.
+    if (!desc.cleared && desc.enemySpawnCount === 0 && desc.kind !== RoomKind.Boss) {
       this.markCurrentRoomCleared();
     }
   }
@@ -571,24 +566,16 @@ export class GameScene extends Phaser.Scene {
   private tearDownActiveRoom(): void {
     // Remove colliders before destroying their targets.
     this.playerWallCollider?.destroy();
-    this.playerRockCollider?.destroy();
-    this.playerTreeCollider?.destroy();
     this.playerEnemyCollider?.destroy();
     this.missileWallCollider?.destroy();
-    this.missileRockCollider?.destroy();
-    this.missileTreeCollider?.destroy();
     this.missileEnemyOverlap?.destroy();
     this.playerEnemyOverlap?.destroy();
     this.playerPickupOverlap?.destroy();
     this.enemyProjectileWallCollider?.destroy();
-    this.enemyProjectileRockCollider?.destroy();
-    this.enemyProjectileTreeCollider?.destroy();
     this.enemyProjectilePlayerOverlap?.destroy();
     this.enemyBlockerCollider?.destroy();
     this.enemyProjectileBlockerCollider?.destroy();
     this.enemyWallCollider?.destroy();
-    this.enemyRockCollider?.destroy();
-    this.enemyTreeCollider?.destroy();
     for (const c of this.playerBarrierColliders) c.destroy();
     for (const c of this.missileBarrierColliders) c.destroy();
     for (const c of this.enemyProjectileBarrierColliders) c.destroy();
@@ -742,12 +729,7 @@ export class GameScene extends Phaser.Scene {
       }),
       getTreePositions: () => {
         if (!this.currentRoom) return [];
-        const out: { x: number; y: number }[] = [];
-        for (const child of this.currentRoom.trees.getChildren()) {
-          const t = child as Phaser.GameObjects.Image;
-          out.push({ x: t.x, y: t.y });
-        }
-        return out;
+        return this.currentRoom.treePositions.map((p) => ({ x: p.x, y: p.y }));
       },
     };
   }
@@ -841,41 +823,17 @@ export class GameScene extends Phaser.Scene {
     };
 
     this.playerWallCollider = this.physics.add.collider(this.player, this.currentRoom.walls);
-    this.playerRockCollider = this.physics.add.collider(this.player, this.currentRoom.rocks);
-    this.playerTreeCollider = this.physics.add.collider(this.player, this.currentRoom.trees);
     this.enemyWallCollider = this.physics.add.collider(this.enemies, this.currentRoom.walls);
-    this.enemyRockCollider = this.physics.add.collider(this.enemies, this.currentRoom.rocks);
-    this.enemyTreeCollider = this.physics.add.collider(this.enemies, this.currentRoom.trees);
     this.missileWallCollider = this.physics.add.collider(
       this.missilePool.getGroup(),
       this.currentRoom.walls,
       deactivateMissile,
     );
-    this.missileRockCollider = this.physics.add.collider(
-      this.missilePool.getGroup(),
-      this.currentRoom.rocks,
-      deactivateMissile,
-    );
-    this.missileTreeCollider = this.physics.add.collider(
-      this.missilePool.getGroup(),
-      this.currentRoom.trees,
-      deactivateMissile,
-    );
 
-    // Enemy projectiles share the same wall/rock/tree kill behaviour.
+    // Enemy projectiles share the same wall kill behaviour.
     this.enemyProjectileWallCollider = this.physics.add.collider(
       this.enemyProjectilePool.getGroup(),
       this.currentRoom.walls,
-      deactivateMissile,
-    );
-    this.enemyProjectileRockCollider = this.physics.add.collider(
-      this.enemyProjectilePool.getGroup(),
-      this.currentRoom.rocks,
-      deactivateMissile,
-    );
-    this.enemyProjectileTreeCollider = this.physics.add.collider(
-      this.enemyProjectilePool.getGroup(),
-      this.currentRoom.trees,
       deactivateMissile,
     );
 

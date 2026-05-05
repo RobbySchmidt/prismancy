@@ -58,15 +58,17 @@ export abstract class BossEnemy extends BaseEnemy {
   protected abstract onPhaseChanged(newPhase: number): void;
 
   /**
-   * Override `BaseEnemy.takeDamage` to (a) emit `boss:hpChanged` for the HUD
-   * and (b) check whether the latest hit crossed any phase threshold. We
-   * delegate to `super.takeDamage` so flash + knockback + the death path run
-   * exactly the same as for normal enemies; the death branch just additionally
-   * emits `boss:killed` (see `die()` below).
+   * Override `BaseEnemy.takeDamage` to (a) drop the knockback velocity + AI
+   * lock so sustained missile fire doesn't pin the boss in a corner with its
+   * AI permanently locked (a single hit lasts KNOCKBACK_DURATION_MS; under
+   * fast firerate the lock never expires and the boss stops attacking),
+   * (b) emit `boss:hpChanged` for the HUD, (c) check whether the latest hit
+   * crossed any phase threshold. The death branch additionally emits
+   * `boss:killed` (see `die()` below).
    */
-  override takeDamage(amount: number, knockback?: Vector2): boolean {
-    if (amount <= 0 || this.hp <= 0) return super.takeDamage(amount, knockback);
-    const killed = super.takeDamage(amount, knockback);
+  override takeDamage(amount: number, _knockback?: Vector2): boolean {
+    if (amount <= 0 || this.hp <= 0) return super.takeDamage(amount, undefined);
+    const killed = super.takeDamage(amount, undefined);
 
     if (this.hp > 0) {
       EventBus.emit('boss:hpChanged', { current: this.hp, max: this.maxHp });

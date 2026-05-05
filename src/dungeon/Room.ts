@@ -25,14 +25,12 @@ import { Door } from './Door';
  */
 export class Room {
   readonly walls: Phaser.Physics.Arcade.StaticGroup;
-  readonly rocks: Phaser.Physics.Arcade.StaticGroup;
   /**
-   * Trees collide too — body is sized to the trunk + lower foliage so the
-   * player walks around the trunk but the canopy can still overlap the
-   * upper part of adjacent tiles visually. Same physical role as `rocks`,
-   * just sourced from a different decoration kind.
+   * Rocks and trees are purely visual decoration (no physics body) — player
+   * and enemies walk through them freely. Tree positions are tracked so the
+   * Pixie Queen can teleport between them.
    */
-  readonly trees: Phaser.Physics.Arcade.StaticGroup;
+  readonly treePositions: { x: number; y: number }[] = [];
   /**
    * Invisible barriers at each door position, always present whether the
    * door is open or closed. Used to keep enemies + enemy projectiles inside
@@ -57,8 +55,6 @@ export class Room {
     this.widthPx = ROOM_WIDTH_TILES * TILE_SIZE;
     this.heightPx = ROOM_HEIGHT_TILES * TILE_SIZE;
     this.walls = scene.physics.add.staticGroup();
-    this.rocks = scene.physics.add.staticGroup();
-    this.trees = scene.physics.add.staticGroup();
     this.enemyBlockers = scene.physics.add.staticGroup();
 
     const rng = new RNG(descriptor.decorationSeed);
@@ -220,16 +216,8 @@ export class Room {
         ty * TILE_SIZE + TILE_SIZE / 2,
         rockDecoKey(this.theme.id),
       )
-      .setDepth(DepthLayers.Wall);
-    this.scene.physics.add.existing(rock, true);
-    // Body shrunk to a circle matching the visible rock silhouette so two
-    // adjacent rock tiles leave enough gap for the player (PLAYER_HITBOX_RADIUS
-    // = 18) to squeeze through. Without this the body covers the full 36×28
-    // texture frame and adjacent rocks form a wall.
-    const body = rock.body as Phaser.Physics.Arcade.StaticBody;
-    body.setCircle(12, (rock.width - 24) / 2, (rock.height - 24) / 2 + 2);
-    body.updateFromGameObject();
-    this.rocks.add(rock);
+      .setDepth(DepthLayers.FloorDecoration);
+    this.decorations.push(rock);
   }
 
   private placeTree(tx: number, ty: number, rng: RNG): void {
@@ -237,17 +225,9 @@ export class Room {
     const cy = ty * TILE_SIZE + TILE_SIZE / 2 + rng.intBetween(-4, 4);
     const tree = this.scene.add
       .image(cx, cy, treeDecoKey(this.theme.id))
-      .setDepth(DepthLayers.Wall);
-    // Body covers just the trunk (~bottom 14 px) so adjacent trees leave
-    // enough gap for the player to squeeze through. Width 12 matches the
-    // trunk width, not the canopy — the canopy is purely visual and can
-    // overlap neighbouring tiles freely.
-    this.scene.physics.add.existing(tree, true);
-    const body = tree.body as Phaser.Physics.Arcade.StaticBody;
-    body.setSize(12, 14);
-    body.setOffset((tree.width - 12) / 2, tree.height - 14);
-    body.updateFromGameObject();
-    this.trees.add(tree);
+      .setDepth(DepthLayers.FloorDecoration);
+    this.decorations.push(tree);
+    this.treePositions.push({ x: cx, y: cy });
   }
 
   private placeMushroom(tx: number, ty: number, rng: RNG): void {
@@ -318,10 +298,7 @@ export class Room {
     this.floorTiles.length = 0;
     this.walls.clear(true, true);
     this.walls.destroy();
-    this.rocks.clear(true, true);
-    this.rocks.destroy();
-    this.trees.clear(true, true);
-    this.trees.destroy();
+    this.treePositions.length = 0;
     this.enemyBlockers.clear(true, true);
     this.enemyBlockers.destroy();
   }

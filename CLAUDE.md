@@ -270,8 +270,9 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 
 **Hitbox-Tuning (User-Validated):**
 - `PLAYER_HITBOX_RADIUS = 13` (war 18 — zu groß für Squeeze zwischen Rocks). Body-Center +12 px nach unten so der Hut nicht die Hitbox ist, sondern die Robe.
-- Rocks: Circle-Body Radius 12 (statt voller 36×28 Texture-Frame). Adjacent Rocks lassen 40 px Lücke für Spieler.
-- Trees: 12×14 Trunk-Body am unteren Sprite-Rand. Krone überlappt visuell ohne Kollision.
+- Rocks + Trees: **keine Hitbox**, reine Boden-Deko auf `DepthLayers.FloorDecoration` (unter Spieler/Gegner) — User-Feedback: Steine machten als Hindernis im Bewegungsfluss keinen Sinn, Bäume verbargen Pixies hinter ihrer Krone, und alles soll unter Spieler/Gegnern sein. `Room.treePositions` trackt die Tree-Positionen weiter, damit Pixie Queen zwischen Bäumen teleportieren kann.
+
+**Boss-Knockback:** `BossEnemy.takeDamage` ignoriert den `knockback`-Parameter — andernfalls verlängert jeder Treffer `knockbackUntil` und die Boss-AI bleibt unter Sustained Fire dauerhaft gelockt (Bug: Mossy Behemoth wurde in die Ecke geschoben und blieb inaktiv). Hits flashen + applizieren Damage wie gehabt, Bosse bewegen sich aber ausschließlich durch ihre eigene AI.
 
 **DEV-Hooks:** `__wiz.spawnTreasure()`, `__wiz.simulateFloor2()` (markiert Treasure/Shop-Türen als locked zum Lock-Test), `__wiz.stats()`, `__wiz.itemSystem()` — nur in `import.meta.env.DEV`. **`STARTING_COINS = 50`** als Test-Konstante in GameConfig.ts (Standard wird später 0 oder Meta-Progression).
 
