@@ -14,10 +14,13 @@
         overflow: hidden;
         font-family: system-ui, -apple-system, sans-serif;
       }
+      /*
+       * Plain block container — Phaser's `autoCenter: CENTER_BOTH` handles
+       * the canvas centering via inline margins. Stacking flex centering
+       * on top of Phaser's auto-center conflicted and pushed the canvas
+       * off-axis on wide viewports.
+       */
       #game {
-        display: flex;
-        align-items: center;
-        justify-content: center;
         width: 100vw;
         height: 100vh;
       }

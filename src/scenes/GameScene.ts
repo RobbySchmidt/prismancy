@@ -747,7 +747,13 @@ export class GameScene extends Phaser.Scene {
     if (desc.kind === RoomKind.Shop && !desc.looted) {
       const center = this.getCurrentRoomCenter();
       if (center) {
-        const result = ShopRoomBuilder.build(this.shopHost(), desc, this.dungeonSeed, center);
+        const result = ShopRoomBuilder.build(
+          this.shopHost(),
+          desc,
+          this.dungeonSeed,
+          center,
+          this.itemSystem.getPickedIds(),
+        );
         if (result.allBought) desc.looted = true;
       }
     }

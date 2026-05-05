@@ -9,9 +9,13 @@ const DROP_ICON_TEXTURE: Partial<Record<PickupKind, string>> = {
   [PickupKind.Heart]: TextureKeys.HeartFull,
   [PickupKind.Coin]: TextureKeys.Coin,
   [PickupKind.Key]: TextureKeys.Key,
+  [PickupKind.GoldCrate]: TextureKeys.GoldCrate,
+  [PickupKind.BrownCrate]: TextureKeys.BrownCrate,
 };
 const DROP_ICON_PRIORITY: readonly PickupKind[] = [
   PickupKind.Heart,
+  PickupKind.GoldCrate,
+  PickupKind.BrownCrate,
   PickupKind.Key,
   PickupKind.Coin,
 ];

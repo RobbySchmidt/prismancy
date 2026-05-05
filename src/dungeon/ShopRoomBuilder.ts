@@ -6,7 +6,7 @@ import {
   SHOP_SLOT_SPACING,
 } from '../config/GameConfig';
 import { type ItemDefinition, ItemPool, type RoomDescriptor } from '../types';
-import { pickItemFromPool, type ItemId } from '../data/items';
+import { ITEMS, pickItemFromPool, type ItemId } from '../data/items';
 import { RNG } from '../utils/RNG';
 import { type BasePickup } from '../entities/pickups/BasePickup';
 
@@ -37,11 +37,14 @@ export interface ShopBuildResult {
 
 /**
  * Lays out a shop room's 4 purchasable slots: heart, key, two items from
- * `ItemPool.Shop`. Item slots are deterministic per (dungeonSeed, room id)
- * so re-entry rolls the same items, and they're distinct via the
- * `pickItemFromPool` exclude set. Already-purchased slots in
- * `desc.purchasedShopSlots` are skipped so a partial-bought shop only shows
- * what's left.
+ * `ItemPool.Shop`. Item slots are rolled once on the first visit (with
+ * the player's `pickedIds` as the initial exclude so the shop never
+ * spawns an item the player already owns at build time) and the result
+ * is snapshotted into `desc.shopItemIds` — re-entry uses the snapshot,
+ * never re-rolls. If the player picks up one of the snapshot's items
+ * from somewhere else AFTER the shop was built, that slot is hidden on
+ * re-entry (snapshot stays stable; the "owned" item just doesn't display).
+ * Already-purchased slots in `desc.purchasedShopSlots` are skipped.
  */
 export class ShopRoomBuilder {
   static build(
@@ -49,9 +52,9 @@ export class ShopRoomBuilder {
     desc: RoomDescriptor,
     dungeonSeed: string,
     roomCenter: { x: number; y: number },
+    pickedIds: ReadonlySet<string> = new Set<string>(),
   ): ShopBuildResult {
     const purchased = new Set(desc.purchasedShopSlots ?? []);
-    const rng = new RNG(`${dungeonSeed}-shop-${desc.id}`);
 
     const slotXs: number[] = [];
     const totalWidth = (SHOP_SLOT_COUNT - 1) * SHOP_SLOT_SPACING;
@@ -73,22 +76,43 @@ export class ShopRoomBuilder {
       spawned++;
     }
 
-    // Item slots 2 + 3: deterministic + distinct via the exclude set. We
-    // always advance the RNG for slot 2's pick even if slot 2 is already
-    // bought, so slot 3 picks the same item it did on the first build.
-    const exclude = new Set<ItemId>();
-    for (const slotIndex of [2, 3] as const) {
-      const item = pickItemFromPool(ItemPool.Shop, rng, exclude);
-      if (!item) break;
-      exclude.add(item.id as ItemId);
+    // Slots 2 + 3: snapshot or roll fresh.
+    const itemDefs: [ItemDefinition | null, ItemDefinition | null] = [null, null];
+    if (desc.shopItemIds) {
+      const itemMap = ITEMS as Record<string, ItemDefinition | undefined>;
+      itemDefs[0] = desc.shopItemIds[0] ? (itemMap[desc.shopItemIds[0]] ?? null) : null;
+      itemDefs[1] = desc.shopItemIds[1] ? (itemMap[desc.shopItemIds[1]] ?? null) : null;
+    } else {
+      const rng = new RNG(`${dungeonSeed}-shop-${desc.id}`);
+      const exclude = new Set<ItemId>(pickedIds as ReadonlySet<ItemId>);
+      const slot2 = pickItemFromPool(ItemPool.Shop, rng, exclude);
+      itemDefs[0] = slot2;
+      if (slot2) exclude.add(slot2.id as ItemId);
+      const slot3 = pickItemFromPool(ItemPool.Shop, rng, exclude);
+      itemDefs[1] = slot3;
+      desc.shopItemIds = [slot2?.id ?? '', slot3?.id ?? ''] as const;
+    }
+
+    for (let i = 0; i < 2; i++) {
+      const slotIndex = (i + 2) as 2 | 3;
+      const item = itemDefs[i];
+      if (!item) continue;
       if (purchased.has(slotIndex)) continue;
+      // Hide if the player picked the item up elsewhere after the shop
+      // was first rolled — keeps the snapshot stable while still honouring
+      // "owned items disappear from pools".
+      if (pickedIds.has(item.id)) continue;
       const price = item.shopPrice ?? SHOP_DEFAULT_ITEM_PRICE;
       host.spawnItemPickup(slotXs[slotIndex]!, slotY, item, price, slotIndex);
       host.drawPriceLabel(slotXs[slotIndex]!, slotY - 30, price);
       spawned++;
     }
 
-    const allBought = purchased.size >= SHOP_SLOT_COUNT;
+    // Mark the shop as exhausted once nothing's left to display, even if
+    // some slots were never explicitly bought (heart fully owned, items
+    // hidden because picked up elsewhere). This lets `looted` flip and
+    // future re-entries skip the build entirely.
+    const allBought = spawned === 0;
     return { spawnedSlots: spawned, allBought };
   }
 }

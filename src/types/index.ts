@@ -139,6 +139,14 @@ export interface RoomDescriptor {
    * when the last slot is bought.
    */
   purchasedShopSlots?: number[];
+  /**
+   * Snapshot of the two item-slot ids rolled on the first visit to this
+   * Shop room. Cached so re-entry shows the same items even after the
+   * player picks up things elsewhere (which would otherwise change the
+   * `pickedIds` exclude set and re-roll different items). Empty string
+   * means "no eligible item could be rolled for this slot".
+   */
+  shopItemIds?: readonly [string, string];
 }
 
 export interface PickupSnapshot {
