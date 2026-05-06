@@ -218,7 +218,7 @@ src/
 - [x] Floor-Theme-Switch: Camera-Background (`theme.palette.ambient`), Wall-/Floor-Textures, Decorations alle per-floor in PreloadScene. Sapphire-Decos: **Lily Pad** (statt Tree, mit Bloom + Saphir-Wassertropfen) + **Mangroven-Wurzel** (statt Rock, verschlungene Wurzelbänder mit Saphir-Glow-Knoten + Algen-Strängen) via neuem `FloorTheme.decorationStyle: 'forest' | 'swamp'` Diskriminator.
 - [ ] HP/Damage-Skalierung pro Floor — *noch nicht relevant*: neue Sapphire-Mobs/Bosse haben passende Werte direkt eingebacken. Wird interessant sobald Floor-1-Mobs auf Floor 3+ wiederkehren.
 
-**Chunk 4 — Onyx Mansion + Secret Endboss (in progress)**
+**Chunk 4 — Onyx Mansion + Secret Endboss (mostly DONE — only Win-Screens + final tuning offen)**
 
 *Foundation* (DONE):
 - [x] `onyx-mansion` als `FloorTheme` in `data/floors.ts` mit eigener Palette (deep purple-black + gold/amethyst-glow accents)
@@ -227,31 +227,63 @@ src/
 - [x] Mansion-Decos: **Candelabrum** (statt Tree, gold-trim iron stand mit 3 lit candles + amber halo) + **Cracked Vase** (statt Rock, purple ceramic mit gold rim + visible crack mit amethyst glow leaking)
 - [x] Boss/Treasure/Shop/Normal door textures funktionieren palette-driven für mansion (kein eigenes branching nötig)
 - [x] **Gem-Texturen redesign** (alle 3 Floors): 18×18 Canvas (statt 14×14), per-Floor cut variant — Emerald = emerald-cut step, Sapphire = round brilliant, Onyx = marquise. Palette-driven 5-tone shading + per-floor halo color in `GemPickup` (statt vorher hardcoded grün)
-- [x] **DEV_FLOOR_ORDER** in `GameScene.ts`: superset of `FLOOR_ORDER` mit `onyx-mansion` so dass `__wiz.gotoFloor(3)` Onyx visuell testen kann ohne natural-progression zu brechen (Sapphire stairs spawnen weiterhin nicht, Sapphire bleibt last reachable floor)
-
-*Geplante Boss-Mechanik* (locked design, eigene Sessions):
-- **Vampire-Doppelboss** als Floor-Standard-Boss (NICHT Lord Onyx). Asymmetrisch: eine Melee (rot), eine Magic/Range (blau). Phasen: beide → eine → Berserker, **zwei distinct Berserker-Patterns** (eine pro Body, depending on which survived). Asymmetric chosen damit's nicht "double bullet hell" wird.
-- **Gem-Siegel an der Wand** nach Vampire-Kill: 3 Gems einsetzen → Lord-Onyx-Room öffnet
-- **No-Gems-Pfad:** Treppe nach oben + Win-Screen mit subtle hint ("the dark light survived" oder ähnlich) — Run als "abgeschlossen aber unvollständig" gewertet, kein Bad Ending
-- **Gem-Mechanik bleibt:** no-hit-rewards von jedem Floor-Boss (perfect run on Emerald + Sapphire + Vampires = alle 3 Gems)
-- **Lord Onyx** als Secret Endboss hinter dem Gem-Siegel. Visuelle Vorlage existiert in `StyleMockupScene.drawLordOnyx`, aber User flagged für visual rework
-- **Win-Screen** (full-victory variant) nach Lord-Onyx-Kill
+- [x] **`onyx-mansion` in `FLOOR_ORDER`** — Sapphire-Boss-Kill spawnt jetzt natürliche Stairs nach Onyx. `DEV_FLOOR_ORDER` ist jetzt identisch mit `FLOOR_ORDER` (bleibt als separate Konstante für künftige half-built floors).
 
 *Mansion-Mob-Roster (DONE, post-playtest activity bump):*
-- [x] **Wraith** — Phasing-Chaser. Beelines auf Player, alle ~2.5s wechselt in Intangible-Phase (~1.5s, alpha 0.28, `body.checkCollision.none = true` → Player + Missiles passen durch, kein Contact-Damage). `takeDamage` no-ops während intangible (auch falls overlap durchschlüpft). HP 2, speed 100. Threat: Timing.
-- [x] **Possessed Candelabra** — Slow Tank-Walker mit dual threat layer: (a) droppt alle **2.0s** eine WaxPuddle hinter sich (`WaxPuddleGroup` pool, 16 instances; puddle 3s lifetime, 12px hitbox, 1 HP damage, fade-out in den letzten 600ms) **+** (b) feuert alle **2.5s** einen 3-projektil **Flame-Cone** (`FlameMissile` orange ember texture, ±15° spread) toward player. Initial-Delay 1.4s + 0-600ms jitter so eine Welle nicht synchron feuert. HP 5, speed 55. Threat: Positional Control + Ranged Pressure.
-- [x] **Cursed Mirror** — Rooted Predictive Shooter. State-Machine: idle → telegraph (**500ms**, alpha-flash + capture player.x/y) → fire (`MansionMissile` amethyst-purple texture via EnemyProjectilePool optional texture override) → cooldown **1.5s**. Schießt auf gespeicherte Position, nicht aktuelle → still-stehen = Treffer, bewegen = Miss. HP 3. Threat: Movement-Predictor (~Shot alle 2s).
-- [x] Onyx-Roster gewichtet: wraith ×4, candelabra ×2, mirror ×2 — Wraith dominiert numerisch wie Forest Sprite auf Emerald
-- [x] **EnemyProjectilePool.fire** akzeptiert optional `textureKey` für andere bullets als Default-Thorn (used by Cursed Mirror = MansionMissile, Possessed Candelabra = FlameMissile)
-- [x] **WaxPuddle / WaxPuddleGroup** in `src/entities/hazards/` — separate hazard layer, deaktiviert beim room-tear-down via `waxPuddleGroup.deactivateAll()` in tear-down. Player ↔ puddle overlap is room-scoped (created per `enterRoom`, destroyed in tear-down).
+- [x] **Wraith** — Phasing-Chaser. Beelines auf Player, alle ~2.5s wechselt in Intangible-Phase (~1.5s, alpha 0.28, `body.checkCollision.none = true` → Player + Missiles passen durch, kein Contact-Damage). `takeDamage` no-ops während intangible. **HP 5** (war 2 — bei endgame damage one-shot, jetzt müssen Hits across Phasing-Cycles getimed werden), speed 100. Threat: Timing.
+- [x] **Possessed Candelabra** — Slow Tank-Walker mit dual threat layer: (a) droppt alle **2.0s** eine WaxPuddle hinter sich (`WaxPuddleGroup` pool, 16 instances; puddle 3s lifetime, 12px hitbox, 1 HP damage, fade-out in den letzten 600ms) **+** (b) feuert alle **2.5s** einen 3-projektil **Flame-Cone** (`FlameMissile` orange ember texture, ±15° spread) toward player. Initial-Delay 1.4s + 0-600ms jitter so eine Welle nicht synchron feuert. **HP 9** (war 5), speed 55. Threat: Positional Control + Ranged Pressure.
+- [x] **Cursed Mirror** — Rooted Homing Shooter (war: Predictive). State-Machine: idle → telegraph (**450ms**, alpha-flash) → fire (`MansionMissile` amethyst-purple texture, mit Homing) → cooldown **1100ms** (war 1500ms). Schießt auf aktuelle Player-Position und enabled Homing am Projektil (`MIRROR_HOMING_TURN_RATE_DEG = 110°/s`, `MIRROR_PROJECTILE_LIFETIME_MS = 2200ms`). Sharp 90°-Cuts dodgen, geradeaus laufen wird bestraft. **HP 7** (war 3). **`minPerRoom: 1`** — garantiert mindestens 1 Mirror pro Mansion-Room (sonst zu selten via weighted roll).
+- [x] Onyx-Roster gewichtet: wraith ×4, candelabra ×2, mirror ×2 (mirror force-spawn 1) — Wraith dominiert numerisch wie Forest Sprite auf Emerald
+- [x] **EnemyProjectilePool.fire** akzeptiert optional `textureKey` für andere bullets als Default-Thorn (used by Mirror = MansionMissile, Candelabra = FlameMissile, Marquis/Onyx = BloodProjectile/MansionMissile)
+- [x] **EnemyProjectile.setHoming(target, turnRateRadPerSec)** — generisches Homing-Capability. Frame-by-frame rotation der Velocity Richtung Target, capped auf turn rate. Reset bei jedem `fire()` damit recycled Pool-Sprites nicht weiterhomen. Used by Cursed Mirror + Lord Onyx.
+- [x] **WaxPuddle / WaxPuddleGroup + BloodTrail / BloodTrailGroup** in `src/entities/hazards/` — separate hazard layers, deaktiviert beim room-tear-down. Player↔hazard overlap room-scoped.
+- [x] **Per-Roster `minPerRoom?: number`** in `EnemyRosterEntry` — force-spawnt N instances vor weighted-fill. Used für Mirror auf Mansion. Counts gegen `enemySpawnCount` (3-5 total bleibt).
+
+*Vampire-Doppelboss (DONE — Standard-Boss auf Onyx):*
+- [x] **Architektur**: zwei Bodies + Coordinator-Pattern. `VampireBody` (extends BaseEnemy) suppresst knockback + notifiziert Coordinator on damage/death. `CrimsonLord` (Melee Dash) + `SapphireMarquis` (Range Kite + Blood-Magic). **`VampireFight`** Coordinator (NICHT Phaser GameObject) owns beide Bodies, aggregates HP für combined Bar, fired `boss:killed` exakt einmal beim zweiten Tod, triggers Solo-Mode auf Survivor wenn first stirbt.
+- [x] **`activeBoss`** Field-Type widened auf `BossEnemy | VampireFight | null` — beide implementieren `destroy()`.
+- [x] **Crimson Lord** (Melee, HP 35): chase player at **70 px/s** (war 100, zu aggressiv) → telegraph **700ms** (war 400, point-blank dash war undodgeable) → dash **500 px/s** × 250ms → recovery 600ms → idle gap **1400ms** (Phase 1) / 600ms (Phase 2 solo) / 250ms (Phase 3 berserker, no telegraph). Phase 2+ droppt **Blood-Trail** (4 drops along dash path, 1.2s lifetime, 1 HP damage). Berserker re-aims direction at dash-start (snappier feel ohne homing).
+- [x] **Sapphire Marquis** (Range/Mage, HP 35): kited bei **180 px** vom Player @ 60 px/s. Phase 1: **5-thorn fan** (60° spread) alle 1800ms + Teleport alle 4000ms (mit min **180 px PLAYER-distance** — bug-fix, vorher self-distance gemessen → materialized auf Spieler). Phase 2 solo: 7-thorn fan (90° spread) + 12-thorn radial **Bullet-Curtain** alle 3000ms mit 300ms Telegraph. Phase 3 berserker: stationär mit **8-arm rotating spinning stream**, **1 arm always skipped** → permanenter 90° Gap der mit-rotiert (`SAPPHIRE_MARQUIS_BERSERKER_SKIPPED_ARMS = 1`, war 0 = full ring → first wave dodgeable, später Gap closed). Spin 80°/s, fire 170ms.
+- [x] Marquis-Body bleibt blau, Projektile sind **rot/Blut** (Blood-Magic-Theme; `BloodProjectile` texture).
+- [x] **Phase 3 Berserker-Trigger** = Survivor unter 30 % HP via `VAMPIRE_BERSERKER_HP_FRACTION`. Tracked per body internally in `VampireBody.takeDamage`.
+- [x] **Texturen** (PreloadScene): Crimson Lord 36×42 (rote Robes, gold Trim, Fanged-Grin, slicked-back hair, Ruby-Medaillon), Sapphire Marquis 36×42 (blaue Robes, gold V-Collar, single glowing red eye + Scar, Wand mit red-Crystal-Tip, Sapphire-Medaillon), BloodProjectile 16×16 crimson orb, BloodTrail 28×28 crimson splat.
+- [x] **Spawn-Position**: Lord links + Marquis rechts vom Room-Center, offset `VAMPIRE_SPAWN_OFFSET_TILES = 1.8`. Boss-Roster `boss-vampire-twins` (virtueller ID) dispatcht in `spawnBossForRoom`/`devSpawnBoss` zum `VampireFight`. Display-Name "Vampire Twins". `VampireFight.destroy()` für tear-down.
+
+*No-Hit-Tracking (FIXED):*
+- [x] `playerTookDamageHandler` gated jetzt auf **`activeBoss !== null`** (war: `desc.kind === RoomKind.Boss`). Beim `__wiz.spawnBoss` außerhalb echter Boss-Rooms wurde der Damage nicht getrackt → Gem fälschlich gedroppt. Jetzt wahrer Predikat.
+- [x] **`bossDamageCount`** field als sanity-check parallel zum boolean flag. Gem-Award braucht `flag === true && damageCount === 0`. Dev-Console-Log am Boss-Kill: `flag=… damageCount=… → noHit=…, hasGem=…`.
+
+*Gem-Siegel (DONE):*
+- [x] **`GemSeal`** in `src/entities/GemSeal.ts` — gothic Stone-Altar mit gold Trim + 3 Sockets (one per floor in `REQUIRED_GEM_FLOORS = ['emerald-forest', 'sapphire-swamp', 'onyx-mansion']`). Render: empty Socket = dim+tinted, filled Socket = full color + pulsing halo (per-floor glow color from FLOORS palette). Trigger-Zone größer als Frame damit Player nicht pixel-perfect tappen muss.
+- [x] **Spawn**: nach Vampire-Kill auf Onyx, am bottom-center des Boss-Rooms (center.y + 3 tiles). Stairs spawnen oben (no-gems Exit). Re-entry path respawnt beide.
+- [x] **Activation**: Player-Overlap → wenn 3/3 Gems → Cinematic (Sockets E→S→O pulsen pro 180ms, lila Burst, Camera-Flash + Shake) → emit `seal:activated`. Wenn <3 → Floating "X / 3 trophies" Hint mit 1500ms Cooldown + emit `seal:hintShown`.
+- [x] **Auto-Insert** beim Gem-Pickup während Seal lebt: neuer Event `gem:pickedUp { floorId, x, y }` aus `GemPickup.onCollect` (vor `inventory.addGem`). `GemSeal.addGem(floorId, fromX, fromY)` animiert Gem-Sprite per **quadratischer Bezier-Kurve** (steigt nach oben, dann runter ins Socket) → empty Plate wird live zu filled (clearTint + alpha + Halo) + Back.Out-Punch beim Settle.
+- [x] **No-Gems-Exit**: `spawnStairsInCurrentRoom(onOverlap)` parametrisierter Action-Callback. Onyx-Variante emittet `run:onyxExitTaken` statt `advanceToNextFloor`. Placeholder-Reaction = Camera-Flash + Console-Log (Win-Screen kommt in #5).
+
+*Lord Onyx (DONE — Secret Endboss):*
+- [x] **`LordOnyx`** in `src/entities/enemies/LordOnyx.ts` — extends BossEnemy, rooted at room center. HP **90** (highest of any boss).
+- [x] **Phase 1** (HP > 66 %): Aimed Homing Missile alle **1800ms** (turn rate **60°/s** — easier als Mirror's 110, end-game player kann mit gestackten move-stats outmaneuvern) + 8-Thorn Radial alle 4000ms.
+- [x] **Phase 2** (33-66 %): on entry **2 Wraith-Adds** an deterministic Room-Corners + Camera-Shake. Cadence tightens: missile 1300ms, radial 3000ms, **+ 4-thorn spinning Cross** alle 2000ms (drift orientation each cycle).
+- [x] **Phase 3** (< 33 %): Camera-Flash + heavy Shake. **Continuous Marquis-style spinning stream** (8 arms, 1 skipped → 90° Gap rotates @ 60°/s, fire 180ms) **+ aimed Homing alle 2400ms** on top — Gap-Riding allein reicht nicht.
+- [x] **Texture** (PreloadScene 64×88): gothic Vampire-King silhouette. Gold 5-spire crown mit central amethyst gem at peak, sunken glowing red eyes mit halos, pale skin, dark Cloak mit gold Trim + tatter fringe (kein "festen Boden" — er floated), inner robe collar mit gold pendant, Scepter rechts mit Amethyst-Orb + halo, faint amethyst aura ringsum. (StyleMockupScene-Vorlage existiert noch in `drawLordOnyx` für Reference, aber neue Texture ist die canonical.)
+- [x] **Spawn-Pfad**: `seal:activated` → close all doors + tear down exit-stairs + Banner "Lord Onyx stirs..." → 900ms Delay → spawn LordOnyx zentral. Same `activeBoss` slot, same no-hit tracking, same boss bar.
+- [x] **Death-Pfad**: `boss:killed` payload checks `name === 'Lord Onyx'` → bypasses normal reward flow → calls `handleLordOnyxKilled` → Cosmetics.unlockPrismancySkin() + VICTORY-Banner + "Prismancy Skin Unlocked" Toast (only wenn neu) + Camera-Flash + Shake + emit `run:onyxFullVictory` (Win-Screen wires here in #5).
+
+*Cosmetic-Unlock-System (DONE):*
+- [x] **`src/systems/Cosmetics.ts`** — localStorage-backed mit try/catch fallback (private browsing). Storage-Key `'prismancy.unlocks.lordOnyxBeaten'`. API: `hasPrismancySkin()`, `unlockPrismancySkin()`, `resetAll()`.
+- [x] **Prismancy Wizard-Skin**: Roter+goldener Skin als Trophy für Lord-Onyx-Kill. Same pixel-layout wie Default, refactored `drawWizardTexture` in PreloadScene nimmt jetzt `palette` + `textureKey` Parameter. Beide Texturen werden bei Preload generiert: `tex-player` (default purple/white) + `tex-player-prismancy` (deep crimson robe + gold trim + black hat mit gold band).
+- [x] **Auto-Apply**: `Player`-Constructor + `MainMenuScene` checken `Cosmetics.hasPrismancySkin()` und wählen entsprechende Textur. Kein Toggle/Settings — once unlocked = always applied.
+
+*Onyx Boss-Pool-Items (DONE — droppt vom Vampire-Kill, NICHT Lord Onyx):*
+- [x] **Bloodbound Chalice** (`bloodboundChalice`): +1 max HP, +20 % damage (mult), Crimson missile tint (0xc8284a). Texture: gold goblet mit blood + side drip.
+- [x] **Vampire's Signet** (`vampireSignet`): +25 % fire rate, +15 % missile speed, gold-red tint. Texture: gold ring mit ruby cabochon top-mounted.
+- [x] **Obsidian Heart** (`obsidianHeart`): +1 dmg (add), +40 % range, amethyst tint (0x8a4ad8). Texture: faceted black-amethyst heart mit gold vein crack + sparkle.
+- Alle drei mit `floor: 'onyx-mansion'` tag → werden nur aus Vampire-Boss-Pool gezogen via `pickItemFromPool(..., currentFloor)`. **Lord Onyx gibt KEINE Items** — sein Reward ist der cosmetic Skin-Unlock.
 
 *Noch offen:*
-- [ ] Vampire-Doppelboss inkl. dual-body state machine + zwei Berserker-Patterns
-- [ ] Gem-Siegel UI + state machine (vampire-clear → seal-spawn → gem-input → onyx-room oder kryptische Nachricht)
-- [ ] Lord Onyx (mit visual rework)
-- [ ] Onyx Boss-Pool-Items (3, analog zu Sapphire)
-- [ ] Win-Screen (no-gems + full-victory Variants)
-- [ ] `onyx-mansion` zu `FLOOR_ORDER` (statt nur DEV_FLOOR_ORDER) sobald Vampire + Mobs existieren — dann descenden Sapphire-Stairs natürlich nach Onyx
+- [ ] **Win-Screen** (Phase 5 Chunk 4 #5): zwei Varianten — `run:onyxExitTaken` (no-gems incomplete-victory mit subtle hint "the dark light survived") + `run:onyxFullVictory` (full-victory mit Lord Onyx defeated + maybe stats display). Currently beide nur Placeholder (Camera-Flash + Banner-Text in GameScene).
+- [ ] **HP/Damage-Skalierung pro Floor systematisch** — Onyx-Mobs sind ad-hoc gebumped (5/9/7), aber kein generelles Scaling-System. Wird interessant sobald Floor-1-Mobs auf späteren Floors wiederkehren.
+- [ ] **Lord Onyx visual polish pass** — current texture funktioniert, aber User flagged ursprünglich für Rework. Wenn das spätere Sound/Polish-Phase erreicht, ggf. Iteration.
 
 **DoD:** Vollständiger Run vom Start bis zum finalen Boss möglich.
 
@@ -300,9 +332,13 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 
 **Pickup-Persistenz pro Raum:** `RoomDescriptor.pendingPickups` snapshottet uncollected Drops beim `tearDownActiveRoom`. Restore in `enterRoom` plus clear of the field (live group nimmt's auf). Item-Pickups (Treasure-Pedestals, Gold-Crate-Items) snapshotten NICHT — sie werden über `desc.looted` getrackt oder sind ephemerial (Gold Crate items: must collect immediately).
 
-**Boss-System (Phase 5):** `RoomKind.Boss` triggert in `enterRoom` einen Boss-Spawn statt normaler Enemies (`enemySpawnCount = 0` für Boss-Räume). `pickBossForFloor(floorId, rng)` mit Seed `${dungeonSeed}-boss` wählt deterministisch 1 von 4 Bossen pro Floor (Emerald + Sapphire haben jeweils 4). `bossNoHitInProgress`-Flag wird auf `false` gesetzt sobald `player:tookDamage` während Boss-Room feuert. Bei `boss:killed`: Türen auf, Boss-Pool-Item-Pedestal + 2 Hearts in Mitte, Gem-Pickup wenn no-hit, **Treppe** wenn `hasNextFloor()`. Spawn-Protection 700 ms auf alle Reward-Pickups.
+**Boss-System (Phase 5):** `RoomKind.Boss` triggert in `enterRoom` einen Boss-Spawn statt normaler Enemies (`enemySpawnCount = 0` für Boss-Räume). `pickBossForFloor(floorId, rng)` mit Seed `${dungeonSeed}-boss` wählt deterministisch einen Boss pro Floor (Emerald + Sapphire haben jeweils 4 alternativen, Onyx hat den virtuellen `boss-vampire-twins` der zum `VampireFight` Coordinator dispatcht). `bossNoHitInProgress`-Flag wird auf `false` gesetzt sobald `player:tookDamage` während aktivem Boss-Fight (`activeBoss !== null`) feuert — **gated auf activeBoss, nicht room-kind**, damit `__wiz.spawnBoss` außerhalb echter Boss-Rooms auch korrekt trackt. Parallel: `bossDamageCount` zählt Hits unabhängig vom Flag als sanity-check. Bei `boss:killed`: Türen auf, Boss-Pool-Item-Pedestal + 2 Hearts in Mitte, Gem-Pickup wenn `flag === true && damageCount === 0`, **Treppe** wenn `hasNextFloor()`. Spawn-Protection 700 ms auf alle Reward-Pickups.
 
-**Floor-Transition (Stairs):** `handleBossKilled` spawnt nach Loot eine Stairs-Image (oben-mittig im Boss-Raum) auf `DepthLayers.FloorDecoration` mit Pulse-Tween + Player-Overlap. Auf Overlap → `advanceToNextFloor()`: Snapshot `RunCarryOver`, Camera-Fade-Out 260ms, dann `scene.stop(UI) + scene.start(Game, {floorIndex+1, floorId, carryOver}) + scene.launch(UI)`. `FLOOR_ORDER = ['emerald-forest', 'sapphire-swamp']` — wird gegated für Win-Screen sobald Onyx kommt. Re-Entry des cleared Boss-Rooms respawnt die Treppe via `enterRoom`-Path. `tearDownActiveRoom` zerstört Sprite + Overlap.
+**Floor-Transition (Stairs):** `handleBossKilled` spawnt nach Loot eine Stairs-Image (oben-mittig im Boss-Raum) auf `DepthLayers.FloorDecoration` mit Pulse-Tween + Player-Overlap. `spawnStairsInCurrentRoom(onOverlap?)` nimmt optionales Action-Callback — default = `advanceToNextFloor()`. Auf Overlap → `advanceToNextFloor()`: Snapshot `RunCarryOver`, Camera-Fade-Out 260ms, dann `scene.stop(UI) + scene.start(Game, {floorIndex+1, floorId, carryOver}) + scene.launch(UI)`. `FLOOR_ORDER = ['emerald-forest', 'sapphire-swamp', 'onyx-mansion']`. Re-Entry des cleared Boss-Rooms respawnt die Treppe via `enterRoom`-Path. `tearDownActiveRoom` zerstört Sprite + Overlap.
+
+**Onyx-Endgame-Flow:** Onyx ist der letzte Floor in `FLOOR_ORDER` — kein `advanceToNextFloor` möglich. Stattdessen branched `handleBossKilled` für Onyx: spawnt **GemSeal unten + Exit-Stairs oben**. Stairs-Action emittet `run:onyxExitTaken` (no-gems incomplete-victory path; Win-Screen-Placeholder). Seal-Overlap mit 3/3 Gems → cinematic + emit `seal:activated` → `handleSealActivated` schließt Türen + tearDown Stairs + 900ms Delay → `spawnLordOnyxInCurrentRoom`. Lord Onyx Death (`name === 'Lord Onyx'` in payload) bypassed normal reward flow → `handleLordOnyxKilled` → `Cosmetics.unlockPrismancySkin()` + VICTORY-Banner + emit `run:onyxFullVictory` (Win-Screen-Placeholder). **Lord Onyx droppt KEINE Items** — nur Skin-Unlock.
+
+**Cosmetic-Unlock-System:** `src/systems/Cosmetics.ts` mit localStorage backing (try/catch fallback für private browsing). Storage-Key `'prismancy.unlocks.lordOnyxBeaten'`. API: `hasPrismancySkin()`, `unlockPrismancySkin()`, `resetAll()`. **Prismancy-Skin** (red/gold wizard) = Trophy für Lord-Onyx-Kill. `drawWizardTexture` in PreloadScene refactored mit `palette` + `textureKey` Parametern, generiert beide Variants up-front (`tex-player` + `tex-player-prismancy`). Player-Constructor + MainMenuScene checken Cosmetics und wählen entsprechende Textur. Auto-Apply, kein Toggle. Greift erst nach next scene start.
 
 **Run-Restart:** Zwei Wege um einen Run zu reseten:
 1. **Game-Over-R:** `GameOverScene` poll'd `R` (und `Enter`) via `JustDown` im update-loop statt `keyboard.once` (Bug-Fix: paused-scene + `scene.start` racet, once-listener feuerte unzuverlässig). `restartTriggered`-Flag verhindert Doppel-Restart.
@@ -327,8 +363,11 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 **DEV-Hooks** (nur `import.meta.env.DEV`):
 - `__wiz.spawnTreasure()` — Treasure-Pedestal im aktuellen Raum
 - `__wiz.simulateFloor2()` — markiert Treasure/Shop-Türen als locked zum Lock-Test
-- `__wiz.spawnBoss(id)` — force-spawnt Boss im aktuellen Raum, schließt Türen, killt vorhandene Enemies. Emerald: `'boss-vine-lord'`, `'boss-mossy-behemoth'`, `'boss-pixie-queen'`, `'boss-forest-heart'`. Sapphire: `'boss-toad-sovereign'`, `'boss-bloomheart'`, `'boss-damselfly-empress'`, `'boss-bog-colossus'`.
-- `__wiz.gotoFloor(n)` — restart auf Floor n (1=Emerald, 2=Sapphire, **3=Onyx**). Resettet alle Run-Stats; nur für Mob-/Theme-Testing. Mapped via `DEV_FLOOR_ORDER` (superset of `FLOOR_ORDER`) so onyx-mansion erreichbar ist obwohl es noch nicht in der natural-progression steht (Sapphire stairs spawnen weiterhin nicht weil hasNextFloor() noch ['emerald', 'sapphire'] gated).
+- `__wiz.spawnBoss(id)` — force-spawnt Boss im aktuellen Raum, schließt Türen, killt vorhandene Enemies. Emerald: `'boss-vine-lord'`, `'boss-mossy-behemoth'`, `'boss-pixie-queen'`, `'boss-forest-heart'`. Sapphire: `'boss-toad-sovereign'`, `'boss-bloomheart'`, `'boss-damselfly-empress'`, `'boss-bog-colossus'`. Onyx: `'boss-vampire-twins'` (dispatcht zu VampireFight), `'boss-lord-onyx'`.
+- `__wiz.spawnLordOnyx()` — Convenience-Wrapper für `__wiz.spawnBoss('boss-lord-onyx')`. Skippt Vampire + Seal komplett.
+- `__wiz.gotoFloor(n)` — restart auf Floor n (1=Emerald, 2=Sapphire, **3=Onyx**). Resettet alle Run-Stats; nur für Mob-/Theme-Testing. `DEV_FLOOR_ORDER` ist jetzt identisch mit `FLOOR_ORDER` (Onyx ist natural progression).
+- `__wiz.giveGems()` — granted alle 3 Floor-Gems instant. Test-Pfad für GemSeal mit 3/3 Sockets ohne perfect runs auf jedem Floor.
+- `__wiz.unlockSkin()` / `__wiz.lockSkin()` — toggle Cosmetics.unlockPrismancySkin / resetAll. Greift erst nach next scene start (Player + MainMenu lesen Cosmetics nur im Constructor). Kombo: `__wiz.unlockSkin()` + `__wiz.gotoFloor(1)` → Player ist jetzt rot/gold.
 - `__wiz.stats()`, `__wiz.itemSystem()` — Inspect
 
 **`STARTING_COINS = 0`** in GameConfig.ts (war zwischenzeitlich 50 zum Testen). Spieler startet jetzt ohne Coins, muss alles von Gegnern + Crates + Drops sammeln.
@@ -336,7 +375,7 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 **Geplante Progression:**
 1. **Emerald Forest** (Floor 1) — implementiert inkl. 4 Bosse (Vine Lord, Mossy Behemoth, Pixie Queen, Forest Heart, random pick).
 2. **Sapphire Swamp** (Floor 2) — implementiert. 4 Mobs (Bog Frog, Snapper Bloom, Damselfly, Bog Tortoise), 4 Bosse (Toad Sovereign, Bloomheart, Damselfly Empress, Bog Colossus). Eigene Decos (Lily Pad + Mangroven-Wurzel) statt der Forest-Decos via `decorationStyle`-Diskriminator.
-3. **Onyx Mansion** (Endgame) — Foundation + Mob-Roster (Wraith, Possessed Candelabra, Cursed Mirror) + Painterly Atmosphere DONE. **Open**: Vampire-Doppelboss als Standard-Boss + Gem-Siegel-Mechanik + Lord Onyx als Secret-Endboss hinter dem Siegel + Win-Screen. Currently nur via `__wiz.gotoFloor(3)` erreichbar; in `FLOOR_ORDER` einhängen sobald Vampire fertig.
+3. **Onyx Mansion** (Endgame) — Vollständig implementiert. 3 Mobs (Wraith, Possessed Candelabra, Cursed Mirror — letzterer mit `minPerRoom: 1`), Painterly Atmosphere, **Vampire Twins** (Crimson Lord melee dash + Sapphire Marquis range/blood-magic, dual-body via VampireFight Coordinator) als Standard-Boss, **GemSeal** + Exit-Stairs nach Vampire-Kill, **Lord Onyx** als Secret-Endboss hinter dem Siegel mit 3-Phase-AI, **Cosmetic-Skin-Unlock** (Prismancy red/gold wizard) bei Lord-Onyx-Kill. In `FLOOR_ORDER` als Floor 3 — Sapphire-Stairs descenden natürlich nach Onyx. Win-Screen-Variants (no-gems exit + full-victory) sind noch Placeholder-Banner — `run:onyxExitTaken` + `run:onyxFullVictory` Events sind die hooks für #5.
 
 Weitere Edelsteinfloors (Ruby/Topaz/...) können zwischen Sapphire und Onyx ergänzt werden. Floor-Reihenfolge wird in `FLOOR_ORDER` (`GameScene.ts`) gegated; Stairs verwenden den nächsten Eintrag.
 
@@ -348,7 +387,7 @@ Weitere Edelsteinfloors (Ruby/Topaz/...) können zwischen Sapphire und Onyx erg�
 
 Drawn in `PreloadScene` per Floor-Theme. `drawLockBadge` ist shared zwischen Treasure/Shop-Locked-Varianten.
 
-**Item-Pool-Floor-Filter:** `pickItemFromPool(pool, rng, exclude, currentFloor?)` filtert nur den Boss-Pool nach `ItemDefinition.floor`. Treasure/Shop-Items haben bewusst kein Floor-Tag (sind floor-agnostic). Beim Boss-Reward übergibt `spawnBossPoolItem` den `currentFloorId`. Items ohne `floor`-Tag werden in jedem Boss-Pool gefunden — derzeit haben aber alle 6 Boss-Items einen Floor-Tag.
+**Item-Pool-Floor-Filter:** `pickItemFromPool(pool, rng, exclude, currentFloor?)` filtert nur den Boss-Pool nach `ItemDefinition.floor`. Treasure/Shop-Items haben bewusst kein Floor-Tag (sind floor-agnostic). Beim Boss-Reward übergibt `spawnBossPoolItem` den `currentFloorId`. Items ohne `floor`-Tag werden in jedem Boss-Pool gefunden — derzeit haben aber alle 9 Boss-Items einen Floor-Tag (3 Emerald + 3 Sapphire + 3 Onyx). Onyx-Pool: **Bloodbound Chalice** (+1 maxHP, +20% damage), **Vampire's Signet** (+25% fire rate, +15% missile speed), **Obsidian Heart** (+1 dmg, +40% range). Lord Onyx droppt **kein** Pool-Item — nur den Cosmetic-Skin-Unlock.
 
 ---
 
