@@ -128,12 +128,16 @@ export class PreloadScene extends Phaser.Scene {
       this.drawShopDoorTexture(g, theme, false);
       this.drawShopDoorTexture(g, theme, true);
       this.drawMushroomTexture(g, theme);
-      // Swamp floors use lily pads + mangrove roots in place of trees + rocks.
-      // Both variants write to the same texture keys (treeDecoKey / rockDecoKey)
-      // so the consumer (Room) doesn't need to know which silhouette it got.
+      // Swamp floors use lily pads + mangrove roots; mansion floors use
+      // candelabra + cracked vases. All variants write to the same texture
+      // keys (treeDecoKey / rockDecoKey) so the consumer (Room) doesn't
+      // need to know which silhouette it got.
       if (theme.decorationStyle === 'swamp') {
         this.drawLilyPadTexture(g, theme);
         this.drawMangroveRootTexture(g, theme);
+      } else if (theme.decorationStyle === 'mansion') {
+        this.drawCandelabrumTexture(g, theme);
+        this.drawCrackedVaseTexture(g, theme);
       } else {
         this.drawRockTexture(g, theme);
         this.drawTreeTexture(g, theme);
@@ -494,6 +498,8 @@ export class PreloadScene extends Phaser.Scene {
     g.clear();
     if (theme.decorationStyle === 'swamp') {
       this.drawSwampWallTexture(g, theme);
+    } else if (theme.decorationStyle === 'mansion') {
+      this.drawMansionWallTexture(g, theme);
     } else {
       this.drawForestWallTexture(g, theme);
     }
@@ -690,6 +696,262 @@ export class PreloadScene extends Phaser.Scene {
     // Outer outline so wall tiles separate cleanly from the floor.
     g.lineStyle(2, 0x000000, 0.5);
     g.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
+  }
+
+  /**
+   * Mansion wall — gothic stone-brick courses with gold molding + a candle
+   * sconce inset every other tile. Reads as "ornate ballroom wall by
+   * candlelight" rather than dungeon brick. Single tile is tilable: brick
+   * courses align horizontally so a wall ring reads as one continuous wall.
+   */
+  private drawMansionWallTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
+    const { wallBase, wallHighlight, ambient, glow } = theme.palette;
+    const rng = new RNG(`${theme.id}-wall`);
+
+    // Background mortar
+    g.fillStyle(0x040208, 1);
+    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    g.fillStyle(ambient, 1);
+    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+    // 4 courses of bricks, each course offset horizontally so bonds break.
+    const courseH = 16;
+    const brickW = 22;
+    for (let row = 0; row < 4; row++) {
+      const offset = (row % 2) * (brickW / 2);
+      const y = row * courseH;
+      for (let bx = -brickW; bx < TILE_SIZE + brickW; bx += brickW) {
+        const x = bx + offset;
+        // Mortar gap
+        g.fillStyle(0x040208, 1);
+        g.fillRect(x, y, brickW, courseH);
+        // Brick body
+        g.fillStyle(wallBase, 1);
+        g.fillRect(x + 1, y + 1, brickW - 2, courseH - 2);
+        // Top highlight strip
+        g.fillStyle(wallHighlight, 1);
+        g.fillRect(x + 1, y + 1, brickW - 2, 2);
+        // Bottom shadow strip
+        g.fillStyle(0x180828, 1);
+        g.fillRect(x + 1, y + courseH - 3, brickW - 2, 2);
+        // Random speckle on the brick for stone texture
+        if (rng.chance(0.7)) {
+          g.fillStyle(0x180828, 0.9);
+          g.fillRect(x + 4 + rng.intBetween(0, brickW - 8), y + 4 + rng.intBetween(0, courseH - 8), 1, 1);
+        }
+      }
+    }
+
+    // Gold molding strip — runs across the center horizontally.
+    const moldY = 30;
+    g.fillStyle(0x402030, 1);
+    g.fillRect(0, moldY, TILE_SIZE, 4);
+    g.fillStyle(0x8a5a18, 1);
+    g.fillRect(0, moldY + 1, TILE_SIZE, 2);
+    g.fillStyle(0xffd84a, 0.85);
+    g.fillRect(0, moldY + 1, TILE_SIZE, 1);
+    // Tally marks on the molding
+    g.fillStyle(0xffd84a, 1);
+    for (let mx = 4; mx < TILE_SIZE; mx += 8) {
+      g.fillRect(mx, moldY + 2, 2, 1);
+    }
+
+    // Candle sconce — a small bracket with a flame, placed on a deterministic
+    // horizontal slot. Visual interest without breaking tilability since it
+    // sits inside a single tile (no wraparound).
+    const sconceX = 30 + rng.intBetween(-4, 4);
+    const sconceY = 44;
+    // Bracket
+    g.fillStyle(0x040208, 1);
+    g.fillRect(sconceX - 4, sconceY - 1, 9, 5);
+    g.fillStyle(0x402030, 1);
+    g.fillRect(sconceX - 3, sconceY, 7, 3);
+    g.fillStyle(0x8a5a18, 1);
+    g.fillRect(sconceX - 2, sconceY, 5, 1);
+    // Candle stub
+    g.fillStyle(0xfff8c0, 1);
+    g.fillRect(sconceX, sconceY - 5, 2, 4);
+    g.fillStyle(0xc0c0a0, 1);
+    g.fillRect(sconceX + 1, sconceY - 5, 1, 4);
+    // Flame
+    g.fillStyle(0xffd84a, 1);
+    g.fillTriangle(sconceX + 1, sconceY - 11, sconceX - 1, sconceY - 5, sconceX + 3, sconceY - 5);
+    g.fillStyle(0xfff8a0, 1);
+    g.fillRect(sconceX + 1, sconceY - 9, 1, 3);
+    // Flame halo
+    g.fillStyle(0xffd84a, 0.18);
+    g.fillCircle(sconceX + 1, sconceY - 8, 9);
+    g.fillStyle(0xfff8a0, 0.20);
+    g.fillCircle(sconceX + 1, sconceY - 8, 5);
+
+    // Sparse amethyst-glow cracks — tiny purple sparkle in mortar gaps.
+    const cracks = 1 + rng.intBetween(0, 1);
+    for (let c = 0; c < cracks; c++) {
+      const cx = rng.intBetween(8, TILE_SIZE - 8);
+      const cy = rng.intBetween(8, TILE_SIZE - 8);
+      g.fillStyle(0x040208, 1);
+      g.fillCircle(cx, cy, 2);
+      g.fillStyle(glow, 1);
+      g.fillCircle(cx, cy, 1.2);
+      g.fillStyle(0xffffff, 0.9);
+      g.fillRect(cx, cy - 1, 1, 1);
+    }
+
+    // Outer outline so wall tiles separate cleanly from the floor.
+    g.lineStyle(2, 0x000000, 0.5);
+    g.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
+  }
+
+  /**
+   * Candelabrum — replaces the forest tree on mansion floors. Iron stand
+   * with three candle arms, three lit candles at the top, gold-trim base,
+   * a soft amber halo + ground shadow. Drawn into a `TILE_SIZE × TILE_SIZE`
+   * canvas centered on its base so the consumer can drop it where a tree
+   * would have gone.
+   */
+  private drawCandelabrumTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
+    g.clear();
+    const cx = TILE_SIZE / 2;
+    const cy = TILE_SIZE / 2 + 14;
+
+    // Ground shadow
+    this.groundShadow(g, cx, cy + 10, 14, 5, 0.4);
+    // Amber halo
+    g.fillStyle(0xffd84a, 0.16);
+    g.fillEllipse(cx, cy - 6, 38, 30);
+    g.fillStyle(0xfff8a0, 0.22);
+    g.fillEllipse(cx, cy - 6, 22, 16);
+
+    // Base — gold-trimmed iron pedestal
+    g.fillStyle(0x040208, 1);
+    g.fillRect(cx - 11, cy + 4, 22, 7);
+    g.fillStyle(0x261438, 1);
+    g.fillRect(cx - 10, cy + 5, 20, 5);
+    g.fillStyle(0x8a5a18, 1);
+    g.fillRect(cx - 8, cy + 4, 16, 1);
+    g.fillStyle(0xffd84a, 0.85);
+    g.fillRect(cx - 8, cy + 4, 16, 1);
+    g.fillStyle(0x180828, 1);
+    g.fillRect(cx - 10, cy + 9, 20, 1);
+
+    // Stem
+    g.fillStyle(0x040208, 1);
+    g.fillRect(cx - 2, cy - 22, 4, 27);
+    g.fillStyle(0x402030, 1);
+    g.fillRect(cx - 1, cy - 22, 2, 27);
+    g.fillStyle(0x8a5a18, 1);
+    g.fillRect(cx - 1, cy - 22, 1, 27);
+
+    // Cross-arms — horizontal bar at the top, with hooked ends
+    g.fillStyle(0x040208, 1);
+    g.fillRect(cx - 14, cy - 22, 28, 2);
+    g.fillStyle(0x402030, 1);
+    g.fillRect(cx - 13, cy - 22, 26, 1);
+    g.fillStyle(0x8a5a18, 1);
+    g.fillRect(cx - 13, cy - 22, 26, 1);
+    // Arm hooks (small upright stubs at each end + center)
+    for (const ax of [cx - 13, cx, cx + 13]) {
+      g.fillStyle(0x040208, 1);
+      g.fillRect(ax - 1, cy - 26, 3, 4);
+      g.fillStyle(0x402030, 1);
+      g.fillRect(ax, cy - 26, 1, 4);
+    }
+
+    // 3 candles
+    for (const px of [cx - 12, cx, cx + 12]) {
+      // Wax body
+      g.fillStyle(0xfff8c0, 1);
+      g.fillRect(px - 1, cy - 32, 3, 6);
+      g.fillStyle(0xc0c0a0, 1);
+      g.fillRect(px + 1, cy - 32, 1, 6);
+      // Wick
+      g.fillStyle(0x040208, 1);
+      g.fillRect(px, cy - 33, 1, 1);
+      // Flame
+      g.fillStyle(0xffd84a, 1);
+      g.fillTriangle(px, cy - 40, px - 2, cy - 33, px + 2, cy - 33);
+      g.fillStyle(0xfff8a0, 1);
+      g.fillRect(px, cy - 38, 1, 4);
+      // Bright tip
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(px, cy - 37, 1, 1);
+    }
+
+    g.generateTexture(treeDecoKey(theme.id), TILE_SIZE, TILE_SIZE);
+  }
+
+  /**
+   * Cracked vase — replaces the forest rock on mansion floors. Tall purple
+   * ceramic with gold rim and visible vertical crack, with a faint amethyst
+   * glow leaking from the crack. Floor decoration only — no hitbox.
+   */
+  private drawCrackedVaseTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
+    const { glow } = theme.palette;
+    g.clear();
+    const cx = TILE_SIZE / 2;
+    const cy = TILE_SIZE / 2 + 4;
+
+    // Ground shadow
+    this.groundShadow(g, cx, cy + 16, 18, 6, 0.4);
+
+    // Amethyst halo (subtle — leaks from the crack)
+    g.fillStyle(glow, 0.10);
+    g.fillEllipse(cx, cy + 4, 36, 30);
+    g.fillStyle(glow, 0.18);
+    g.fillEllipse(cx, cy + 4, 22, 18);
+
+    // Vase silhouette — outline first
+    g.fillStyle(0x040208, 1);
+    g.fillEllipse(cx, cy, 22, 30);
+    // Rim flair (slight bulge at top)
+    g.fillEllipse(cx, cy - 14, 16, 6);
+    // Base ring
+    g.fillRect(cx - 11, cy + 14, 22, 4);
+
+    // Body — purple ceramic
+    g.fillStyle(0x261438, 1);
+    g.fillEllipse(cx, cy, 18, 26);
+    g.fillStyle(0x402060, 1);
+    g.fillEllipse(cx - 4, cy - 4, 7, 14);
+    g.fillStyle(0x180828, 1);
+    g.fillEllipse(cx + 4, cy + 4, 7, 12);
+
+    // Rim
+    g.fillStyle(0x261438, 1);
+    g.fillEllipse(cx, cy - 14, 14, 5);
+    // Gold rim trim
+    g.fillStyle(0x8a5a18, 1);
+    g.fillRect(cx - 7, cy - 14, 14, 1);
+    g.fillStyle(0xffd84a, 0.85);
+    g.fillRect(cx - 7, cy - 15, 14, 1);
+
+    // Base ring with gold trim
+    g.fillStyle(0x180828, 1);
+    g.fillRect(cx - 10, cy + 14, 20, 3);
+    g.fillStyle(0x8a5a18, 1);
+    g.fillRect(cx - 10, cy + 14, 20, 1);
+    g.fillStyle(0xffd84a, 0.85);
+    g.fillRect(cx - 10, cy + 14, 20, 1);
+
+    // Crack — jagged dark line down the body
+    g.fillStyle(0x040208, 1);
+    g.fillRect(cx - 1, cy - 10, 1, 4);
+    g.fillRect(cx, cy - 6, 1, 4);
+    g.fillRect(cx - 1, cy - 2, 1, 4);
+    g.fillRect(cx, cy + 2, 1, 4);
+    g.fillRect(cx - 1, cy + 6, 1, 4);
+    // Glow leaking through the crack
+    g.fillStyle(glow, 0.85);
+    g.fillRect(cx - 1, cy - 4, 1, 1);
+    g.fillRect(cx, cy + 1, 1, 1);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(cx, cy - 3, 1, 1);
+
+    // Small chip missing from the rim (top-right)
+    g.fillStyle(0x040208, 1);
+    g.fillTriangle(cx + 4, cy - 16, cx + 8, cy - 14, cx + 5, cy - 12);
+
+    g.generateTexture(rockDecoKey(theme.id), TILE_SIZE, TILE_SIZE);
   }
 
   // ---------------------------------------------------------------------------
@@ -4056,66 +4318,233 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   /**
-   * Per-floor gem trophy. Diamond/crystal silhouette in the floor's glow
-   * palette with a 3-tone shading + bright highlight pixel + dark outline.
-   * Drawn at 14×14 (same canvas size as item icons) so the GemPickup's
-   * default scaling reads consistently with the other pickups.
+   * Per-floor gem trophy. 18 × 18 canvas with a cut-shape that varies by
+   * floor so each gem reads as a real gemstone variety, not a recoloured
+   * sticker:
+   *   - emerald-forest → emerald-cut (rectangular step-cut)
+   *   - sapphire-swamp → round brilliant (octagonal with radial facets)
+   *   - onyx-mansion   → marquise (pointed oval with central spine)
+   *
+   * Shading is palette-driven: each gem derives 5 tones from `theme.palette.glow`
+   * (outline, dark facet, mid fill, highlight facet, sparkle pixel) so adding a
+   * new floor only needs a glow colour pick — no new pixel art.
    */
   private drawGemTexture(g: Phaser.GameObjects.Graphics, theme: FloorTheme): void {
-    const w = 14;
-    const h = 14;
+    const w = 18;
+    const h = 18;
     g.clear();
 
     const glow = theme.palette.glow;
+    const OUT = this.shadeColor(glow, -0.7);
     const dark = this.shadeColor(glow, -0.45);
     const mid = this.shadeColor(glow, -0.15);
     const hi = this.shadeColor(glow, 0.4);
-    const OUT = this.shadeColor(glow, -0.7);
 
-    // Diamond outline
-    g.fillStyle(OUT, 1);
-    g.fillRect(6, 1, 2, 1);
-    g.fillRect(4, 2, 6, 1);
-    g.fillRect(2, 3, 10, 1);
-    g.fillRect(2, 4, 10, 1);
-    g.fillRect(2, 5, 10, 1);
-    g.fillRect(3, 6, 8, 1);
-    g.fillRect(4, 7, 6, 1);
-    g.fillRect(4, 8, 6, 1);
-    g.fillRect(5, 9, 4, 1);
-    g.fillRect(5, 10, 4, 1);
-    g.fillRect(6, 11, 2, 1);
-    g.fillRect(6, 12, 2, 1);
-
-    // Mid fill
-    g.fillStyle(mid, 1);
-    g.fillRect(6, 2, 2, 1);
-    g.fillRect(4, 3, 6, 1);
-    g.fillRect(3, 4, 8, 2);
-    g.fillRect(4, 6, 6, 1);
-    g.fillRect(5, 7, 4, 1);
-    g.fillRect(6, 8, 2, 1);
-    g.fillRect(6, 9, 2, 1);
-    g.fillRect(6, 10, 2, 1);
-
-    // Bright facet (top-left)
-    g.fillStyle(hi, 1);
-    g.fillRect(5, 3, 2, 1);
-    g.fillRect(4, 4, 2, 1);
-    g.fillRect(3, 5, 2, 1);
-
-    // Dark facet (right side)
-    g.fillStyle(dark, 1);
-    g.fillRect(8, 4, 2, 1);
-    g.fillRect(8, 5, 2, 1);
-    g.fillRect(8, 6, 2, 1);
-    g.fillRect(7, 7, 2, 1);
-
-    // Sparkle pixel (single white pixel in the highlight band)
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(4, 4, 1, 1);
+    if (theme.id === 'emerald-forest') {
+      this.drawEmeraldCutGem(g, OUT, dark, mid, hi);
+    } else if (theme.id === 'sapphire-swamp') {
+      this.drawBrilliantCutGem(g, OUT, dark, mid, hi);
+    } else if (theme.id === 'onyx-mansion') {
+      this.drawMarquiseCutGem(g, OUT, dark, mid, hi);
+    } else {
+      // Future floors fall back to the brilliant cut so they at least render.
+      this.drawBrilliantCutGem(g, OUT, dark, mid, hi);
+    }
 
     g.generateTexture(gemTextureKey(theme.id), w, h);
+  }
+
+  /**
+   * Emerald-cut step gemstone — rectangular silhouette with parallel step
+   * facets, the classic cut for green emeralds. 18 × 18 grid centred.
+   */
+  private drawEmeraldCutGem(
+    g: Phaser.GameObjects.Graphics,
+    OUT: number,
+    dark: number,
+    mid: number,
+    hi: number,
+  ): void {
+    // Outline — rectangular with chamfered corners
+    g.fillStyle(OUT, 1);
+    g.fillRect(5, 2, 8, 1);
+    g.fillRect(4, 3, 1, 1);
+    g.fillRect(13, 3, 1, 1);
+    g.fillRect(3, 4, 1, 11);
+    g.fillRect(14, 4, 1, 11);
+    g.fillRect(4, 15, 1, 1);
+    g.fillRect(13, 15, 1, 1);
+    g.fillRect(5, 16, 8, 1);
+    // Body fill (mid)
+    g.fillStyle(mid, 1);
+    g.fillRect(5, 3, 8, 13);
+    g.fillRect(4, 4, 1, 11);
+    g.fillRect(13, 4, 1, 11);
+    // Step facets — horizontal lines splitting the body into rows
+    g.fillStyle(dark, 1);
+    g.fillRect(4, 6, 10, 1);
+    g.fillRect(4, 12, 10, 1);
+    // Right-side darker facet (key light from top-left)
+    g.fillStyle(dark, 1);
+    g.fillRect(11, 4, 2, 11);
+    g.fillRect(13, 5, 1, 9);
+    // Top-left highlight facet
+    g.fillStyle(hi, 1);
+    g.fillRect(5, 4, 5, 1);
+    g.fillRect(5, 5, 1, 1);
+    g.fillRect(4, 5, 1, 1);
+    // Inner table highlight band
+    g.fillStyle(hi, 1);
+    g.fillRect(6, 8, 4, 1);
+    g.fillRect(6, 11, 3, 1);
+    // Sparkle pixel
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(6, 4, 1, 1);
+    g.fillRect(7, 7, 1, 1);
+  }
+
+  /**
+   * Round-brilliant gemstone — octagonal silhouette with radial facets, the
+   * classic cut for blue sapphires. 18 × 18 grid centred.
+   */
+  private drawBrilliantCutGem(
+    g: Phaser.GameObjects.Graphics,
+    OUT: number,
+    dark: number,
+    mid: number,
+    hi: number,
+  ): void {
+    // Outline — octagonal silhouette
+    g.fillStyle(OUT, 1);
+    g.fillRect(6, 1, 6, 1);
+    g.fillRect(4, 2, 2, 1);
+    g.fillRect(12, 2, 2, 1);
+    g.fillRect(3, 3, 1, 1);
+    g.fillRect(14, 3, 1, 1);
+    g.fillRect(2, 4, 1, 4);
+    g.fillRect(15, 4, 1, 4);
+    g.fillRect(3, 8, 1, 2);
+    g.fillRect(14, 8, 1, 2);
+    g.fillRect(4, 10, 1, 2);
+    g.fillRect(13, 10, 1, 2);
+    g.fillRect(5, 12, 1, 2);
+    g.fillRect(12, 12, 1, 2);
+    g.fillRect(6, 14, 1, 1);
+    g.fillRect(11, 14, 1, 1);
+    g.fillRect(7, 15, 4, 1);
+    // Body fill (mid)
+    g.fillStyle(mid, 1);
+    g.fillRect(6, 2, 6, 1);
+    g.fillRect(4, 3, 10, 1);
+    g.fillRect(3, 4, 12, 4);
+    g.fillRect(4, 8, 10, 2);
+    g.fillRect(5, 10, 8, 2);
+    g.fillRect(6, 12, 6, 2);
+    g.fillRect(7, 14, 4, 1);
+    // Crown facets (radial dark lines from center to edges)
+    g.fillStyle(dark, 1);
+    // Star facets (4 spokes)
+    g.fillRect(8, 5, 2, 5); // vertical (subtle)
+    // Diagonals
+    g.fillRect(5, 5, 1, 1);
+    g.fillRect(6, 6, 1, 1);
+    g.fillRect(7, 7, 1, 1);
+    g.fillRect(12, 5, 1, 1);
+    g.fillRect(11, 6, 1, 1);
+    g.fillRect(10, 7, 1, 1);
+    g.fillRect(5, 12, 1, 1);
+    g.fillRect(6, 11, 1, 1);
+    g.fillRect(7, 10, 1, 1);
+    g.fillRect(12, 12, 1, 1);
+    g.fillRect(11, 11, 1, 1);
+    g.fillRect(10, 10, 1, 1);
+    // Right-side darker shadow
+    g.fillRect(12, 6, 2, 4);
+    g.fillRect(11, 9, 1, 1);
+    // Highlight crown facets (top-left)
+    g.fillStyle(hi, 1);
+    g.fillRect(5, 3, 4, 1);
+    g.fillRect(4, 4, 3, 1);
+    g.fillRect(4, 5, 1, 1);
+    g.fillRect(8, 8, 2, 1);
+    // Sparkle pixels
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(5, 4, 1, 1);
+    g.fillRect(8, 8, 1, 1);
+  }
+
+  /**
+   * Marquise-cut gemstone — pointed oval silhouette with a central facet
+   * spine, classic for high-drama gemstones. 18 × 18 grid centred.
+   */
+  private drawMarquiseCutGem(
+    g: Phaser.GameObjects.Graphics,
+    OUT: number,
+    dark: number,
+    mid: number,
+    hi: number,
+  ): void {
+    // Outline — pointed oval (top + bottom point, broad middle)
+    g.fillStyle(OUT, 1);
+    // Top point
+    g.fillRect(8, 1, 2, 1);
+    g.fillRect(7, 2, 1, 1);
+    g.fillRect(10, 2, 1, 1);
+    g.fillRect(6, 3, 1, 1);
+    g.fillRect(11, 3, 1, 1);
+    g.fillRect(5, 4, 1, 2);
+    g.fillRect(12, 4, 1, 2);
+    g.fillRect(4, 6, 1, 2);
+    g.fillRect(13, 6, 1, 2);
+    // Middle (broadest)
+    g.fillRect(3, 8, 1, 2);
+    g.fillRect(14, 8, 1, 2);
+    g.fillRect(4, 10, 1, 2);
+    g.fillRect(13, 10, 1, 2);
+    g.fillRect(5, 12, 1, 2);
+    g.fillRect(12, 12, 1, 2);
+    // Bottom point
+    g.fillRect(6, 14, 1, 1);
+    g.fillRect(11, 14, 1, 1);
+    g.fillRect(7, 15, 1, 1);
+    g.fillRect(10, 15, 1, 1);
+    g.fillRect(8, 16, 2, 1);
+    // Body fill (mid)
+    g.fillStyle(mid, 1);
+    g.fillRect(8, 2, 2, 1);
+    g.fillRect(7, 3, 4, 1);
+    g.fillRect(6, 4, 6, 2);
+    g.fillRect(5, 6, 8, 2);
+    g.fillRect(4, 8, 10, 2);
+    g.fillRect(5, 10, 8, 2);
+    g.fillRect(6, 12, 6, 2);
+    g.fillRect(7, 14, 4, 1);
+    g.fillRect(8, 15, 2, 1);
+    // Central facet spine — vertical highlight
+    g.fillStyle(hi, 1);
+    g.fillRect(8, 3, 1, 12);
+    g.fillRect(9, 7, 1, 4);
+    // Side facets — diagonal lines from spine to edge
+    g.fillStyle(dark, 1);
+    g.fillRect(9, 3, 2, 1);
+    g.fillRect(10, 4, 2, 1);
+    g.fillRect(11, 5, 1, 1);
+    g.fillRect(12, 6, 1, 1);
+    g.fillRect(13, 7, 1, 1);
+    g.fillRect(13, 8, 1, 2);
+    g.fillRect(12, 10, 1, 1);
+    g.fillRect(11, 11, 1, 1);
+    g.fillRect(10, 12, 1, 1);
+    g.fillRect(9, 13, 1, 1);
+    g.fillRect(9, 14, 1, 1);
+    // Bright table — small bright section at center
+    g.fillStyle(hi, 1);
+    g.fillRect(8, 8, 1, 1);
+    g.fillRect(7, 9, 1, 1);
+    // Sparkle pixels
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(8, 4, 1, 1);
+    g.fillRect(8, 8, 1, 1);
   }
 
   /**

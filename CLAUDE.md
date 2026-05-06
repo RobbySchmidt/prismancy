@@ -218,10 +218,33 @@ src/
 - [x] Floor-Theme-Switch: Camera-Background (`theme.palette.ambient`), Wall-/Floor-Textures, Decorations alle per-floor in PreloadScene. Sapphire-Decos: **Lily Pad** (statt Tree, mit Bloom + Saphir-Wassertropfen) + **Mangroven-Wurzel** (statt Rock, verschlungene Wurzelbänder mit Saphir-Glow-Knoten + Algen-Strängen) via neuem `FloorTheme.decorationStyle: 'forest' | 'swamp'` Diskriminator.
 - [ ] HP/Damage-Skalierung pro Floor — *noch nicht relevant*: neue Sapphire-Mobs/Bosse haben passende Werte direkt eingebacken. Wird interessant sobald Floor-1-Mobs auf Floor 3+ wiederkehren.
 
-**Chunk 4 — Onyx Mansion + Secret Endboss (TODO)**
-- [ ] Onyx Mansion als Final Floor mit Endboss
-- [ ] Secret Gem-Door: wenn alle Floor-Gems gesammelt (no-hit auf jedem Floor) → Door öffnet sich → Secret Endboss
-- [ ] Win-Screen
+**Chunk 4 — Onyx Mansion + Secret Endboss (in progress)**
+
+*Foundation* (DONE):
+- [x] `onyx-mansion` als `FloorTheme` in `data/floors.ts` mit eigener Palette (deep purple-black + gold/amethyst-glow accents)
+- [x] `decorationStyle: 'mansion'` als dritter Diskriminator (forest / swamp / **mansion**)
+- [x] Mansion wall texture (`drawMansionWallTexture`) — gothic stone-brick courses mit gold molding strip + candle sconce + amethyst-crack accent
+- [x] Mansion-Decos: **Candelabrum** (statt Tree, gold-trim iron stand mit 3 lit candles + amber halo) + **Cracked Vase** (statt Rock, purple ceramic mit gold rim + visible crack mit amethyst glow leaking)
+- [x] Boss/Treasure/Shop/Normal door textures funktionieren palette-driven für mansion (kein eigenes branching nötig)
+- [x] **Gem-Texturen redesign** (alle 3 Floors): 18×18 Canvas (statt 14×14), per-Floor cut variant — Emerald = emerald-cut step, Sapphire = round brilliant, Onyx = marquise. Palette-driven 5-tone shading + per-floor halo color in `GemPickup` (statt vorher hardcoded grün)
+- [x] **DEV_FLOOR_ORDER** in `GameScene.ts`: superset of `FLOOR_ORDER` mit `onyx-mansion` so dass `__wiz.gotoFloor(3)` Onyx visuell testen kann ohne natural-progression zu brechen (Sapphire stairs spawnen weiterhin nicht, Sapphire bleibt last reachable floor)
+
+*Geplante Boss-Mechanik* (locked design, eigene Sessions):
+- **Vampire-Doppelboss** als Floor-Standard-Boss (NICHT Lord Onyx). Asymmetrisch: eine Melee (rot), eine Magic/Range (blau). Phasen: beide → eine → Berserker, **zwei distinct Berserker-Patterns** (eine pro Body, depending on which survived). Asymmetric chosen damit's nicht "double bullet hell" wird.
+- **Gem-Siegel an der Wand** nach Vampire-Kill: 3 Gems einsetzen → Lord-Onyx-Room öffnet
+- **No-Gems-Pfad:** Treppe nach oben + Win-Screen mit subtle hint ("the dark light survived" oder ähnlich) — Run als "abgeschlossen aber unvollständig" gewertet, kein Bad Ending
+- **Gem-Mechanik bleibt:** no-hit-rewards von jedem Floor-Boss (perfect run on Emerald + Sapphire + Vampires = alle 3 Gems)
+- **Lord Onyx** als Secret Endboss hinter dem Gem-Siegel. Visuelle Vorlage existiert in `StyleMockupScene.drawLordOnyx`, aber User flagged für visual rework
+- **Win-Screen** (full-victory variant) nach Lord-Onyx-Kill
+
+*Noch offen:*
+- [ ] Mansion-Mob-Roster: Wraith, Possessed Candelabra, Cursed Mirror (Vorlagen in StyleMockupScene)
+- [ ] Vampire-Doppelboss inkl. dual-body state machine + zwei Berserker-Patterns
+- [ ] Gem-Siegel UI + state machine (vampire-clear → seal-spawn → gem-input → onyx-room oder kryptische Nachricht)
+- [ ] Lord Onyx (mit visual rework)
+- [ ] Onyx Boss-Pool-Items (3, analog zu Sapphire)
+- [ ] Win-Screen (no-gems + full-victory Variants)
+- [ ] `onyx-mansion` zu `FLOOR_ORDER` (statt nur DEV_FLOOR_ORDER) sobald Vampire + Mobs existieren — dann descenden Sapphire-Stairs natürlich nach Onyx
 
 **DoD:** Vollständiger Run vom Start bis zum finalen Boss möglich.
 

@@ -100,8 +100,21 @@ export interface GameSceneInitData {
   carryOver?: RunCarryOver;
 }
 
-/** Canonical floor progression. Drives `__wiz.gotoFloor` + stairs descent. */
+/** Canonical floor progression. Drives stairs descent in real play. */
 const FLOOR_ORDER: readonly FloorId[] = ['emerald-forest', 'sapphire-swamp'];
+
+/**
+ * Dev-only superset of `FLOOR_ORDER` that adds floors which exist as
+ * authored themes / textures but aren't yet hooked up for natural play
+ * (no boss roster, no carry-through balancing). Used by `__wiz.gotoFloor`
+ * so the user can visually inspect a half-built floor without breaking
+ * stairs progression for normal runs.
+ */
+const DEV_FLOOR_ORDER: readonly FloorId[] = [
+  'emerald-forest',
+  'sapphire-swamp',
+  'onyx-mansion',
+];
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -377,11 +390,16 @@ export class GameScene extends Phaser.Scene {
    * mechanic testing, not for piping a save through.
    */
   private devGotoFloor(floorIndex: number): void {
-    const idx = Math.max(1, Math.min(FLOOR_ORDER.length, Math.floor(floorIndex)));
-    const floorId = FLOOR_ORDER[idx - 1]!;
+    const idx = Math.max(1, Math.min(DEV_FLOOR_ORDER.length, Math.floor(floorIndex)));
+    const floorId = DEV_FLOOR_ORDER[idx - 1]!;
     // eslint-disable-next-line no-console
     console.log(`[__wiz.gotoFloor] Restarting on floor ${idx} (${floorId})`);
-    this.scene.restart({ floorIndex: idx, floorId });
+    // Restart both scenes — UIScene reads `currentFloorId` from registry only
+    // in `create()`, so without the explicit stop/launch the floor title text
+    // would stay stuck on the previous floor's name.
+    this.scene.stop(SceneKeys.UI);
+    this.scene.start(SceneKeys.Game, { floorIndex: idx, floorId });
+    this.scene.launch(SceneKeys.UI);
   }
 
   /**

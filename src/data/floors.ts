@@ -64,6 +64,37 @@ export const FLOORS = {
       { id: 'bog-tortoise', weight: 1 },
     ] satisfies readonly EnemyRosterEntry[],
   },
+  'onyx-mansion': {
+    id: 'onyx-mansion',
+    displayName: 'Onyx Mansion',
+    palette: {
+      // Deep purple-black mansion with amethyst glow accents + gold trim.
+      // Walls lean dark-purple-stone so the floor reads "haunted ballroom
+      // by candlelight" rather than the wet-stone of the swamp.
+      floorBase: 0x1a0e22,
+      floorAccent: 0x2a1a3a,
+      wallBase: 0x261438,
+      wallHighlight: 0x4a2a44,
+      ambient: 0x080418,
+      glow: 0xc864ff,
+    },
+    decorationDensities: {
+      mushroom: 0.07,
+      rock: 0.07,
+      tree: 0.06,
+    },
+    decorationStyle: 'mansion',
+    // Roster left empty until the mansion mob set (Wraith / Possessed
+    // Candelabra / Cursed Mirror) is implemented in the next session.
+    // The Sapphire roster is reused for any visual-test runs that need
+    // mob spawns before the real mansion enemies exist.
+    enemyRoster: [
+      { id: 'bog-frog', weight: 4 },
+      { id: 'snapper-bloom', weight: 2 },
+      { id: 'damselfly', weight: 2 },
+      { id: 'bog-tortoise', weight: 1 },
+    ] satisfies readonly EnemyRosterEntry[],
+  },
 } as const satisfies Record<string, FloorTheme>;
 
 export type FloorId = keyof typeof FLOORS;

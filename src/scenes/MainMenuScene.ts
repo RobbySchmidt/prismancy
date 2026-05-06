@@ -57,6 +57,12 @@ export class MainMenuScene extends Phaser.Scene {
     this.input.keyboard?.once('keydown-SPACE', startGame);
     this.input.keyboard?.once('keydown-ENTER', startGame);
     this.input.once('pointerdown', startGame);
+
+    if (import.meta.env.DEV) {
+      this.input.keyboard?.once('keydown-M', () => {
+        this.scene.start(SceneKeys.StyleMockup);
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -314,6 +320,18 @@ export class MainMenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setAlpha(0.85);
+
+    if (import.meta.env.DEV) {
+      this.add
+        .text(cx, GAME_HEIGHT - 22, '[M] STYLE MOCKUP', {
+          fontSize: '11px',
+          color: '#88c060',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.6);
+    }
   }
 }
 

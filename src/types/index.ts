@@ -59,8 +59,11 @@ export interface FloorDecorationDensities {
  * floors get tree + rock + glowing-mushroom; swamp floors swap the tree
  * for a lily pad and the rock for a tangled mangrove-root cluster (the
  * mushroom stays since the palette swap already reads as swamp-y fungi).
+ * Mansion floors swap the tree for a candelabrum and the rock for a
+ * cracked vase; the mushroom is replaced visually by a floating amethyst
+ * mote so the palette reads as gothic-mansion rather than dungeon stone.
  */
-export type DecorationStyle = 'forest' | 'swamp';
+export type DecorationStyle = 'forest' | 'swamp' | 'mansion';
 
 export interface FloorTheme {
   id: string;

@@ -591,6 +591,7 @@ export const SceneKeys = {
   Game: 'GameScene',
   UI: 'UIScene',
   GameOver: 'GameOverScene',
+  StyleMockup: 'StyleMockupScene',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];

@@ -16,6 +16,7 @@ import { DepthLayers } from '../config/DepthLayers';
 import { RoomKind, type Direction, type FloorTheme, type RoomDescriptor } from '../types';
 import { RNG } from '../utils/RNG';
 import { Door } from './Door';
+import { RoomAtmosphere } from './RoomAtmosphere';
 
 /**
  * Single rectangular room rendered into the active scene. Driven by a
@@ -47,6 +48,7 @@ export class Room {
   private readonly scene: Phaser.Scene;
   private readonly decorations: Phaser.GameObjects.GameObject[] = [];
   private readonly floorTiles: Phaser.GameObjects.GameObject[] = [];
+  private readonly atmosphere: RoomAtmosphere;
 
   constructor(scene: Phaser.Scene, theme: FloorTheme, descriptor: RoomDescriptor) {
     this.scene = scene;
@@ -61,6 +63,11 @@ export class Room {
     this.buildFloor(rng);
     this.buildWallsWithDoorGaps();
     this.buildDoors(descriptor.cleared);
+    // Painterly overlay (radial vignette + patches + light shafts + mist +
+    // fireflies + edge vignette). Per-floor palette-driven, applies to all
+    // room kinds so treasure / shop / boss rooms also get the atmospheric
+    // wash — they just don't get scattered decorations.
+    this.atmosphere = new RoomAtmosphere(scene, theme, descriptor);
     // Treasure / Shop / Boss rooms stay clean so the pedestals, slots, or
     // boss have visual + physical priority — no rocks blocking shop slots.
     if (
@@ -210,12 +217,11 @@ export class Room {
   }
 
   private placeRock(tx: number, ty: number): void {
+    const cx = tx * TILE_SIZE + TILE_SIZE / 2;
+    const cy = ty * TILE_SIZE + TILE_SIZE / 2;
+    this.atmosphere.paintDecorationHalo(this.scene, cx, cy, this.theme, 'medium');
     const rock = this.scene.add
-      .image(
-        tx * TILE_SIZE + TILE_SIZE / 2,
-        ty * TILE_SIZE + TILE_SIZE / 2,
-        rockDecoKey(this.theme.id),
-      )
+      .image(cx, cy, rockDecoKey(this.theme.id))
       .setDepth(DepthLayers.FloorDecoration);
     this.decorations.push(rock);
   }
@@ -223,6 +229,7 @@ export class Room {
   private placeTree(tx: number, ty: number, rng: RNG): void {
     const cx = tx * TILE_SIZE + TILE_SIZE / 2 + rng.intBetween(-6, 6);
     const cy = ty * TILE_SIZE + TILE_SIZE / 2 + rng.intBetween(-4, 4);
+    this.atmosphere.paintDecorationHalo(this.scene, cx, cy, this.theme, 'medium');
     const tree = this.scene.add
       .image(cx, cy, treeDecoKey(this.theme.id))
       .setDepth(DepthLayers.FloorDecoration);
@@ -233,6 +240,7 @@ export class Room {
   private placeMushroom(tx: number, ty: number, rng: RNG): void {
     const cx = tx * TILE_SIZE + TILE_SIZE / 2 + rng.intBetween(-12, 12);
     const cy = ty * TILE_SIZE + TILE_SIZE / 2 + rng.intBetween(-12, 12);
+    this.atmosphere.paintDecorationHalo(this.scene, cx, cy, this.theme, 'small');
     const mushroom = this.scene.add
       .image(cx, cy, mushroomDecoKey(this.theme.id))
       .setDepth(DepthLayers.FloorDecoration)
@@ -296,6 +304,7 @@ export class Room {
     this.decorations.length = 0;
     for (const tile of this.floorTiles) tile.destroy();
     this.floorTiles.length = 0;
+    this.atmosphere.destroy();
     this.walls.clear(true, true);
     this.walls.destroy();
     this.treePositions.length = 0;

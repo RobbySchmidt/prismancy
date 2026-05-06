@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { gemTextureKey } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
+import { FLOORS, type FloorId } from '../../data/floors';
 import { PickupKind } from '../../types';
 import { type Inventory } from '../../systems/Inventory';
 import { type Player } from '../Player';
@@ -42,10 +43,13 @@ export class GemPickup extends BasePickup {
     this.floorId = floorId;
     this.setScale(1.8);
 
-    // Pulsating halo behind the gem — sits one layer below the pickup so the
-    // gem sprite reads on top of the glow.
+    // Pulsating halo behind the gem — uses the source floor's palette glow
+    // so each gem reads in its own colour (emerald green, sapphire cyan,
+    // onyx amethyst). Falls back to the emerald glow if the floor id isn't
+    // in `FLOORS`, which would only happen for a malformed save file.
+    const haloColor = FLOORS[floorId as FloorId]?.palette.glow ?? 0x6effa0;
     this.glow = scene.add
-      .circle(x, y, 26, 0x6effa0, 0.45)
+      .circle(x, y, 26, haloColor, 0.45)
       .setDepth(DepthLayers.Pickup - 1);
     scene.tweens.add({
       targets: this.glow,
