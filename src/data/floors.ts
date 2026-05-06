@@ -84,15 +84,16 @@ export const FLOORS = {
       tree: 0.06,
     },
     decorationStyle: 'mansion',
-    // Roster left empty until the mansion mob set (Wraith / Possessed
-    // Candelabra / Cursed Mirror) is implemented in the next session.
-    // The Sapphire roster is reused for any visual-test runs that need
-    // mob spawns before the real mansion enemies exist.
+    // Mansion roster — three threat types that don't overlap with the
+    // sapphire bullet-hell pressure: Wraith (timing chaser), Possessed
+    // Candelabra (positional tank with wax-puddle trail), Cursed Mirror
+    // (predictive shooter). See Phase 5 Chunk 4 in CLAUDE.md.
     enemyRoster: [
-      { id: 'bog-frog', weight: 4 },
-      { id: 'snapper-bloom', weight: 2 },
-      { id: 'damselfly', weight: 2 },
-      { id: 'bog-tortoise', weight: 1 },
+      { id: 'wraith', weight: 4 },
+      { id: 'possessed-candelabra', weight: 2 },
+      // Mirror is rare under pure weighted picks; force at least one per room
+      // so its homing-shot pressure consistently mixes with the wraith chase.
+      { id: 'cursed-mirror', weight: 2, minPerRoom: 1 },
     ] satisfies readonly EnemyRosterEntry[],
   },
 } as const satisfies Record<string, FloorTheme>;

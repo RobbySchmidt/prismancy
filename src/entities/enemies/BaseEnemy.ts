@@ -3,6 +3,7 @@ import {
   HIT_FLASH_DURATION_MS,
   HIT_FLASH_TINT_ENEMY,
   KNOCKBACK_DURATION_MS,
+  WORLD_SPRITE_SCALE,
 } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
 import { type Vector2 } from '../../types';
@@ -28,10 +29,16 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     this.hp = definition.hp;
 
     this.setDepth(DepthLayers.Enemy);
+    this.setScale(WORLD_SPRITE_SCALE);
+    // Counter-scale the physics body so its world size + position stay at
+    // the authored values regardless of the visual scale. (Phaser scales
+    // the body by sprite.scale automatically; without this division the
+    // body grows + shifts and breaks fine collisions like door triggers.)
+    const radius = definition.hitboxRadius / WORLD_SPRITE_SCALE;
     this.setCircle(
-      definition.hitboxRadius,
-      this.width / 2 - definition.hitboxRadius,
-      this.height / 2 - definition.hitboxRadius,
+      radius,
+      this.width / 2 - radius,
+      this.height / 2 - radius,
     );
     this.setCollideWorldBounds(true);
   }

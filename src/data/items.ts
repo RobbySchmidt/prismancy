@@ -182,6 +182,43 @@ export const ITEMS = {
     missileTint: 0xff7aa0,
     floor: 'sapphire-swamp',
   },
+  bloodboundChalice: {
+    id: 'bloodboundChalice',
+    displayName: 'Bloodbound Chalice',
+    description: '+1 max HP, +20% Damage. Crimson missile.',
+    textureKey: TextureKeys.ItemBloodboundChalice,
+    pools: [ItemPool.Boss],
+    effects: [{ stat: 'damage', mult: 1.2 }],
+    missileTint: 0xc8284a,
+    maxHealthBonus: 2,
+    floor: 'onyx-mansion',
+  },
+  vampireSignet: {
+    id: 'vampireSignet',
+    displayName: "Vampire's Signet",
+    description: '+25% Fire Rate, +15% Missile Speed.',
+    textureKey: TextureKeys.ItemVampireSignet,
+    pools: [ItemPool.Boss],
+    effects: [
+      { stat: 'fireRate', mult: 1.25 },
+      { stat: 'missileSpeed', mult: 1.15 },
+    ],
+    missileTint: 0xffb060,
+    floor: 'onyx-mansion',
+  },
+  obsidianHeart: {
+    id: 'obsidianHeart',
+    displayName: 'Obsidian Heart',
+    description: '+1 Damage, +40% Range. Amethyst missile.',
+    textureKey: TextureKeys.ItemObsidianHeart,
+    pools: [ItemPool.Boss],
+    effects: [
+      { stat: 'damage', add: 1 },
+      { stat: 'range', mult: 1.4 },
+    ],
+    missileTint: 0x8a4ad8,
+    floor: 'onyx-mansion',
+  },
 } as const satisfies Record<string, ItemDefinition>;
 
 export type ItemId = keyof typeof ITEMS;

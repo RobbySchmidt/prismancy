@@ -26,6 +26,24 @@ export interface GameEvents {
   'boss:killed': { x: number; y: number; name: string; noHit: boolean };
   'boss:phaseChanged': { phase: number };
   'gem:collected': { floorId: string };
+  /** Fired BEFORE `gem:collected`, with the pickup's world position. The
+   * Onyx gem seal listens for this to animate the gem flying from the
+   * pickup point into its empty socket. Distinct from `gem:collected`
+   * because that one's payload is value-only (HUD / inventory don't need
+   * coordinates). */
+  'gem:pickedUp': { floorId: string; x: number; y: number };
+  /** Player walked onto the gem seal in the Onyx vampire room with all
+   * three floor gems — Lord-Onyx-room transition placeholder hooks here. */
+  'seal:activated': { x: number; y: number };
+  /** Player walked onto the seal without all three gems — HUD shows the
+   * X-of-3 hint, no activation. */
+  'seal:hintShown': { owned: number; total: number };
+  /** Player took the no-gems exit stairs after the Onyx vampire kill —
+   * win-screen-incomplete placeholder hooks here. */
+  'run:onyxExitTaken': void;
+  /** Lord Onyx is dead — full-victory win-screen hooks here, AND the
+   * Prismancy red/gold cosmetic skin gets persisted to localStorage. */
+  'run:onyxFullVictory': void;
 }
 
 class TypedEventBus {

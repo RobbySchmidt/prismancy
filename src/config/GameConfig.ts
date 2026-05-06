@@ -10,6 +10,28 @@ export const GAME_HEIGHT = ROOM_HEIGHT_TILES * TILE_SIZE;
 
 export const WALL_THICKNESS = TILE_SIZE;
 
+/**
+ * Main-camera zoom factor. 1.0 = whole room visible at once (Isaac-style).
+ * Bumped past 1.0 zooms into the player + scrolls — broken for bullet-hell
+ * boss rooms because the player can't see incoming projectiles, so this
+ * stays at 1.0 by default and we make sprites larger via `WORLD_SPRITE_SCALE`
+ * instead.
+ */
+export const CAMERA_ZOOM = 1.0;
+
+/**
+ * Visual scale applied to in-world sprites (player, enemies, pickups,
+ * decorations, items) — purely cosmetic. Hitboxes / physics bodies stay at
+ * their authored sizes, so increasing this makes the *visual* sprite read
+ * larger inside the room without changing collisions or movement distances.
+ *
+ * Tile / wall textures aren't scaled by this — they're rendered as a
+ * tiling grid that has to stay pixel-aligned, so making them bigger needs
+ * a TILE_SIZE bump instead. 1.25 = "a step bigger but still readable",
+ * 1.5 = noticeable, 2.0 = pixel-perfect doubled (might feel cramped).
+ */
+export const WORLD_SPRITE_SCALE = 1.25;
+
 export const PLAYER_SPEED = 220;
 export const PLAYER_MAX_HEALTH = 6;
 export const PLAYER_HITBOX_RADIUS = 13;
@@ -111,7 +133,7 @@ export const VINE_LORD_PHASE2_ADD_INTERVAL_MS = 4000;
 /** Phase 2: max simultaneously alive vine-sprout adds. */
 export const VINE_LORD_PHASE2_MAX_ADDS = 3;
 /** Visual scale for the boss sprite (relative to the Vine Sprout texture). */
-export const VINE_LORD_VISUAL_SCALE = 2.5;
+export const VINE_LORD_VISUAL_SCALE = 2.5 * WORLD_SPRITE_SCALE;
 /** Initial delay before the boss starts shooting after spawning. */
 export const VINE_LORD_FIRE_INITIAL_DELAY_MS = 900;
 /** Phase-change tint flash duration. */
@@ -138,7 +160,7 @@ export const MOSSY_BEHEMOTH_PHASE2_HOP_INTERVAL_MS = 900;
 /** Duration (ms) of one hop arc — sets velocity for this long, then halts. */
 export const MOSSY_BEHEMOTH_HOP_DURATION_MS = 320;
 /** Visual scale applied to the boss texture. */
-export const MOSSY_BEHEMOTH_VISUAL_SCALE = 1.6;
+export const MOSSY_BEHEMOTH_VISUAL_SCALE = 1.6 * WORLD_SPRITE_SCALE;
 /** Initial delay before the first hop after spawn. */
 export const MOSSY_BEHEMOTH_HOP_INITIAL_DELAY_MS = 700;
 /** Phase 2: max simultaneously alive mossy-slime adds spawned on landing. */
@@ -165,7 +187,7 @@ export const PIXIE_QUEEN_PHASE2_MAX_ADDS = 3;
 /** Initial delay before the first teleport after spawn. */
 export const PIXIE_QUEEN_TELEPORT_INITIAL_DELAY_MS = 800;
 /** Visual scale applied to the boss texture. */
-export const PIXIE_QUEEN_VISUAL_SCALE = 1.4;
+export const PIXIE_QUEEN_VISUAL_SCALE = 1.4 * WORLD_SPRITE_SCALE;
 /** Phase-change tint flash duration. */
 export const PIXIE_QUEEN_PHASE_FLASH_MS = 200;
 /** Min distance (px) the random fallback teleport keeps from the player. */
@@ -244,7 +266,7 @@ export const BOG_TORTOISE_BURST_INITIAL_DELAY_MS = 1500;
 
 // --- Toad Sovereign (boss, Floor 2) ------------------------------------------
 
-export const TOAD_SOVEREIGN_VISUAL_SCALE = 2.4;
+export const TOAD_SOVEREIGN_VISUAL_SCALE = 2.4 * WORLD_SPRITE_SCALE;
 export const TOAD_SOVEREIGN_PHASE_FLASH_MS = 200;
 /** Phase 1: idle-then-shoot cadence + tongue-burst spread. */
 export const TOAD_SOVEREIGN_PHASE1_IDLE_MS = 1100;
@@ -266,7 +288,7 @@ export const TOAD_SOVEREIGN_PHASE2_MAX_ADDS = 2;
 
 // --- Bloomheart (boss, Floor 2) ----------------------------------------------
 
-export const BLOOMHEART_VISUAL_SCALE = 2.4;
+export const BLOOMHEART_VISUAL_SCALE = 2.4 * WORLD_SPRITE_SCALE;
 export const BLOOMHEART_PHASE_FLASH_MS = 200;
 export const BLOOMHEART_INITIAL_DELAY_MS = 900;
 /** Phase 1: 5-thorn wide fan (±30°) on a slow cadence. */
@@ -286,7 +308,7 @@ export const BLOOMHEART_PHASE2_MAX_ADDS = 2;
 
 // --- Damselfly Empress (boss, Floor 2) ---------------------------------------
 
-export const DAMSELFLY_EMPRESS_VISUAL_SCALE = 1.6;
+export const DAMSELFLY_EMPRESS_VISUAL_SCALE = 1.6 * WORLD_SPRITE_SCALE;
 export const DAMSELFLY_EMPRESS_PHASE_FLASH_MS = 200;
 export const DAMSELFLY_EMPRESS_INITIAL_DELAY_MS = 900;
 /** Phase 1: dash cycle = pause-and-aim → dash → recovery. */
@@ -313,7 +335,7 @@ export const DAMSELFLY_EMPRESS_PHASE2_LANDING_RADIAL_SPEED = 170;
 
 // --- Bog Colossus (boss, Floor 2) --------------------------------------------
 
-export const BOG_COLOSSUS_VISUAL_SCALE = 1.6;
+export const BOG_COLOSSUS_VISUAL_SCALE = 1.6 * WORLD_SPRITE_SCALE;
 export const BOG_COLOSSUS_PHASE_FLASH_MS = 200;
 export const BOG_COLOSSUS_INITIAL_DELAY_MS = 1500;
 export const BOG_COLOSSUS_PHASE1_WALK_SPEED = 50;
@@ -368,7 +390,7 @@ export const FOREST_HEART_WAVE_THORN_COUNT = 6;
 /** Initial delay before the first wave after spawn. */
 export const FOREST_HEART_FIRE_INITIAL_DELAY_MS = 900;
 /** Visual scale applied to the boss texture. */
-export const FOREST_HEART_VISUAL_SCALE = 1.0;
+export const FOREST_HEART_VISUAL_SCALE = 1.0 * WORLD_SPRITE_SCALE;
 /** Phase-change tint flash duration. */
 export const FOREST_HEART_PHASE_FLASH_MS = 220;
 /** Phase 1 pulse tween scale low / high bounds. */
@@ -381,6 +403,165 @@ export const FOREST_HEART_PHASE2_PULSE_HIGH = 1.15;
 export const FOREST_HEART_PHASE1_PULSE_DURATION_MS = 1100;
 /** Phase 2 pulse duration (faster). */
 export const FOREST_HEART_PHASE2_PULSE_DURATION_MS = 700;
+
+// --- Onyx Mansion mob tuning -------------------------------------------------
+
+/** Wraith — solid (visible + targetable) phase duration. */
+export const WRAITH_PHASE_SOLID_MS = 2500;
+/** Wraith — intangible (translucent + untargetable) phase duration. */
+export const WRAITH_PHASE_INTANGIBLE_MS = 1500;
+/** Solid-phase alpha. */
+export const WRAITH_ALPHA_SOLID = 0.95;
+/** Intangible-phase alpha — clearly faded so player can read the state. */
+export const WRAITH_ALPHA_INTANGIBLE = 0.28;
+
+/** Possessed Candelabra — interval (ms) between wax puddle drops. */
+export const CANDELABRA_PUDDLE_DROP_INTERVAL_MS = 2000;
+/** Interval between cone-fire bursts (3 flame projectiles toward player). */
+export const CANDELABRA_FIRE_INTERVAL_MS = 2500;
+/** Initial delay before the candelabra starts firing after spawning. */
+export const CANDELABRA_FIRE_INITIAL_DELAY_MS = 1400;
+/** Number of flame projectiles per burst (cone-spread toward player). */
+export const CANDELABRA_PROJECTILE_COUNT = 3;
+/** Total cone spread in degrees across the burst (e.g. 30 = ±15° from
+ * center-line). Tuned tight enough that the player can dodge sideways. */
+export const CANDELABRA_PROJECTILE_SPREAD_DEG = 30;
+/** How long a wax puddle stays on the floor before fading out. */
+export const WAX_PUDDLE_LIFETIME_MS = 3000;
+/** Damage dealt to the player on wax-puddle overlap (HP, with 1 HP = half heart). */
+export const WAX_PUDDLE_DAMAGE = 1;
+/** Wax-puddle hitbox radius. */
+export const WAX_PUDDLE_HITBOX_RADIUS = 12;
+
+/** Cursed Mirror — telegraph window before firing. Player sees the flash as
+ * a "homing missile incoming" warning. */
+export const MIRROR_TELEGRAPH_MS = 450;
+/** Cooldown between telegraph cycles. */
+export const MIRROR_FIRE_INTERVAL_MS = 1100;
+/** Initial delay before the mirror starts its first telegraph after spawning. */
+export const MIRROR_FIRE_INITIAL_DELAY_MS = 800;
+/** Homing turn rate (deg/sec) for the Cursed Mirror's missile. Low enough
+ * that sharp 90° direction changes outmaneuver it; high enough that drifting
+ * in a straight line gets you hit. Tune from here. */
+export const MIRROR_HOMING_TURN_RATE_DEG = 110;
+/** How long the mirror's homing missile lives before auto-despawning (ms).
+ * Bumped above the default since a tracking missile may circle a bit before
+ * either hitting or hitting a wall. */
+export const MIRROR_PROJECTILE_LIFETIME_MS = 2200;
+
+// --- Vampire Twins (boss, Onyx Mansion) -------------------------------------
+// Asymmetric duo — Crimson Lord (melee chaser w/ dash) + Sapphire Marquis
+// (range kiter w/ blood-magic projectiles). Phase 1 = both alive. Phase 2 =
+// triggered when one body dies; survivor gets stronger pattern. Phase 3 =
+// surviving body crosses HP threshold → berserker.
+
+/** Visual scale multipliers — keep both bodies readable as boss-tier without
+ * crowding each other in the room. */
+export const CRIMSON_LORD_VISUAL_SCALE = 1.6 * WORLD_SPRITE_SCALE;
+export const SAPPHIRE_MARQUIS_VISUAL_SCALE = 1.6 * WORLD_SPRITE_SCALE;
+
+/** Spawn offset from room center: Lord left, Marquis right (in tiles). */
+export const VAMPIRE_SPAWN_OFFSET_TILES = 1.8;
+
+/** HP-fraction at which the surviving body enters Berserker (Phase 3). */
+export const VAMPIRE_BERSERKER_HP_FRACTION = 0.3;
+
+// Crimson Lord (melee, dash chaser). Tuned so the dash is consistently
+// dodgeable: telegraph long enough to read at point-blank range, chase
+// speed slow enough that the player can keep distance instead of being
+// shoved into a wall.
+export const CRIMSON_LORD_HP = 35;
+export const CRIMSON_LORD_CHASE_SPEED = 70;
+/** Phase 1 dash settings (telegraph → dash → recovery → idle gap). */
+export const CRIMSON_LORD_DASH_SPEED = 500;
+export const CRIMSON_LORD_DASH_TELEGRAPH_MS = 700;
+export const CRIMSON_LORD_DASH_DURATION_MS = 250;
+export const CRIMSON_LORD_DASH_RECOVERY_MS = 600;
+/** Time between the END of one dash and the START of the next telegraph. */
+export const CRIMSON_LORD_DASH_GAP_PHASE1_MS = 1400;
+/** Phase 2 (solo): tighter cycle so a lone Lord still pressures. */
+export const CRIMSON_LORD_DASH_GAP_PHASE2_MS = 600;
+/** Phase 3 (berserker): no telegraph, pure dash spam. Used as the gap between
+ * dashes when in berserker (telegraph is skipped). */
+export const CRIMSON_LORD_DASH_GAP_PHASE3_MS = 250;
+/** Wax-puddle-style trail dropped along the Lord's dash path in Phase 2+. */
+export const CRIMSON_LORD_BLOOD_TRAIL_DROPS = 4;
+export const CRIMSON_LORD_BLOOD_TRAIL_LIFETIME_MS = 1200;
+
+// Sapphire Marquis (range, kite + blood projectiles).
+export const SAPPHIRE_MARQUIS_HP = 35;
+export const SAPPHIRE_MARQUIS_KITE_SPEED = 60;
+/** Distance the Marquis tries to maintain from the player. */
+export const SAPPHIRE_MARQUIS_KITE_DISTANCE = 180;
+/** Phase 1 fan: 5 projectiles, ±30° (= 60° total spread = 15° per spacing). */
+export const SAPPHIRE_MARQUIS_PHASE1_FAN_COUNT = 5;
+export const SAPPHIRE_MARQUIS_PHASE1_FAN_SPREAD_RAD = (60 * Math.PI) / 180;
+export const SAPPHIRE_MARQUIS_PHASE1_FAN_INTERVAL_MS = 1800;
+export const SAPPHIRE_MARQUIS_PHASE1_FIRE_INITIAL_DELAY_MS = 900;
+/** Teleport cadence + the minimum distance the destination must be from the
+ * PLAYER (not from the Marquis). Prevents the materialise-on-top-of-player
+ * bug when the player walks into the destination during the fade. */
+export const SAPPHIRE_MARQUIS_TELEPORT_INTERVAL_MS = 4000;
+export const SAPPHIRE_MARQUIS_TELEPORT_MIN_PLAYER_DISTANCE = 180;
+export const SAPPHIRE_MARQUIS_TELEPORT_FADE_MS = 220;
+/** Phase 2 fan: 7 projectiles, wider 90° spread. */
+export const SAPPHIRE_MARQUIS_PHASE2_FAN_COUNT = 7;
+export const SAPPHIRE_MARQUIS_PHASE2_FAN_SPREAD_RAD = (90 * Math.PI) / 180;
+/** Phase 2 bullet curtain — 12-thorn radial every interval, with telegraph. */
+export const SAPPHIRE_MARQUIS_CURTAIN_INTERVAL_MS = 3000;
+export const SAPPHIRE_MARQUIS_CURTAIN_THORN_COUNT = 12;
+export const SAPPHIRE_MARQUIS_CURTAIN_TELEGRAPH_MS = 300;
+/** Phase 3 spinning stream — N evenly-spaced spawn slots around the body,
+ * with `BERSERKER_SKIPPED_ARMS` of them deliberately left empty so a
+ * permanent dodge-gap rotates with the spin. (Without skipping, every gap
+ * eventually closes as the rotation fills it in over time — first wave
+ * looks dodgeable, later waves catch the player.) Skipping 1 of 8 slots
+ * gives a 90° wide rotating gap. */
+export const SAPPHIRE_MARQUIS_BERSERKER_SPIN_RATE_DEG_PER_SEC = 80;
+export const SAPPHIRE_MARQUIS_BERSERKER_FIRE_INTERVAL_MS = 170;
+export const SAPPHIRE_MARQUIS_BERSERKER_ARM_COUNT = 8;
+export const SAPPHIRE_MARQUIS_BERSERKER_SKIPPED_ARMS = 1;
+
+/** Phase-flash duration for both bodies (visual feedback on phase change). */
+export const VAMPIRE_PHASE_FLASH_MS = 220;
+
+// --- Lord Onyx (secret endboss, Onyx Mansion) -------------------------------
+// Rooted endgame boss. Three phases: aimed homing missile + radial wave →
+// adds + faster cadence → continuous gap-spinning stream. Earned by
+// activating the gem seal with all 3 floor trophies.
+
+export const LORD_ONYX_HP = 90;
+/** Visual scale — chunky boss-tier silhouette so the silhouette dominates
+ * the room. */
+export const LORD_ONYX_VISUAL_SCALE = 1.7 * WORLD_SPRITE_SCALE;
+
+// Phase 1: aimed homing + radial wave.
+export const LORD_ONYX_P1_MISSILE_INTERVAL_MS = 1800;
+export const LORD_ONYX_P1_MISSILE_INITIAL_DELAY_MS = 1000;
+export const LORD_ONYX_P1_RADIAL_INTERVAL_MS = 4000;
+export const LORD_ONYX_P1_RADIAL_THORN_COUNT = 8;
+/** Slower turn rate than Cursed Mirror (110°/s) so even an end-game player
+ * with stat-pumped move speed can sharp-cut around it. */
+export const LORD_ONYX_HOMING_TURN_RATE_DEG = 60;
+export const LORD_ONYX_PROJECTILE_LIFETIME_MS = 2400;
+
+// Phase 2: faster cadence + Wraith adds + spinning cross.
+export const LORD_ONYX_P2_MISSILE_INTERVAL_MS = 1300;
+export const LORD_ONYX_P2_RADIAL_INTERVAL_MS = 3000;
+export const LORD_ONYX_P2_CROSS_INTERVAL_MS = 2000;
+export const LORD_ONYX_P2_ADD_COUNT = 2;
+
+// Phase 3: continuous spinning stream with permanent gap (Marquis-style).
+export const LORD_ONYX_P3_SPIN_RATE_DEG_PER_SEC = 60;
+export const LORD_ONYX_P3_FIRE_INTERVAL_MS = 180;
+export const LORD_ONYX_P3_ARM_COUNT = 8;
+export const LORD_ONYX_P3_SKIPPED_ARMS = 1;
+/** Aimed homing on top of the spin, so standing in the gap forever isn't
+ * enough — player has to keep moving with the gap AND dodge a heat-seeker. */
+export const LORD_ONYX_P3_MISSILE_INTERVAL_MS = 2400;
+
+/** Phase transition flash + camera shake durations. */
+export const LORD_ONYX_PHASE_FLASH_MS = 260;
 
 export const BACKGROUND_COLOR = '#08060c';
 
@@ -430,9 +611,26 @@ export const TextureKeys = {
   ItemLilyDiadem: 'tex-item-lily-diadem',
   ItemMirePearl: 'tex-item-mire-pearl',
   ItemFrogTongue: 'tex-item-frog-tongue',
+  ItemBloodboundChalice: 'tex-item-bloodbound-chalice',
+  ItemVampireSignet: 'tex-item-vampire-signet',
+  ItemObsidianHeart: 'tex-item-obsidian-heart',
   BossMossyBehemoth: 'tex-boss-mossy-behemoth',
   BossPixieQueen: 'tex-boss-pixie-queen',
   BossForestHeart: 'tex-boss-forest-heart',
+  Wraith: 'tex-enemy-wraith',
+  PossessedCandelabra: 'tex-enemy-possessed-candelabra',
+  CursedMirror: 'tex-enemy-cursed-mirror',
+  MansionMissile: 'tex-projectile-mansion-missile',
+  FlameMissile: 'tex-projectile-flame-missile',
+  WaxPuddle: 'tex-hazard-wax-puddle',
+  BossCrimsonLord: 'tex-boss-crimson-lord',
+  BossSapphireMarquis: 'tex-boss-sapphire-marquis',
+  BloodProjectile: 'tex-projectile-blood',
+  BloodTrail: 'tex-hazard-blood-trail',
+  BossLordOnyx: 'tex-boss-lord-onyx',
+  /** Prismancy unlock — red/gold wizard skin awarded by defeating Lord
+   * Onyx. Auto-applied at Player construction if unlocked. */
+  PlayerPrismancy: 'tex-player-prismancy',
 } as const;
 
 export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];

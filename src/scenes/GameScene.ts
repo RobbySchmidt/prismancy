@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  CAMERA_ZOOM,
   ENEMY_PROJECTILE_DAMAGE,
   GAME_HEIGHT,
   GAME_WIDTH,
@@ -17,10 +18,12 @@ import {
   SceneKeys,
   TILE_SIZE,
   TextureKeys,
+  WORLD_SPRITE_SCALE,
 } from '../config/GameConfig';
 import { DepthLayers } from '../config/DepthLayers';
 import { type EnemyId } from '../data/enemies';
 import { FLOORS, STARTING_FLOOR_ID, type FloorId } from '../data/floors';
+import { GemSeal } from '../entities/GemSeal';
 import { Player } from '../entities/Player';
 import { BaseEnemy } from '../entities/enemies/BaseEnemy';
 import { type BossEnemy } from '../entities/enemies/BossEnemy';
@@ -28,9 +31,11 @@ import { Bloomheart, type BloomheartHost } from '../entities/enemies/Bloomheart'
 import { BogColossus, type BogColossusHost } from '../entities/enemies/BogColossus';
 import { DamselflyEmpress, type DamselflyEmpressHost } from '../entities/enemies/DamselflyEmpress';
 import { ForestHeart, type ForestHeartHost } from '../entities/enemies/ForestHeart';
+import { LordOnyx, type LordOnyxHost } from '../entities/enemies/LordOnyx';
 import { MossyBehemoth, type MossyBehemothHost } from '../entities/enemies/MossyBehemoth';
 import { PixieQueen, type PixieQueenHost } from '../entities/enemies/PixieQueen';
 import { ToadSovereign, type ToadSovereignHost } from '../entities/enemies/ToadSovereign';
+import { VampireFight, type VampireFightHost } from '../entities/enemies/VampireFight';
 import { VineLord, type VineLordHost } from '../entities/enemies/VineLord';
 import { createEnemy } from '../entities/enemies';
 import { BasePickup } from '../entities/pickups/BasePickup';
@@ -42,6 +47,10 @@ import { HeartPickup } from '../entities/pickups/HeartPickup';
 import { ItemPickup } from '../entities/pickups/ItemPickup';
 import { KeyPickup } from '../entities/pickups/KeyPickup';
 import { EnemyProjectile } from '../entities/projectiles/EnemyProjectile';
+import { BloodTrail } from '../entities/hazards/BloodTrail';
+import { BloodTrailGroup } from '../entities/hazards/BloodTrailGroup';
+import { WaxPuddle } from '../entities/hazards/WaxPuddle';
+import { WaxPuddleGroup } from '../entities/hazards/WaxPuddleGroup';
 import { EnemyProjectilePool } from '../entities/projectiles/EnemyProjectilePool';
 import { MagicMissile } from '../entities/projectiles/MagicMissile';
 import { MagicMissilePool } from '../entities/projectiles/MagicMissilePool';
@@ -50,6 +59,7 @@ import { DungeonGenerator, type FloorLayout } from '../dungeon/DungeonGenerator'
 import { Room } from '../dungeon/Room';
 import { ShopRoomBuilder, type ShopRoomBuilderHost } from '../dungeon/ShopRoomBuilder';
 import { CombatSystem } from '../systems/CombatSystem';
+import { Cosmetics } from '../systems/Cosmetics';
 import { DropSystem } from '../systems/DropSystem';
 import { InputManager } from '../systems/InputManager';
 import { Inventory } from '../systems/Inventory';
@@ -101,14 +111,18 @@ export interface GameSceneInitData {
 }
 
 /** Canonical floor progression. Drives stairs descent in real play. */
-const FLOOR_ORDER: readonly FloorId[] = ['emerald-forest', 'sapphire-swamp'];
+const FLOOR_ORDER: readonly FloorId[] = [
+  'emerald-forest',
+  'sapphire-swamp',
+  'onyx-mansion',
+];
 
 /**
- * Dev-only superset of `FLOOR_ORDER` that adds floors which exist as
- * authored themes / textures but aren't yet hooked up for natural play
- * (no boss roster, no carry-through balancing). Used by `__wiz.gotoFloor`
- * so the user can visually inspect a half-built floor without breaking
- * stairs progression for normal runs.
+ * Dev-only superset of `FLOOR_ORDER` — kept as a separate constant so
+ * future floors that exist visually but aren't yet hooked into natural
+ * progression can be reached via `__wiz.gotoFloor` without breaking real
+ * runs. Currently identical to `FLOOR_ORDER` (Onyx has its full Vampire
+ * fight wired in).
  */
 const DEV_FLOOR_ORDER: readonly FloorId[] = [
   'emerald-forest',
@@ -120,6 +134,8 @@ export class GameScene extends Phaser.Scene {
   private player!: Player;
   private missilePool!: MagicMissilePool;
   private enemyProjectilePool!: EnemyProjectilePool;
+  private waxPuddleGroup!: WaxPuddleGroup;
+  private bloodTrailGroup!: BloodTrailGroup;
   private inputManager!: InputManager;
   private stats!: StatsSystem;
   private inventory!: Inventory;
@@ -155,6 +171,8 @@ export class GameScene extends Phaser.Scene {
   private enemyProjectileWallCollider: Phaser.Physics.Arcade.Collider | null = null;
   private enemyProjectileBarrierColliders: Phaser.Physics.Arcade.Collider[] = [];
   private enemyProjectilePlayerOverlap: Phaser.Physics.Arcade.Collider | null = null;
+  private waxPuddlePlayerOverlap: Phaser.Physics.Arcade.Collider | null = null;
+  private bloodTrailPlayerOverlap: Phaser.Physics.Arcade.Collider | null = null;
   private enemyBlockerCollider: Phaser.Physics.Arcade.Collider | null = null;
   private enemyProjectileBlockerCollider: Phaser.Physics.Arcade.Collider | null = null;
   private enemyWallCollider: Phaser.Physics.Arcade.Collider | null = null;
@@ -183,8 +201,20 @@ export class GameScene extends Phaser.Scene {
    * BossEnemy.die can read it without a direct GameScene reference.
    */
   private bossNoHitInProgress = false;
-  /** The boss currently active in the room, or null if no boss fight is live. */
-  private activeBoss: BossEnemy | null = null;
+  /** Total damage events received during the current boss fight. Independent
+   * of the boolean flag — used as a sanity check at boss-killed time so a
+   * stuck-true flag can't silently award a no-hit gem. */
+  private bossDamageCount = 0;
+  /** The boss currently active in the room, or null if no boss fight is live.
+   * Widened to accept the `VampireFight` coordinator (which isn't a Phaser
+   * GameObject but has a manual `destroy()`); both share the same destroy +
+   * null-check lifecycle from GameScene's perspective. */
+  private activeBoss: BossEnemy | VampireFight | null = null;
+
+  /** Gem seal placed in the Onyx vampire room after the Twins die. Holds
+   * the activation state + tear-down handle. Null on every other floor. */
+  private gemSeal: GemSeal | null = null;
+  private gemSealOverlap: Phaser.Physics.Arcade.Collider | null = null;
 
   /**
    * Stairs sprite spawned in the boss room after a kill. Held as a field
@@ -210,9 +240,15 @@ export class GameScene extends Phaser.Scene {
   private restartHoldLabel: Phaser.GameObjects.Text | null = null;
 
   private readonly playerTookDamageHandler = (): void => {
+    // Gate on active boss fight, NOT on room kind — `__wiz.spawnBoss` can
+    // host a fight outside a real boss room, and the no-hit tracker has to
+    // count those hits the same way. `activeBoss !== null` is the true
+    // "boss fight in progress" predicate.
+    if (!this.activeBoss) return;
+    // Increment unconditionally even if the flag is already false — this is
+    // the source of truth for the gem-award sanity check at boss-killed time.
+    this.bossDamageCount++;
     if (!this.bossNoHitInProgress) return;
-    const desc = this.layout?.rooms.get(this.currentRoomId);
-    if (!desc || desc.kind !== RoomKind.Boss) return;
     this.bossNoHitInProgress = false;
     this.registry.set('bossNoHitInProgress', false);
   };
@@ -223,6 +259,18 @@ export class GameScene extends Phaser.Scene {
     name: string;
     noHit: boolean;
   }): void => this.handleBossKilled(payload);
+
+  private readonly sealActivatedHandler = (payload: { x: number; y: number }): void =>
+    this.handleSealActivated(payload);
+
+  private readonly gemPickedUpHandler = (payload: {
+    floorId: string;
+    x: number;
+    y: number;
+  }): void => {
+    if (!this.gemSeal) return;
+    this.gemSeal.addGem(payload.floorId, payload.x, payload.y);
+  };
 
   constructor() {
     super({ key: SceneKeys.Game });
@@ -259,6 +307,8 @@ export class GameScene extends Phaser.Scene {
     // HP-up items.
     this.missilePool = new MagicMissilePool(this);
     this.enemyProjectilePool = new EnemyProjectilePool(this);
+    this.waxPuddleGroup = new WaxPuddleGroup(this);
+    this.bloodTrailGroup = new BloodTrailGroup(this);
     this.inputManager = new InputManager(this);
     this.player = new Player(this, 0, 0, this.inputManager, this.missilePool, this.stats);
 
@@ -290,6 +340,7 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.world.setBounds(0, 0, ROOM_WIDTH_TILES * TILE_SIZE, ROOM_HEIGHT_TILES * TILE_SIZE);
     this.cameras.main.setBounds(0, 0, ROOM_WIDTH_TILES * TILE_SIZE, ROOM_HEIGHT_TILES * TILE_SIZE);
+    this.cameras.main.setZoom(CAMERA_ZOOM);
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
 
     this.enterRoom(this.layout.startId, null);
@@ -319,6 +370,8 @@ export class GameScene extends Phaser.Scene {
     EventBus.on('map:teleport', this.mapTeleportHandler);
     EventBus.on('player:tookDamage', this.playerTookDamageHandler);
     EventBus.on('boss:killed', this.bossKilledHandler);
+    EventBus.on('seal:activated', this.sealActivatedHandler);
+    EventBus.on('gem:pickedUp', this.gemPickedUpHandler);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.dropSystem.detach();
       EventBus.off('player:died', this.playerDiedHandler);
@@ -329,6 +382,8 @@ export class GameScene extends Phaser.Scene {
       EventBus.off('map:teleport', this.mapTeleportHandler);
       EventBus.off('player:tookDamage', this.playerTookDamageHandler);
       EventBus.off('boss:killed', this.bossKilledHandler);
+      EventBus.off('seal:activated', this.sealActivatedHandler);
+      EventBus.off('gem:pickedUp', this.gemPickedUpHandler);
       // Phaser destroys child GameObjects on scene shutdown, but our class
       // fields are still pointing at them. If the scene is restarted (e.g.
       // via `__wiz.gotoFloor`), the next `create()` would see a truthy but
@@ -341,11 +396,14 @@ export class GameScene extends Phaser.Scene {
       this.pickups = undefined as unknown as Phaser.Physics.Arcade.Group;
       this.activeBoss = null;
       this.bossNoHitInProgress = false;
+      this.bossDamageCount = 0;
       this.registry.set('bossNoHitInProgress', false);
       this.inTransition = false;
       this.currentShopPriceLabels = [];
       this.stairsSprite = null;
       this.stairsOverlap = null;
+      this.gemSeal = null;
+      this.gemSealOverlap = null;
       this.restartHoldStartedAt = null;
       this.restartKey = null;
       this.restartHoldBg = null;
@@ -379,6 +437,39 @@ export class GameScene extends Phaser.Scene {
          * Usage: `__wiz.gotoFloor(2)`.
          */
         gotoFloor: (floorIndex: number) => this.devGotoFloor(floorIndex),
+        /**
+         * Grant all 3 floor gems instantly. Use to test the gem seal in the
+         * Onyx vampire room without running a perfect no-hit on every floor
+         * first. Usage: `__wiz.giveGems()`.
+         */
+        giveGems: () => {
+          this.inventory.addGem('emerald-forest');
+          this.inventory.addGem('sapphire-swamp');
+          this.inventory.addGem('onyx-mansion');
+          // eslint-disable-next-line no-console
+          console.log('[__wiz.giveGems] Granted Emerald, Sapphire, Onyx.');
+        },
+        /** Spawn Lord Onyx in the current room, regardless of seal state.
+         * Replaces any existing boss. Useful for boss-pattern tuning
+         * without grinding through Vampires + 3-gem requirement. */
+        spawnLordOnyx: () => this.devSpawnBoss('boss-lord-onyx'),
+        /** Toggle the Prismancy red/gold cosmetic skin unlock state. The
+         * change applies on the NEXT scene start (Player reads Cosmetics
+         * at construction). Restart with `__wiz.gotoFloor(1)` to see it. */
+        unlockSkin: () => {
+          Cosmetics.unlockPrismancySkin();
+          // eslint-disable-next-line no-console
+          console.log(
+            '[__wiz.unlockSkin] Prismancy skin unlocked. Restart for it to take effect.',
+          );
+        },
+        lockSkin: () => {
+          Cosmetics.resetAll();
+          // eslint-disable-next-line no-console
+          console.log(
+            '[__wiz.lockSkin] All cosmetic unlocks cleared. Restart for default skin.',
+          );
+        },
       };
     }
   }
@@ -777,11 +868,17 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Re-entry into a cleared boss room: respawn the stairs so the player
-    // can still descend after returning from a side trip. Skipped on the
-    // last floor in `FLOOR_ORDER` since there's nowhere to go (Phase 5
-    // Chunk 4 will hook this branch up to the win screen).
-    if (desc.kind === RoomKind.Boss && desc.cleared && this.hasNextFloor()) {
-      this.spawnStairsInCurrentRoom();
+    // can still descend after returning from a side trip. Onyx is special:
+    // both the gem seal AND the no-gems exit stairs respawn (the seal so
+    // the player can still trigger the Lord-Onyx path, the stairs so
+    // they can take the no-gems exit instead).
+    if (desc.kind === RoomKind.Boss && desc.cleared) {
+      if (this.currentFloorId === 'onyx-mansion') {
+        this.spawnGemSealInCurrentRoom();
+        this.spawnStairsInCurrentRoom(() => this.handleOnyxExit());
+      } else if (this.hasNextFloor()) {
+        this.spawnStairsInCurrentRoom();
+      }
     }
 
     // If the room starts cleared (start room or already-visited room), doors
@@ -809,6 +906,8 @@ export class GameScene extends Phaser.Scene {
     this.playerPickupOverlap?.destroy();
     this.enemyProjectileWallCollider?.destroy();
     this.enemyProjectilePlayerOverlap?.destroy();
+    this.waxPuddlePlayerOverlap?.destroy();
+    this.bloodTrailPlayerOverlap?.destroy();
     this.enemyBlockerCollider?.destroy();
     this.enemyProjectileBlockerCollider?.destroy();
     this.enemyWallCollider?.destroy();
@@ -826,6 +925,8 @@ export class GameScene extends Phaser.Scene {
     this.enemies.destroy();
     this.missilePool.deactivateAll();
     this.enemyProjectilePool.deactivateAll();
+    this.waxPuddleGroup.deactivateAll();
+    this.bloodTrailGroup.deactivateAll();
 
     // Stairs sprite + overlap are room-scoped: reborn via the boss-room
     // re-entry path in `enterRoom` so we always destroy them on teardown.
@@ -834,11 +935,18 @@ export class GameScene extends Phaser.Scene {
     this.stairsSprite?.destroy();
     this.stairsSprite = null;
 
+    // Gem seal — same room-scoped lifecycle as the stairs.
+    this.gemSealOverlap?.destroy();
+    this.gemSealOverlap = null;
+    this.gemSeal?.destroy();
+    this.gemSeal = null;
+
     // If we were in a boss fight, the boss was just destroyed along with the
     // enemies group — drop the references + clear the no-hit flag so the next
     // boss spawn (e.g. on a re-entry) starts from a clean slate.
     this.activeBoss = null;
     this.bossNoHitInProgress = false;
+    this.bossDamageCount = 0;
     this.registry.set('bossNoHitInProgress', false);
 
     // Snapshot uncollected pickups into the room descriptor so they reappear
@@ -892,15 +1000,15 @@ export class GameScene extends Phaser.Scene {
     // TypeScript treats every floor's tuple type as incompatible with the
     // others.
     const roster = FLOORS[this.currentFloorId]
-      .enemyRoster as readonly { id: EnemyId; weight: number }[];
+      .enemyRoster as readonly { id: EnemyId; weight: number; minPerRoom?: number }[];
     const ctx = {
       scene: this,
       target: this.player,
       enemyProjectilePool: this.enemyProjectilePool,
+      waxPuddleGroup: this.waxPuddleGroup,
     };
 
-    for (let i = 0; i < desc.enemySpawnCount; i++) {
-      const pick = rng.pickWeighted(roster);
+    const spawnAt = (id: EnemyId): void => {
       let x = 0;
       let y = 0;
       // Try multiple positions until we find one outside the safe radius
@@ -912,8 +1020,25 @@ export class GameScene extends Phaser.Scene {
         const dy = y - playerSpawn.y;
         if (dx * dx + dy * dy >= minDistSq) break;
       }
-      const enemy = createEnemy(pick.id as EnemyId, ctx, x, y);
-      this.enemies.add(enemy);
+      this.enemies.add(createEnemy(id, ctx, x, y));
+    };
+
+    // Force-spawn `minPerRoom` instances of any roster entry that requests
+    // them (e.g. mansion's Cursed Mirror). These count against the room's
+    // total enemy budget; the weighted loop fills the remainder.
+    let forcedCount = 0;
+    for (const entry of roster) {
+      const min = entry.minPerRoom ?? 0;
+      for (let i = 0; i < min; i++) {
+        spawnAt(entry.id);
+        forcedCount++;
+      }
+    }
+
+    const remaining = Math.max(0, desc.enemySpawnCount - forcedCount);
+    for (let i = 0; i < remaining; i++) {
+      const pick = rng.pickWeighted(roster);
+      spawnAt(pick.id as EnemyId);
     }
   }
 
@@ -928,6 +1053,7 @@ export class GameScene extends Phaser.Scene {
       scene: this,
       target: this.player,
       enemyProjectilePool: this.enemyProjectilePool,
+      waxPuddleGroup: this.waxPuddleGroup,
     };
     const enemy = createEnemy(id, ctx, x, y);
     this.enemies.add(enemy);
@@ -948,12 +1074,25 @@ export class GameScene extends Phaser.Scene {
     if (!bossId) return; // floor has no authored boss yet
     const center = this.currentRoom.getCenter();
 
+    // Vampire Twins is a virtual boss id — dispatched to a coordinator that
+    // spawns + manages two bodies as one fight. Coordinator emits
+    // `boss:spawned` itself, so we don't double-emit here.
+    if (bossId === 'boss-vampire-twins') {
+      const fight = new VampireFight(this, center.x, center.y, this.bossHost());
+      for (const body of fight.getBodies()) this.enemies.add(body);
+      this.activeBoss = fight;
+      this.bossNoHitInProgress = true;
+      this.registry.set('bossNoHitInProgress', true);
+      return;
+    }
+
     const boss = this.constructBossById(bossId, center.x, center.y);
     if (!boss) return;
     this.enemies.add(boss);
     this.activeBoss = boss;
     this.bossNoHitInProgress = true;
     this.registry.set('bossNoHitInProgress', true);
+    this.bossDamageCount = 0;
     EventBus.emit('boss:spawned', { name: boss.displayName, maxHp: boss.maxHp });
   }
 
@@ -975,12 +1114,27 @@ export class GameScene extends Phaser.Scene {
     }
     this.enemies.clear(true, true);
     const center = this.currentRoom.getCenter();
+
+    // Vampire Twins virtual id — same dispatch as the natural boss spawn.
+    if (bossId === 'boss-vampire-twins') {
+      const fight = new VampireFight(this, center.x, center.y, this.bossHost());
+      for (const body of fight.getBodies()) this.enemies.add(body);
+      this.activeBoss = fight;
+      this.bossNoHitInProgress = true;
+      this.registry.set('bossNoHitInProgress', true);
+      this.currentRoom.closeAllDoors();
+      // eslint-disable-next-line no-console
+      console.log(`[__wiz.spawnBoss] Spawned ${fight.displayName}.`);
+      return;
+    }
+
     const boss = this.constructBossById(bossId, center.x, center.y);
     if (!boss) return;
     this.enemies.add(boss);
     this.activeBoss = boss;
     this.bossNoHitInProgress = true;
     this.registry.set('bossNoHitInProgress', true);
+    this.bossDamageCount = 0;
     EventBus.emit('boss:spawned', { name: boss.displayName, maxHp: boss.maxHp });
     this.currentRoom.closeAllDoors();
     // eslint-disable-next-line no-console
@@ -1001,11 +1155,14 @@ export class GameScene extends Phaser.Scene {
     ToadSovereignHost &
     BloomheartHost &
     DamselflyEmpressHost &
-    BogColossusHost {
+    BogColossusHost &
+    VampireFightHost &
+    LordOnyxHost {
     return {
       enemyProjectilePool: this.enemyProjectilePool,
       spawnEnemyAt: (id, sx, sy) => this.spawnEnemyAt(id, sx, sy),
       getPlayer: () => this.player,
+      bloodTrailGroup: this.bloodTrailGroup,
       getRoomBounds: () => ({
         minX: 2 * TILE_SIZE,
         maxX: (ROOM_WIDTH_TILES - 2) * TILE_SIZE,
@@ -1044,6 +1201,8 @@ export class GameScene extends Phaser.Scene {
         return new DamselflyEmpress(this, x, y, host);
       case 'boss-bog-colossus':
         return new BogColossus(this, x, y, host);
+      case 'boss-lord-onyx':
+        return new LordOnyx(this, x, y, host);
       default:
         console.warn(`[GameScene] Unknown boss id: ${bossId}`);
         return null;
@@ -1059,6 +1218,15 @@ export class GameScene extends Phaser.Scene {
   private handleBossKilled(payload: { x: number; y: number; name: string; noHit: boolean }): void {
     this.markCurrentRoomCleared();
 
+    // Lord Onyx is the run finale — no reward pedestal, no exit stairs,
+    // no further boss-rooms. Persist the cosmetic unlock and emit the
+    // full-victory event so the win screen (Phase 5 Chunk 4 #5) can hook
+    // in. Bypass the normal reward flow entirely.
+    if (payload.name === 'Lord Onyx') {
+      this.handleLordOnyxKilled(payload);
+      return;
+    }
+
     const center = this.currentRoom?.getCenter();
     if (center) {
       // Reward pedestal: boss-pool item.
@@ -1070,23 +1238,38 @@ export class GameScene extends Phaser.Scene {
       const rightHeart = this.spawnPickup(PickupKind.Heart, center.x + heartOffset, center.y);
       rightHeart?.setSpawnProtection(700);
 
-      // No-hit gem — only awarded if the no-hit flag survived the fight AND
-      // the player hasn't already earned this floor's gem.
-      if (this.bossNoHitInProgress && !this.inventory.hasGem(this.currentFloorId)) {
+      // No-hit gem — gated by BOTH the boolean flag AND the damage counter
+      // as a paranoia check (mismatch = bug; logged in dev). Player must
+      // also not already own this floor's gem.
+      const noHit = this.bossNoHitInProgress && this.bossDamageCount === 0;
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[boss:killed] flag=${this.bossNoHitInProgress} damageCount=${this.bossDamageCount} → noHit=${noHit}, hasGem(${this.currentFloorId})=${this.inventory.hasGem(this.currentFloorId)}`,
+        );
+      }
+      if (noHit && !this.inventory.hasGem(this.currentFloorId)) {
         const gem = new GemPickup(this, center.x, center.y - heartOffset, this.currentFloorId);
         gem.setSpawnProtection(700);
         this.pickups.add(gem);
       }
 
-      // Stairs to the next floor. Only spawn if there IS a next floor;
-      // otherwise this kill is the run finale (handled in Phase 5 Chunk 4).
-      if (this.hasNextFloor()) {
+      // Onyx Mansion = end-of-progression. After the Vampire Twins die,
+      // the run forks: gem seal (3 trophies → Lord Onyx room, Phase 5
+      // Chunk 4 #3) OR exit stairs (no-gems early-out → win-screen-
+      // incomplete, #5). Both spawn so the player chooses. For other
+      // floors, fall back to the normal "stairs to next floor" path.
+      if (this.currentFloorId === 'onyx-mansion') {
+        this.spawnGemSealInCurrentRoom();
+        this.spawnStairsInCurrentRoom(() => this.handleOnyxExit());
+      } else if (this.hasNextFloor()) {
         this.spawnStairsInCurrentRoom();
       }
     }
 
     this.activeBoss = null;
     this.bossNoHitInProgress = false;
+    this.bossDamageCount = 0;
     this.registry.set('bossNoHitInProgress', false);
     void payload; // payload.noHit is also available; we trust our own flag
   }
@@ -1103,10 +1286,10 @@ export class GameScene extends Phaser.Scene {
   /**
    * Place the stairs sprite in the current room (above the loot, so the
    * player picks rewards up first then walks onto the stairs to descend).
-   * Wires a player-overlap that triggers `advanceToNextFloor` on contact.
-   * Idempotent — calling twice destroys the previous instance first.
+   * Wires a player-overlap that calls `onOverlap` on contact — defaults to
+   * `advanceToNextFloor` for normal floors. Idempotent.
    */
-  private spawnStairsInCurrentRoom(): void {
+  private spawnStairsInCurrentRoom(onOverlap?: () => void): void {
     const center = this.currentRoom?.getCenter();
     if (!center) return;
 
@@ -1123,22 +1306,213 @@ export class GameScene extends Phaser.Scene {
 
     this.stairsSprite = this.add
       .image(stairsX, stairsY, TextureKeys.Stairs)
-      .setDepth(DepthLayers.FloorDecoration);
+      .setDepth(DepthLayers.FloorDecoration)
+      .setScale(WORLD_SPRITE_SCALE);
     this.physics.add.existing(this.stairsSprite, true);
 
     // Subtle pulse so the stairs telegraph "step on me".
     this.tweens.add({
       targets: this.stairsSprite,
-      scale: { from: 0.96, to: 1.04 },
+      scale: { from: 0.96 * WORLD_SPRITE_SCALE, to: 1.04 * WORLD_SPRITE_SCALE },
       duration: 900,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.InOut',
     });
 
+    const action = onOverlap ?? (() => this.advanceToNextFloor());
     this.stairsOverlap = this.physics.add.overlap(this.player, this.stairsSprite, () => {
-      this.advanceToNextFloor();
+      action();
     });
+  }
+
+  /**
+   * Spawn the Gem Seal at the bottom-center of the current (Onyx vampire)
+   * room. Reads the player's earned gems at spawn-time so the seal renders
+   * the right number of lit sockets. Idempotent — re-spawn destroys any
+   * previous seal first.
+   */
+  private spawnGemSealInCurrentRoom(): void {
+    const center = this.currentRoom?.getCenter();
+    if (!center) return;
+
+    // Tear down a previous instance (re-entry).
+    this.gemSealOverlap?.destroy();
+    this.gemSealOverlap = null;
+    this.gemSeal?.destroy();
+    this.gemSeal = null;
+
+    const sealX = center.x;
+    const sealY = center.y + TILE_SIZE * 3;
+
+    this.gemSeal = new GemSeal(this, sealX, sealY, this.inventory.getGems());
+    this.gemSealOverlap = this.physics.add.overlap(
+      this.player,
+      this.gemSeal.trigger,
+      () => {
+        this.gemSeal?.tryActivate();
+      },
+    );
+  }
+
+  /**
+   * Lord Onyx dead → Prismancy red/gold cosmetic skin unlocks (persists
+   * to localStorage; auto-applies on the next Player construction). Then
+   * placeholder full-victory feedback + `run:onyxFullVictory` event — the
+   * win screen wires in here for #5.
+   */
+  private handleLordOnyxKilled(payload: {
+    x: number;
+    y: number;
+    name: string;
+    noHit: boolean;
+  }): void {
+    const wasAlreadyUnlocked = Cosmetics.hasPrismancySkin();
+    Cosmetics.unlockPrismancySkin();
+
+    this.activeBoss = null;
+    this.bossNoHitInProgress = false;
+    this.bossDamageCount = 0;
+    this.registry.set('bossNoHitInProgress', false);
+
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[run:onyxFullVictory] Lord Onyx defeated. Skin newly unlocked: ${!wasAlreadyUnlocked}`,
+      );
+    }
+
+    // Placeholder visual until #5 ships the real win screen: a centered
+    // banner with "VICTORY" + cosmetic-unlock toast underneath.
+    const cx = payload.x;
+    const cy = payload.y;
+    const victory = this.add
+      .text(cx, cy - 80, 'VICTORY', {
+        fontFamily: 'monospace',
+        fontSize: '36px',
+        color: '#ffd84a',
+        stroke: '#1a0408',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(DepthLayers.HUD - 1)
+      .setAlpha(0)
+      .setScale(0.4);
+    this.tweens.add({
+      targets: victory,
+      alpha: 1,
+      scale: 1,
+      duration: 600,
+      ease: 'Back.Out',
+    });
+    if (!wasAlreadyUnlocked) {
+      const skinToast = this.add
+        .text(cx, cy - 40, 'Prismancy Skin Unlocked', {
+          fontFamily: 'monospace',
+          fontSize: '16px',
+          color: '#ff80a0',
+          stroke: '#1a0408',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5, 0.5)
+        .setDepth(DepthLayers.HUD - 1)
+        .setAlpha(0);
+      this.tweens.add({
+        targets: skinToast,
+        alpha: 1,
+        delay: 700,
+        duration: 500,
+      });
+    }
+    this.cameras.main.flash(420, 240, 200, 100, false);
+    this.cameras.main.shake(360, 0.006);
+
+    EventBus.emit('run:onyxFullVictory');
+    void payload;
+  }
+
+  /**
+   * Placeholder reaction to the no-gems exit on Onyx — fires the
+   * `run:onyxExitTaken` event so the win-screen-incomplete in Phase 5
+   * Chunk 4 #5 can hook in. For now it logs in dev and visually flashes
+   * the camera so the trigger is at least observable while testing.
+   */
+  private handleOnyxExit(): void {
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log('[run:onyxExitTaken] No-gems exit taken on Onyx Mansion.');
+    }
+    this.cameras.main.flash(280, 80, 80, 120, false);
+    EventBus.emit('run:onyxExitTaken');
+  }
+
+  /**
+   * Seal activation → Lord Onyx spawn. After the seal's own activation
+   * cinematic, we close the room doors, drop a brief "Lord Onyx stirs"
+   * banner, then spawn the boss after a short dramatic delay so the
+   * player has a moment to register the transition.
+   */
+  private handleSealActivated(payload: { x: number; y: number }): void {
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log(`[seal:activated] All 3 gems at (${payload.x}, ${payload.y}).`);
+    }
+    // Close the doors immediately — the Lord Onyx fight is committed the
+    // moment the seal lights up; no walking out.
+    this.currentRoom?.closeAllDoors();
+    // Tear down the no-gems exit stairs — they shouldn't compete with the
+    // boss arena. Re-entry path won't respawn them either since the boss
+    // re-arms `bossNoHitInProgress` (different flag than vampire kill).
+    this.stairsOverlap?.destroy();
+    this.stairsOverlap = null;
+    this.stairsSprite?.destroy();
+    this.stairsSprite = null;
+
+    const banner = this.add
+      .text(payload.x, payload.y - 56, 'Lord Onyx stirs...', {
+        fontFamily: 'monospace',
+        fontSize: '18px',
+        color: '#ff80ff',
+        stroke: '#000000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(DepthLayers.HUD - 1);
+    // Fade the banner out so it doesn't linger over the boss bar.
+    this.tweens.add({
+      targets: banner,
+      alpha: { from: 1, to: 0 },
+      delay: 1400,
+      duration: 600,
+      onComplete: () => banner.destroy(),
+    });
+
+    // Brief dramatic delay after the seal's cinematic so the room transitions
+    // mentally from "puzzle solved" to "boss arena" before the bar appears.
+    this.time.delayedCall(900, () => this.spawnLordOnyxInCurrentRoom());
+  }
+
+  /**
+   * Spawn Lord Onyx at the room center. Uses the same `activeBoss` slot as
+   * the regular boss path, so the existing no-hit tracking, HP-bar, and
+   * `boss:killed` plumbing all flow through unchanged. Differentiation is
+   * by `displayName` in `handleBossKilled`.
+   */
+  private spawnLordOnyxInCurrentRoom(): void {
+    if (!this.currentRoom) return;
+    if (this.activeBoss) {
+      // Defensive: shouldn't happen (vampires are dead, no other boss
+      // could exist) but if it does, don't double-spawn.
+      return;
+    }
+    const center = this.currentRoom.getCenter();
+    const boss = new LordOnyx(this, center.x, center.y, this.bossHost());
+    this.enemies.add(boss);
+    this.activeBoss = boss;
+    this.bossNoHitInProgress = true;
+    this.registry.set('bossNoHitInProgress', true);
+    this.bossDamageCount = 0;
+    EventBus.emit('boss:spawned', { name: boss.displayName, maxHp: boss.maxHp });
   }
 
   /**
@@ -1292,6 +1666,61 @@ export class GameScene extends Phaser.Scene {
           }
         } catch (err) {
           console.error('[enemyProjectile↔player overlap] error:', err);
+        }
+      },
+    );
+
+    // Wax puddle ↔ player: contact damage with the player's normal i-frames.
+    // The puddle is a hazard tile (no destroy on hit) — it just keeps
+    // burning for its full lifetime, so a player who stands in it gets
+    // ticked once per i-frame window.
+    this.waxPuddlePlayerOverlap = this.physics.add.overlap(
+      this.player,
+      this.waxPuddleGroup.getGroup(),
+      (a, b) => {
+        try {
+          const puddle = (a instanceof WaxPuddle ? a : b) as WaxPuddle;
+          if (!puddle.active) return;
+          if (!this.player.health.isVulnerable(this.time.now)) return;
+          // Knockback away from the puddle so the player at least gets
+          // nudged out of repeated tick stacking on the same frame.
+          const knockback = CombatSystem.knockbackVector(
+            { x: puddle.x, y: puddle.y },
+            { x: this.player.x, y: this.player.y },
+            KNOCKBACK_FORCE_PLAYER,
+          );
+          const landed = this.player.takeDamage(puddle.damage, knockback, this.time.now);
+          if (landed) {
+            this.cameras.main.shake(SCREEN_SHAKE_DURATION_MS, SCREEN_SHAKE_INTENSITY);
+          }
+        } catch (err) {
+          console.error('[waxPuddle↔player overlap] error:', err);
+        }
+      },
+    );
+
+    // Blood trail ↔ player: same hazard-tile pattern as the wax puddle, just
+    // a different sprite/lifetime. Dropped along the Crimson Lord's dash
+    // path in Phase 2+.
+    this.bloodTrailPlayerOverlap = this.physics.add.overlap(
+      this.player,
+      this.bloodTrailGroup.getGroup(),
+      (a, b) => {
+        try {
+          const trail = (a instanceof BloodTrail ? a : b) as BloodTrail;
+          if (!trail.active) return;
+          if (!this.player.health.isVulnerable(this.time.now)) return;
+          const knockback = CombatSystem.knockbackVector(
+            { x: trail.x, y: trail.y },
+            { x: this.player.x, y: this.player.y },
+            KNOCKBACK_FORCE_PLAYER,
+          );
+          const landed = this.player.takeDamage(trail.damage, knockback, this.time.now);
+          if (landed) {
+            this.cameras.main.shake(SCREEN_SHAKE_DURATION_MS, SCREEN_SHAKE_INTENSITY);
+          }
+        } catch (err) {
+          console.error('[bloodTrail↔player overlap] error:', err);
         }
       },
     );

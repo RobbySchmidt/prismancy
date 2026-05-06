@@ -77,7 +77,7 @@ export interface FloorTheme {
    * `types/` without depending on `data/enemies.ts` (which would cycle).
    * Concrete data files use the stricter `EnemyRosterEntry` from `data/enemies.ts`.
    */
-  enemyRoster: ReadonlyArray<{ id: string; weight: number }>;
+  enemyRoster: ReadonlyArray<{ id: string; weight: number; minPerRoom?: number }>;
 }
 
 export const RoomKind = {

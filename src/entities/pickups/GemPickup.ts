@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
-import { gemTextureKey } from '../../config/GameConfig';
+import { gemTextureKey, WORLD_SPRITE_SCALE } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
 import { FLOORS, type FloorId } from '../../data/floors';
 import { PickupKind } from '../../types';
 import { type Inventory } from '../../systems/Inventory';
+import { EventBus } from '../../utils/EventBus';
 import { type Player } from '../Player';
 import { BasePickup } from './BasePickup';
 
@@ -41,7 +42,7 @@ export class GemPickup extends BasePickup {
   constructor(scene: Phaser.Scene, x: number, y: number, floorId: string) {
     super(scene, x, y, gemTextureKey(floorId), PickupKind.Gem);
     this.floorId = floorId;
-    this.setScale(1.8);
+    this.setScale(1.8 * WORLD_SPRITE_SCALE);
 
     // Pulsating halo behind the gem — uses the source floor's palette glow
     // so each gem reads in its own colour (emerald green, sapphire cyan,
@@ -70,6 +71,11 @@ export class GemPickup extends BasePickup {
   }
 
   override onCollect(scene: Phaser.Scene, inventory: Inventory, _player: Player): boolean {
+    // Emit BEFORE addGem so listeners that animate the gem (Onyx seal)
+    // get the pickup position. The cryptic message + halo destroy still
+    // happen via DESTROY listener so the source point is valid for the
+    // tween's full duration.
+    EventBus.emit('gem:pickedUp', { floorId: this.floorId, x: this.x, y: this.y });
     inventory.addGem(this.floorId);
     this.spawnCrypticMessage(scene);
     return true;

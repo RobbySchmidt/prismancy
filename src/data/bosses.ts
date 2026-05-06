@@ -27,6 +27,10 @@ export const BOSSES: Record<string, BossRosterEntry> = {
     floor: 'sapphire-swamp',
   },
   'boss-bog-colossus': { id: 'boss-bog-colossus', weight: 1, floor: 'sapphire-swamp' },
+  // Virtual id — represents the Vampire Twins fight (Crimson Lord + Sapphire
+  // Marquis), dispatched in `constructBossById` to a `VampireFight` coordinator
+  // that spawns and manages both bodies as one logical boss.
+  'boss-vampire-twins': { id: 'boss-vampire-twins', weight: 1, floor: 'onyx-mansion' },
 };
 
 /**

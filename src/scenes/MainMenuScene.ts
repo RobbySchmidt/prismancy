@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, SceneKeys, TextureKeys } from '../config/GameConfig';
+import { Cosmetics } from '../systems/Cosmetics';
 
 /**
  * Title screen styled as a key-art illustration: the wizard duels the
@@ -38,8 +39,14 @@ export class MainMenuScene extends Phaser.Scene {
     });
 
     // 3) Wizard (left side) — heroic stance with magic glow underfoot.
+    // Uses the Prismancy red/gold skin if Lord Onyx has ever been beaten,
+    // matching the in-game player. The title screen reads as a permanent
+    // trophy of the player's run history.
     this.paintWizardAura();
-    const wizard = this.add.image(240, GAME_HEIGHT / 2 + 60, TextureKeys.Player);
+    const wizardKey = Cosmetics.hasPrismancySkin()
+      ? TextureKeys.PlayerPrismancy
+      : TextureKeys.Player;
+    const wizard = this.add.image(240, GAME_HEIGHT / 2 + 60, wizardKey);
     wizard.setScale(4);
     wizard.setRotation(-0.08);
 

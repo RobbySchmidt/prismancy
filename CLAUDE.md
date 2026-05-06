@@ -237,8 +237,15 @@ src/
 - **Lord Onyx** als Secret Endboss hinter dem Gem-Siegel. Visuelle Vorlage existiert in `StyleMockupScene.drawLordOnyx`, aber User flagged für visual rework
 - **Win-Screen** (full-victory variant) nach Lord-Onyx-Kill
 
+*Mansion-Mob-Roster (DONE, post-playtest activity bump):*
+- [x] **Wraith** — Phasing-Chaser. Beelines auf Player, alle ~2.5s wechselt in Intangible-Phase (~1.5s, alpha 0.28, `body.checkCollision.none = true` → Player + Missiles passen durch, kein Contact-Damage). `takeDamage` no-ops während intangible (auch falls overlap durchschlüpft). HP 2, speed 100. Threat: Timing.
+- [x] **Possessed Candelabra** — Slow Tank-Walker mit dual threat layer: (a) droppt alle **2.0s** eine WaxPuddle hinter sich (`WaxPuddleGroup` pool, 16 instances; puddle 3s lifetime, 12px hitbox, 1 HP damage, fade-out in den letzten 600ms) **+** (b) feuert alle **2.5s** einen 3-projektil **Flame-Cone** (`FlameMissile` orange ember texture, ±15° spread) toward player. Initial-Delay 1.4s + 0-600ms jitter so eine Welle nicht synchron feuert. HP 5, speed 55. Threat: Positional Control + Ranged Pressure.
+- [x] **Cursed Mirror** — Rooted Predictive Shooter. State-Machine: idle → telegraph (**500ms**, alpha-flash + capture player.x/y) → fire (`MansionMissile` amethyst-purple texture via EnemyProjectilePool optional texture override) → cooldown **1.5s**. Schießt auf gespeicherte Position, nicht aktuelle → still-stehen = Treffer, bewegen = Miss. HP 3. Threat: Movement-Predictor (~Shot alle 2s).
+- [x] Onyx-Roster gewichtet: wraith ×4, candelabra ×2, mirror ×2 — Wraith dominiert numerisch wie Forest Sprite auf Emerald
+- [x] **EnemyProjectilePool.fire** akzeptiert optional `textureKey` für andere bullets als Default-Thorn (used by Cursed Mirror = MansionMissile, Possessed Candelabra = FlameMissile)
+- [x] **WaxPuddle / WaxPuddleGroup** in `src/entities/hazards/` — separate hazard layer, deaktiviert beim room-tear-down via `waxPuddleGroup.deactivateAll()` in tear-down. Player ↔ puddle overlap is room-scoped (created per `enterRoom`, destroyed in tear-down).
+
 *Noch offen:*
-- [ ] Mansion-Mob-Roster: Wraith, Possessed Candelabra, Cursed Mirror (Vorlagen in StyleMockupScene)
 - [ ] Vampire-Doppelboss inkl. dual-body state machine + zwei Berserker-Patterns
 - [ ] Gem-Siegel UI + state machine (vampire-clear → seal-spawn → gem-input → onyx-room oder kryptische Nachricht)
 - [ ] Lord Onyx (mit visual rework)
@@ -321,7 +328,7 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 - `__wiz.spawnTreasure()` — Treasure-Pedestal im aktuellen Raum
 - `__wiz.simulateFloor2()` — markiert Treasure/Shop-Türen als locked zum Lock-Test
 - `__wiz.spawnBoss(id)` — force-spawnt Boss im aktuellen Raum, schließt Türen, killt vorhandene Enemies. Emerald: `'boss-vine-lord'`, `'boss-mossy-behemoth'`, `'boss-pixie-queen'`, `'boss-forest-heart'`. Sapphire: `'boss-toad-sovereign'`, `'boss-bloomheart'`, `'boss-damselfly-empress'`, `'boss-bog-colossus'`.
-- `__wiz.gotoFloor(n)` — restart auf Floor n (1=Emerald, 2=Sapphire). Resettet alle Run-Stats; nur für Mob-/Theme-Testing.
+- `__wiz.gotoFloor(n)` — restart auf Floor n (1=Emerald, 2=Sapphire, **3=Onyx**). Resettet alle Run-Stats; nur für Mob-/Theme-Testing. Mapped via `DEV_FLOOR_ORDER` (superset of `FLOOR_ORDER`) so onyx-mansion erreichbar ist obwohl es noch nicht in der natural-progression steht (Sapphire stairs spawnen weiterhin nicht weil hasNextFloor() noch ['emerald', 'sapphire'] gated).
 - `__wiz.stats()`, `__wiz.itemSystem()` — Inspect
 
 **`STARTING_COINS = 0`** in GameConfig.ts (war zwischenzeitlich 50 zum Testen). Spieler startet jetzt ohne Coins, muss alles von Gegnern + Crates + Drops sammeln.
@@ -329,7 +336,7 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 **Geplante Progression:**
 1. **Emerald Forest** (Floor 1) — implementiert inkl. 4 Bosse (Vine Lord, Mossy Behemoth, Pixie Queen, Forest Heart, random pick).
 2. **Sapphire Swamp** (Floor 2) — implementiert. 4 Mobs (Bog Frog, Snapper Bloom, Damselfly, Bog Tortoise), 4 Bosse (Toad Sovereign, Bloomheart, Damselfly Empress, Bog Colossus). Eigene Decos (Lily Pad + Mangroven-Wurzel) statt der Forest-Decos via `decorationStyle`-Diskriminator.
-3. **Onyx Mansion** (Endgame) — Phase 5 Chunk 4, finaler Boss + Secret Endboss (gem-locked) + Win-Screen.
+3. **Onyx Mansion** (Endgame) — Foundation + Mob-Roster (Wraith, Possessed Candelabra, Cursed Mirror) + Painterly Atmosphere DONE. **Open**: Vampire-Doppelboss als Standard-Boss + Gem-Siegel-Mechanik + Lord Onyx als Secret-Endboss hinter dem Siegel + Win-Screen. Currently nur via `__wiz.gotoFloor(3)` erreichbar; in `FLOOR_ORDER` einhängen sobald Vampire fertig.
 
 Weitere Edelsteinfloors (Ruby/Topaz/...) können zwischen Sapphire und Onyx ergänzt werden. Floor-Reihenfolge wird in `FLOOR_ORDER` (`GameScene.ts`) gegated; Stairs verwenden den nächsten Eintrag.
 
@@ -349,13 +356,37 @@ Drawn in `PreloadScene` per Floor-Theme. `drawLockBadge` ist shared zwischen Tre
 
 **Title Screen (Key-Art Illustration)** — `MainMenuScene.ts` ist als gemaltes Poster aufgebaut, nicht als Text-Menü. Layered Backdrop via `Phaser.GameObjects.Graphics`: Sky-Gradient (16-Strip Fake-Gradient von dunkellila → dunkelteal), pinker Mond-Halo (5 konzentrische Layer) hinter der Queen für ominöses Backlight, distanter Forest (Triangel-Tannen-Silhouetten) + mid-range Forest (Stamm + 3 überlappende Foliage-Circles), mossy Ground-Curve, Mist-Bands, ~15 Glühwürmchen (forest-grün + ein paar pixie-pink). **Wizard** (Player-Texture scaled 4x) links bei (240, GAME_HEIGHT/2+60) leicht nach rechts geneigt mit grün-goldener Glow-Aura unter den Füßen. **Pixie Queen** (BossPixieQueen-Texture scaled 4x) rechts bei (GAME_WIDTH-240, GAME_HEIGHT/2-30) leicht nach links geneigt, sanfter 1.8s Hover-Bob. **Action**: Magic-Missile-Streak (6 Beads entlang Quadratic Bézier vom Wand zur Queen, fade + Glow + Sparkle), Pixie-Thorn-Volley (3 Thorns mit Tracer-Streaks zurück). **Title** "PRISMANCY" 88px bold mit Stroke + Drop-Shadow + 2s Scale-Pulse. **Subtitle** pulst alpha 0.55→1 alle 900ms. Komposition rein prozedural, keine externen Assets.
 
-**Themed Walls** (`PreloadScene.drawForestWallTexture` / `drawSwampWallTexture`) — gebrancht über `theme.decorationStyle`. **Forest**: 4 vertikale Bark-Planks (14 px Wide + 2 px Gap) mit Outline + Highlight-Strip + Bark-Grooves + 0-2 Astknoten pro Plank, Moos-Krone oben (4 überlappende dunkelgrüne Domes mit Highlights + 3 Blatt-Silhouetten die rauspeeken), 1-3 Glühwürmchen mit Outline+Sparkle-Pixel in palette-glow Farbe. **Swamp**: Algen-Slime-Background, 5-6 vertikale Mangroven-Wurzeln segmentiert (8 px Stack-Segmente mit per-Segment Drift für organischen Look), Highlight + Shadow Strip pro Wurzel, dünne Teal-Algen-Threads quer drüber, 2-4 Sapphir-Glow-Knoten an Wurzel-Joints, hängende Algen-Strähnen am Top-Edge.
+**Themed Walls** (`PreloadScene.drawForestWallTexture` / `drawSwampWallTexture` / `drawMansionWallTexture`) — gebrancht über `theme.decorationStyle`. **Forest**: 4 vertikale Bark-Planks (14 px Wide + 2 px Gap) mit Outline + Highlight-Strip + Bark-Grooves + 0-2 Astknoten pro Plank, Moos-Krone oben (4 überlappende dunkelgrüne Domes mit Highlights + 3 Blatt-Silhouetten die rauspeeken), 1-3 Glühwürmchen mit Outline+Sparkle-Pixel in palette-glow Farbe. **Swamp**: Algen-Slime-Background, 5-6 vertikale Mangroven-Wurzeln segmentiert (8 px Stack-Segmente mit per-Segment Drift für organischen Look), Highlight + Shadow Strip pro Wurzel, dünne Teal-Algen-Threads quer drüber, 2-4 Sapphir-Glow-Knoten an Wurzel-Joints, hängende Algen-Strähnen am Top-Edge. **Mansion**: 4 stone-brick courses (22-px brickW, alternating offset bond) mit top highlight + bottom shadow strip, gold molding strip horizontal mit tally marks, **candle sconce** inset (bracket + flame + halo) deterministisch positioniert pro tile, 1-2 amethyst-glow cracks im mortar.
+
+**Painterly Atmosphere Overlay** (`src/dungeon/RoomAtmosphere.ts`) — applies to **all rooms on all floors**, palette-driven via `theme.decorationStyle`:
+- *Floor-level layers* (depth 1-3): radial floor vignette (6 stacked ellipses warm-core → dark-edge), 30 painterly mossy/algae/parquet patches scattered (3-tone blobs + sparkle pixels via deterministic RNG keyed by `decorationSeed`), 3 diagonal light shafts (warm green-gold for forest / cool moonlight for swamp / candle-gold for mansion)
+- *Wall-band overlay* (depth 71, **above** wall tiles): per-style continuous painterly band that visually replaces the repeating tile look. **Forest**: layered canopy (jagged distant treeline + 3-tone overlapping foliage circles + bright caps), mossy ground band, vertical bark slivers with moss-fringe inner edge. **Swamp**: stone-arch ridge with hanging algae strands + sapphire glow pendants top, muddy bank with cyan algae fringe bottom, mangrove root pillars with cyan glow knots sides. **Mansion**: stone-brick vault courses + gold molding + 5 wall sconces top, red velvet runner with gold trim + tassels bottom, brick courses with gilt molding + 4 mini-portraits (gilt frames with glowing red eyes) per side. **Door-aware gaps** — `paintWallBands` accepts `descriptor.doors`, computes per-tile gap ranges via `doorGap(tx)` + `inGap()` helpers; iterative painting loops skip door pixel range, solid strips split into 2 fillRects via `fillRectGapped` / `fillRectVertGapped` so the door sprite stays visible at its tile.
+- *Sky-level layers* (depth 45+): 3 mist bands across lower floor, **14 fireflies** (forest = green+pink mix / swamp = cyan+sapphire / mansion = **gold+amethyst dust motes** instead of fireflies for theme) with outline + palette-glow + sparkle pixel, gentle alpha pulse 0.85→1, edge vignette overlay (depth 990, just below HUD).
+- *Decoration glow halos* — `paintDecorationHalo(scene, cx, cy, theme, 'small'|'medium')` painted at depth `FloorDecoration - 1` under each tree/rock/mushroom in `Room.placeTree/Rock/Mushroom`, palette-driven. Hooked from `Room.atmosphere`.
+- Lifetime: `RoomAtmosphere` instance owned by `Room`, all Graphics + tweens tracked, `destroy()` cleans up. Created after `buildFloor + buildWalls` in Room constructor.
 
 **Forest Decoration Polish** (`drawTreeTexture` / `drawRockTexture`) — beide neu gezeichnet damit sie zur Sapphire-Polish-Latte (zentraler Anker + radiales Detail + 4 Tonbänder + Outline+Sparkle-Pixel) passen. **Tree**: asymmetrische Foliage-Crown mit 4 Tonbändern (deep shadow / mid green / upper highlight / brightest), Wurzelflanken am Stammbase, getaperter Stamm, herausragende Blatt-Silhouetten an der Krone, 3 Glühwürmchen mit Outline+Sparkle in Glow-Farbe. **Rock**: asymmetrischer Doppelkörper (Hauptkörper + side lump) statt Single-Ellipse, 4 Tonbänder, Moos-Cap mit Drip-Tendrils, **Smaragd-Kristall-Cluster** auf der Krone als Echo der Mangroven-Glow-Nodes (3 dreieckige Shards mit Glow-Fill + Highlight-Pixel).
 
 **Wand Sparkle on Cast** (`Player.spawnWandSparkle`) — 3.5 px goldener Funke (`0xfff8c0`) am Wand-Tip (Sprite-relativ +15, +3 vom Center, eine Layer über `DepthLayers.Player`) bei jedem Schuss. Fadet alpha + scale via Tween über 150 ms, self-cleaning. **Wichtig**: Body-Animation (Walk-Bob via Scale + Rotation, Shoot-Kick via Lean) wurde versucht und verworfen — Sub-Pixel-Verzerrung auf Pixel-Art-Sprites sieht durchgehend falsch aus. Saubere zukünftige Path: Multi-Frame Sprite-Sheet (Walk-Cycle A/B + Cast-Frame), kommt in Phase 6.
 
 **Music** — Phase 6 wartet auf echte Audio-Files (OGG/MP3). Ein prozeduraler Web-Audio-Versuch (3 Tracks, lookahead-Scheduler, crossfade) wurde gebaut und wieder entfernt — proceduraler Sound passte nicht zum Aesthetic. Git-History hat den Code falls jemand das später als Placeholder reaktivieren will.
+
+**`WORLD_SPRITE_SCALE = 1.25`** in `GameConfig.ts` — visual-only sprite scale-up für **alle in-world entities** (Player, Enemies, Bosses, Pickups, Decorations, Item-Pedestals + Items, Stairs). Tile-Texturen (Floor, Wall, Door) werden **nicht** skaliert (würden Tile-Grid-Lücken erzeugen). Bosse haben eigene `*_VISUAL_SCALE`-Konstanten die alle mit `* WORLD_SPRITE_SCALE` multipliziert sind, damit ihre relative scale (z.B. VineLord 2.5×) erhalten bleibt + global mit-skaliert.
+
+**Hitbox-Compensation für `WORLD_SPRITE_SCALE`** — Phaser skaliert Physics-Bodies automatisch mit `setScale`. Damit der Body in **World-Coords** identisch zu vor dem Visual-Bump bleibt (kritisch für door triggers, wall collision, pickup distance), dividieren `Player.ts`, `BaseEnemy.ts`, `BasePickup.ts` ihre `setCircle`-Inputs durch `WORLD_SPRITE_SCALE`. Phasers Auto-Scale multipliziert wieder zurück → effektive Hitbox = authored radius. Specifically:
+```
+const radius = AUTHORED_RADIUS / WORLD_SPRITE_SCALE;
+this.setCircle(radius, halfW - radius, halfH - radius);
+```
+GemPickup + ItemPickup haben extra `setScale(1.8 * WORLD_SPRITE_SCALE)` für die größeren Trophy/Item-Icons. **Wenn diese Compensation fehlt, bricht das Locked-Door-Trigger-Overlap** (locked door barrier + trigger zone overlap on same tile, edge-touching gilt nicht zuverlässig als Phaser overlap → key won't unlock). 1× passiert in dieser Session, einmal gefixt — bleibt ein Trap if jemand neue scaled sprites hinzufügt ohne die Compensation.
+
+**`CAMERA_ZOOM = 1.0`** in `GameConfig.ts` — bewusst NICHT 1.25, weil Camera-Zoom + scrollender Raum den Spielfeld-Überblick zerstört (kritisch für Bullet-Hell auf Floor 2+). Sprites werden via WORLD_SPRITE_SCALE größer dargestellt, der Raum bleibt immer komplett sichtbar.
+
+**`StyleMockupScene`** (`src/scenes/StyleMockupScene.ts`) — dev-only mockup viewer im MainMenu via `M` taste (gegated mit `import.meta.env.DEV`). 4 pages, TAB cycles:
+1. *Backdrop comparison*: links current (real in-game textures) vs rechts proposed (painterly redo). Useful für visual style discussions.
+2. *Emerald Showcase*: Wizard vs. Pixie Queen full-screen painted gameplay frame mit allen Atmospheric Layers + Combat-Effects + Boss HP Bar.
+3. *Sapphire Showcase*: Wizard vs. Toad Sovereign mit cyan halos + sapphire-themed atmospheres.
+4. *Onyx Showcase*: Wizard vs. **Lord Onyx** mit gothic mansion atmosphere + dust motes + amethyst shards. **Lord Onyx visual hier ist die Vorlage** für den Boss in Phase 5 Chunk 4 — User hat geflagged dass die Optik einen Rework braucht. `paintLordOnyx` + helpers (`paintWraith`, `paintPossessedCandelabra`, `paintCursedMirror`, `paintChandelier`, `paintWallSconce`, `paintPortrait`, `paintBrokenColumn`, `paintCandelabrum`, `paintCrackedVase`, `drawOnyxCrownIcon`) sind alle in StyleMockupScene als prozedurale Graphics — ports auf `PreloadScene` als Texturen wenn die ingame versions fertig werden.
 
 ---
 

@@ -1,5 +1,9 @@
 import Phaser from 'phaser';
-import { PICKUP_HITBOX_RADIUS, SHOP_REJECT_COOLDOWN_MS } from '../../config/GameConfig';
+import {
+  PICKUP_HITBOX_RADIUS,
+  SHOP_REJECT_COOLDOWN_MS,
+  WORLD_SPRITE_SCALE,
+} from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
 import { type PickupKind } from '../../types';
 import { type Inventory } from '../../systems/Inventory';
@@ -75,13 +79,17 @@ export abstract class BasePickup extends Phaser.Physics.Arcade.Sprite {
 
     this.kind = kind;
     this.setDepth(DepthLayers.Pickup);
+    this.setScale(WORLD_SPRITE_SCALE);
 
-    // Centered circular hitbox — fits all three pickup textures since they're
-    // smaller than 32 px and visually centered.
+    // Counter-scale the body so its world size stays at the authored radius
+    // regardless of WORLD_SPRITE_SCALE. Centered circular hitbox — fits all
+    // three pickup textures since they're smaller than 32 px and visually
+    // centered.
+    const radius = PICKUP_HITBOX_RADIUS / WORLD_SPRITE_SCALE;
     this.setCircle(
-      PICKUP_HITBOX_RADIUS,
-      this.width / 2 - PICKUP_HITBOX_RADIUS,
-      this.height / 2 - PICKUP_HITBOX_RADIUS,
+      radius,
+      this.width / 2 - radius,
+      this.height / 2 - radius,
     );
 
     // Idle bobbing — ±2 px on the y axis, yoyo, looping forever. Used to

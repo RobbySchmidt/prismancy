@@ -20,10 +20,22 @@ export class EnemyProjectilePool {
     }
   }
 
-  fire(x: number, y: number, vx: number, vy: number): EnemyProjectile | null {
+  /**
+   * Spawn an enemy projectile from the pool. `textureKey` overrides the
+   * default Thorn sprite (used by the Cursed Mirror's amethyst shard, which
+   * reads as a magic-missile-style bullet rather than a vine thorn). If
+   * omitted the projectile is rendered with the default Thorn texture.
+   */
+  fire(
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    textureKey?: string,
+  ): EnemyProjectile | null {
     const p = this.group.getFirstDead(false) as EnemyProjectile | null;
     if (!p) return null;
-    p.fire(x, y, vx, vy);
+    p.fire(x, y, vx, vy, textureKey);
     return p;
   }
 

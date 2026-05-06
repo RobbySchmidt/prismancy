@@ -77,7 +77,8 @@ export class PreloadScene extends Phaser.Scene {
   private generatePlaceholderTextures(): void {
     const g = this.add.graphics();
 
-    this.drawWizardTexture(g);
+    this.drawWizardTexture(g, this.DEFAULT_WIZARD_PALETTE, TextureKeys.Player);
+    this.drawWizardTexture(g, this.PRISMANCY_WIZARD_PALETTE, TextureKeys.PlayerPrismancy);
     this.drawMagicMissileTexture(g);
     this.drawForestSpriteTexture(g);
     this.drawMossySlimeTexture(g);
@@ -94,6 +95,17 @@ export class PreloadScene extends Phaser.Scene {
     this.drawBossMossyBehemothTexture(g);
     this.drawBossPixieQueenTexture(g);
     this.drawBossForestHeartTexture(g);
+    this.drawWraithTexture(g);
+    this.drawPossessedCandelabraTexture(g);
+    this.drawCursedMirrorTexture(g);
+    this.drawMansionMissileTexture(g);
+    this.drawFlameMissileTexture(g);
+    this.drawWaxPuddleTexture(g);
+    this.drawBossCrimsonLordTexture(g);
+    this.drawBossSapphireMarquisTexture(g);
+    this.drawBloodProjectileTexture(g);
+    this.drawBloodTrailTexture(g);
+    this.drawBossLordOnyxTexture(g);
     this.drawThornTexture(g);
     this.drawHeartTextures(g);
     this.drawCoinTexture(g);
@@ -116,6 +128,9 @@ export class PreloadScene extends Phaser.Scene {
     this.drawItemLilyDiademTexture(g);
     this.drawItemMirePearlTexture(g);
     this.drawItemFrogTongueTexture(g);
+    this.drawItemBloodboundChaliceTexture(g);
+    this.drawItemVampireSignetTexture(g);
+    this.drawItemObsidianHeartTexture(g);
     this.drawStairsTexture(g);
 
     for (const theme of Object.values(FLOORS)) {
@@ -215,8 +230,37 @@ export class PreloadScene extends Phaser.Scene {
    * `mockup.html`. Texture is `TILE_SIZE × TILE_SIZE` and the physics body is
    * a circle set in `Player.ts`, so the visual fits inside the existing frame
    * without affecting collision.
+   *
+   * Palette + texture key are parameterised so the same pixel layout can be
+   * recoloured for cosmetic skins (e.g. the Prismancy red/gold unlock
+   * earned by defeating Lord Onyx) without duplicating the per-row block
+   * positions.
    */
-  private drawWizardTexture(g: Phaser.GameObjects.Graphics): void {
+  private drawWizardTexture(
+    g: Phaser.GameObjects.Graphics,
+    palette: {
+      OUT: number;
+      HAT: number;
+      HAT_DARK: number;
+      HAT_HI: number;
+      SKIN: number;
+      SKIN_SHADOW: number;
+      ROBE: number;
+      ROBE_HI: number;
+      ROBE_SHADOW: number;
+      BEARD: number;
+      BEARD_SHADOW: number;
+      BUCKLE: number;
+      WAND: number;
+      TIP: number;
+      SHADOW: number;
+      BOOT: number;
+      BOOT_HI: number;
+      EYE: number;
+      TIP_SPARKLE: number;
+    },
+    textureKey: string,
+  ): void {
     const size = TILE_SIZE;
     g.clear();
 
@@ -227,25 +271,27 @@ export class PreloadScene extends Phaser.Scene {
     const offX = Math.floor((size - GRID_W * PX) / 2);
     const offY = Math.floor((size - GRID_H * PX) / 2);
 
-    const OUT = 0x1a0828;
-    const HAT = 0x5a1f9a;
-    const HAT_DARK = 0x3a0f70;
-    const HAT_HI = 0x7a3fbe;
-    const SKIN = 0xf0c89a;
-    const SKIN_SHADOW = 0xc89a6c;
-    const ROBE = 0x7a2cb8;
-    const ROBE_HI = 0x9a4cd8;
-    const ROBE_SHADOW = 0x5a1c98;
-    const BEARD = 0xe8e8e8;
-    const BEARD_SHADOW = 0xa8a8a8;
-    const BUCKLE = 0xffd84a;
-    const WAND = 0xc89758;
-    const TIP = 0xffd84a;
-    const SHADOW = 0x3a2a4a;
-    const BOOT = 0x2a1a0d;
-    const BOOT_HI = 0x4a3a2d;
-    const EYE = 0x222222;
-    const TIP_SPARKLE = 0xfff8c0;
+    const {
+      OUT,
+      HAT,
+      HAT_DARK,
+      HAT_HI,
+      SKIN,
+      SKIN_SHADOW,
+      ROBE,
+      ROBE_HI,
+      ROBE_SHADOW,
+      BEARD,
+      BEARD_SHADOW,
+      BUCKLE,
+      WAND,
+      TIP,
+      SHADOW,
+      BOOT,
+      BOOT_HI,
+      EYE,
+      TIP_SPARKLE,
+    } = palette;
 
     const block = (x: number, y: number, w: number, h: number, color: number): void =>
       this.pxBlock(g, x, y, w, h, color, PX, offX, offY);
@@ -375,8 +421,64 @@ export class PreloadScene extends Phaser.Scene {
     const groundCy = offY + 25.4 * PX;
     this.groundShadow(g, groundCx, groundCy, 4 * PX, 1.2 * PX, 0.4);
 
-    g.generateTexture(TextureKeys.Player, size, size);
+    g.generateTexture(textureKey, size, size);
   }
+
+  /**
+   * Default purple+white wizard palette. The first time the player runs
+   * the game they spawn with this skin; the Prismancy unlock swaps it
+   * automatically once Lord Onyx is dead.
+   */
+  private readonly DEFAULT_WIZARD_PALETTE = {
+    OUT: 0x1a0828,
+    HAT: 0x5a1f9a,
+    HAT_DARK: 0x3a0f70,
+    HAT_HI: 0x7a3fbe,
+    SKIN: 0xf0c89a,
+    SKIN_SHADOW: 0xc89a6c,
+    ROBE: 0x7a2cb8,
+    ROBE_HI: 0x9a4cd8,
+    ROBE_SHADOW: 0x5a1c98,
+    BEARD: 0xe8e8e8,
+    BEARD_SHADOW: 0xa8a8a8,
+    BUCKLE: 0xffd84a,
+    WAND: 0xc89758,
+    TIP: 0xffd84a,
+    SHADOW: 0x3a2a4a,
+    BOOT: 0x2a1a0d,
+    BOOT_HI: 0x4a3a2d,
+    EYE: 0x222222,
+    TIP_SPARKLE: 0xfff8c0,
+  } as const;
+
+  /**
+   * Prismancy palette — deep crimson robe + gold trim + black hat with gold
+   * band. Earned by defeating Lord Onyx; the wizard wears the slain lord's
+   * colours as a trophy. Same pixel layout as the default skin.
+   */
+  private readonly PRISMANCY_WIZARD_PALETTE = {
+    OUT: 0x1a0408,
+    // Hat: deep black-crimson, gold-band feel via the highlight row.
+    HAT: 0x3a0a18,
+    HAT_DARK: 0x180408,
+    HAT_HI: 0xffd84a,
+    SKIN: 0xf0c89a,
+    SKIN_SHADOW: 0xc89a6c,
+    // Robe: rich crimson with gold highlight + dark blood-red shadow.
+    ROBE: 0xb8202c,
+    ROBE_HI: 0xffc850,
+    ROBE_SHADOW: 0x6a0a14,
+    BEARD: 0xf8f0e0,
+    BEARD_SHADOW: 0xb0a890,
+    BUCKLE: 0xfff0a8,
+    WAND: 0xffc850,
+    TIP: 0xffd84a,
+    SHADOW: 0x3a1a14,
+    BOOT: 0x2a1408,
+    BOOT_HI: 0x6a3a14,
+    EYE: 0x300008,
+    TIP_SPARKLE: 0xffffff,
+  } as const;
 
   // ---------------------------------------------------------------------------
   // Magic Missile
@@ -4318,6 +4420,180 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   /**
+   * Bloodbound Chalice — gold goblet brimming with crimson liquid.
+   * Onyx boss-pool: +1 max HP, +20% damage. The blood-pact reward.
+   */
+  private drawItemBloodboundChaliceTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    const cx = w / 2;
+    g.clear();
+    const OUT = 0x100408;
+    const GOLD_DARK = 0x7a5018;
+    const GOLD = 0xffc850;
+    const GOLD_HI = 0xfff0a8;
+    const BLOOD_DARK = 0x6a0c1e;
+    const BLOOD = 0xc8284a;
+    const BLOOD_HI = 0xff6a80;
+
+    // Stem + foot
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 2, 9, 4, 1);
+    g.fillRect(cx - 1, 8, 2, 2);
+    g.fillRect(cx - 3, 11, 6, 1);
+    g.fillRect(cx - 3, 12, 6, 1);
+    g.fillStyle(GOLD_DARK, 1);
+    g.fillRect(cx - 1, 9, 2, 1);
+    g.fillRect(cx - 2, 12, 4, 1);
+    g.fillStyle(GOLD, 1);
+    g.fillRect(cx - 2, 11, 4, 1);
+
+    // Cup body (trapezoidal)
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 3, 2, 6, 6);
+    g.fillRect(cx - 4, 3, 1, 4);
+    g.fillRect(cx + 3, 3, 1, 4);
+    g.fillStyle(GOLD_DARK, 1);
+    g.fillRect(cx - 3, 3, 6, 5);
+    g.fillStyle(GOLD, 1);
+    g.fillRect(cx - 3, 3, 6, 3);
+    g.fillStyle(GOLD_HI, 1);
+    g.fillRect(cx - 2, 3, 1, 3);
+
+    // Blood surface + drip down side
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 2, 2, 4, 1);
+    g.fillStyle(BLOOD_DARK, 1);
+    g.fillRect(cx - 2, 2, 4, 2);
+    g.fillStyle(BLOOD, 1);
+    g.fillRect(cx - 2, 2, 4, 1);
+    g.fillStyle(BLOOD_HI, 1);
+    g.fillRect(cx - 1, 2, 1, 1);
+
+    // Single blood drip on the rim
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx + 2, 4, 1, 2);
+    g.fillStyle(BLOOD, 1);
+    g.fillRect(cx + 2, 4, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemBloodboundChalice, w, h);
+  }
+
+  /**
+   * Vampire's Signet — gold ring with a crimson cabochon, lifted view so the
+   * gem reads as the focal point. Onyx boss-pool: +25% fire rate, +15% missile
+   * speed. The noble's pact reward.
+   */
+  private drawItemVampireSignetTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    const cx = w / 2;
+    g.clear();
+    const OUT = 0x100408;
+    const GOLD_DARK = 0x7a5018;
+    const GOLD = 0xffc850;
+    const GOLD_HI = 0xfff0a8;
+    const GEM_DARK = 0x6a0c1e;
+    const GEM = 0xff4060;
+    const GEM_HI = 0xffb0c0;
+
+    // Outer band (ring profile, viewed from above, slightly oblique)
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx, 8, 5);
+    g.fillStyle(GOLD_DARK, 1);
+    g.fillCircle(cx, 8, 4.4);
+    g.fillStyle(GOLD, 1);
+    g.fillCircle(cx, 8, 3.6);
+    // Hollow center
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx, 8, 2.2);
+    g.fillStyle(0x1a0a14, 1);
+    g.fillCircle(cx, 8, 1.6);
+
+    // Top band highlight strip
+    g.fillStyle(GOLD_HI, 1);
+    g.fillRect(cx - 2, 5, 4, 1);
+
+    // Bezel + gem mounted on top of the band
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 3, 1, 6, 4);
+    g.fillStyle(GOLD_DARK, 1);
+    g.fillRect(cx - 2, 2, 4, 3);
+    g.fillStyle(GOLD, 1);
+    g.fillRect(cx - 2, 2, 4, 1);
+
+    // Gem face (oval cabochon)
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 2, 2, 4, 2);
+    g.fillStyle(GEM_DARK, 1);
+    g.fillRect(cx - 2, 2, 4, 2);
+    g.fillStyle(GEM, 1);
+    g.fillRect(cx - 1, 2, 3, 2);
+    g.fillStyle(GEM_HI, 1);
+    g.fillRect(cx - 1, 2, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemVampireSignet, w, h);
+  }
+
+  /**
+   * Obsidian Heart — faceted amethyst-black crystal heart. Onyx boss-pool:
+   * +1 damage, +40% range. The cursed-organ reward.
+   */
+  private drawItemObsidianHeartTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    const cx = w / 2;
+    g.clear();
+    const OUT = 0x080010;
+    const STONE_DARK = 0x2a1838;
+    const STONE = 0x4a2868;
+    const STONE_MID = 0x6a3a90;
+    const STONE_HI = 0x8a4ad8;
+    const SPARK = 0xd0a8ff;
+    const VEIN = 0xffb060;
+
+    // Heart silhouette outline (two upper lobes + V-bottom)
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx - 2, 5, 3);
+    g.fillCircle(cx + 2, 5, 3);
+    g.fillRect(cx - 4, 5, 8, 4);
+    g.fillTriangle(cx - 4, 7, cx + 4, 7, cx, 12);
+
+    // Mid stone fill (slightly inset)
+    g.fillStyle(STONE_DARK, 1);
+    g.fillCircle(cx - 2, 5, 2.4);
+    g.fillCircle(cx + 2, 5, 2.4);
+    g.fillRect(cx - 3, 5, 6, 3);
+    g.fillTriangle(cx - 3, 7, cx + 3, 7, cx, 11);
+
+    g.fillStyle(STONE, 1);
+    g.fillCircle(cx - 2, 5, 1.8);
+    g.fillCircle(cx + 2, 5, 1.8);
+    g.fillRect(cx - 2, 5, 4, 2);
+    g.fillTriangle(cx - 2, 7, cx + 2, 7, cx, 10);
+
+    // Faceted highlight (left lobe brighter than right — directional light)
+    g.fillStyle(STONE_MID, 1);
+    g.fillRect(cx - 3, 4, 2, 2);
+    g.fillRect(cx - 1, 7, 2, 2);
+    g.fillStyle(STONE_HI, 1);
+    g.fillRect(cx - 3, 4, 1, 1);
+    g.fillRect(cx - 1, 7, 1, 1);
+
+    // Gold vein crack (single thin diagonal — keeps the "obsidian with gold
+    // inlay" gothic vibe without overpowering the silhouette)
+    g.fillStyle(VEIN, 1);
+    g.fillRect(cx + 1, 6, 1, 1);
+    g.fillRect(cx + 2, 7, 1, 1);
+
+    // Sparkle pixel
+    g.fillStyle(SPARK, 1);
+    g.fillRect(cx - 2, 4, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemObsidianHeart, w, h);
+  }
+
+  /**
    * Per-floor gem trophy. 18 × 18 canvas with a cut-shape that varies by
    * floor so each gem reads as a real gemstone variety, not a recoloured
    * sticker:
@@ -4560,5 +4836,733 @@ export class PreloadScene extends Phaser.Scene {
       return Math.round(c * (1 + factor));
     };
     return ((adjust(r) << 16) | (adjust(g) << 8) | adjust(b)) >>> 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mansion mob textures (Wraith / Possessed Candelabra / Cursed Mirror)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Wraith — translucent hooded ghost. Tattered purple-black robe with a
+   * darker hood and two glowing red eye dots. Default sprite alpha kept at
+   * 1.0; the AI fades it during phase-mode by tweening alpha.
+   */
+  private drawWraithTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = TILE_SIZE;
+    g.clear();
+    const cx = size / 2;
+    const cy = size / 2 + 4;
+
+    this.groundShadow(g, cx, cy + 18, 14, 5, 0.4);
+
+    // Tattered robe — wispy bottom, broader middle
+    g.fillStyle(0x180a28, 1);
+    g.fillTriangle(cx - 14, cy + 14, cx + 14, cy + 14, cx, cy - 14);
+    g.fillStyle(0x261438, 1);
+    g.fillTriangle(cx - 16, cy + 16, cx - 4, cy + 4, cx - 10, cy);
+    g.fillTriangle(cx + 16, cy + 16, cx + 4, cy + 4, cx + 10, cy);
+    // Tattered fringe pixels along the bottom hem
+    g.fillStyle(0x180a28, 1);
+    for (let i = -12; i <= 12; i += 4) {
+      g.fillRect(cx + i, cy + 14, 2, 4);
+    }
+
+    // Hood — outline + interior shadow
+    g.fillStyle(0x0a0418, 1);
+    g.fillEllipse(cx, cy - 10, 22, 20);
+    g.fillStyle(0x180a28, 1);
+    g.fillEllipse(cx, cy - 10, 18, 16);
+
+    // Glowing red eyes
+    g.fillStyle(0xff5577, 1);
+    g.fillRect(cx - 4, cy - 11, 2, 2);
+    g.fillRect(cx + 2, cy - 11, 2, 2);
+    g.fillStyle(0xffaad8, 1);
+    g.fillRect(cx - 4, cy - 11, 1, 1);
+    g.fillRect(cx + 2, cy - 11, 1, 1);
+
+    g.generateTexture(TextureKeys.Wraith, size, size);
+  }
+
+  /**
+   * Possessed Candelabra — animated candle stand with a skull base. Slow
+   * walking tank; drops wax puddles behind it as a hazard layer.
+   */
+  private drawPossessedCandelabraTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = TILE_SIZE;
+    g.clear();
+    const cx = size / 2;
+    const cy = size / 2 + 6;
+
+    this.groundShadow(g, cx, cy + 18, 18, 6, 0.45);
+
+    // Skull base — small, staring upward
+    g.fillStyle(0x261438, 1);
+    g.fillEllipse(cx, cy + 14, 18, 10);
+    g.fillStyle(0xe0d0c0, 1);
+    g.fillEllipse(cx, cy + 12, 14, 10);
+    g.fillStyle(0x040208, 1);
+    g.fillRect(cx - 4, cy + 10, 2, 2);
+    g.fillRect(cx + 2, cy + 10, 2, 2);
+    g.fillStyle(0xff5577, 1);
+    g.fillRect(cx - 4, cy + 10, 1, 1);
+    g.fillRect(cx + 2, cy + 10, 1, 1);
+    // Tiny jaw line
+    g.fillStyle(0x402030, 1);
+    g.fillRect(cx - 3, cy + 16, 6, 1);
+
+    // Spine stem (bone)
+    g.fillStyle(0xe0d0c0, 1);
+    g.fillRect(cx - 1, cy - 6, 2, 14);
+    // Vertebra notches
+    g.fillStyle(0x402030, 1);
+    g.fillRect(cx - 1, cy - 2, 2, 1);
+    g.fillRect(cx - 1, cy + 2, 2, 1);
+
+    // Cross arms (bone)
+    g.fillStyle(0xe0d0c0, 1);
+    g.fillRect(cx - 12, cy - 10, 24, 2);
+    g.fillRect(cx - 12, cy - 10, 1, 4);
+    g.fillRect(cx + 11, cy - 10, 1, 4);
+
+    // 3 candles
+    for (const px of [cx - 11, cx, cx + 11]) {
+      // Wax body
+      g.fillStyle(0xfff8c0, 1);
+      g.fillRect(px - 1, cy - 16, 3, 6);
+      g.fillStyle(0xc0c0a0, 1);
+      g.fillRect(px + 1, cy - 16, 1, 6);
+      // Flame
+      g.fillStyle(0xff7a30, 1);
+      g.fillTriangle(px, cy - 24, px - 3, cy - 16, px + 3, cy - 16);
+      g.fillStyle(0xffd84a, 1);
+      g.fillTriangle(px, cy - 22, px - 2, cy - 16, px + 2, cy - 16);
+      g.fillStyle(0xfff8a0, 1);
+      g.fillRect(px, cy - 20, 1, 3);
+    }
+    // Soft amber halo
+    g.fillStyle(0xffd84a, 0.16);
+    g.fillEllipse(cx, cy - 18, 32, 14);
+
+    g.generateTexture(TextureKeys.PossessedCandelabra, size, size);
+  }
+
+  /**
+   * Cursed Mirror — rooted oval mirror with gold frame and a cracked
+   * surface that leaks amethyst light. Telegraph-fires magic missiles.
+   */
+  private drawCursedMirrorTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = TILE_SIZE;
+    g.clear();
+    const cx = size / 2;
+    const cy = size / 2 + 4;
+
+    this.groundShadow(g, cx, cy + 18, 14, 5, 0.4);
+
+    // Stand — wood base + iron foot
+    g.fillStyle(0x261438, 1);
+    g.fillRect(cx - 12, cy + 14, 24, 4);
+    g.fillStyle(0x402030, 1);
+    g.fillRect(cx - 11, cy + 14, 22, 1);
+    g.fillStyle(0x8a5a18, 1);
+    g.fillRect(cx - 8, cy + 14, 16, 1);
+
+    // Frame — gilt oval
+    g.fillStyle(0x402030, 1);
+    g.fillEllipse(cx, cy - 4, 26, 32);
+    g.fillStyle(0x8a5a18, 1);
+    g.fillEllipse(cx, cy - 4, 23, 29);
+    g.lineStyle(1, 0xffd84a, 1);
+    g.strokeEllipse(cx, cy - 4, 23, 29);
+
+    // Mirror surface — dark with amethyst sheen
+    g.fillStyle(0x0a0410, 1);
+    g.fillEllipse(cx, cy - 4, 18, 24);
+    g.fillStyle(0x261438, 0.85);
+    g.fillEllipse(cx - 3, cy - 6, 7, 13);
+    g.fillStyle(0xc864ff, 0.45);
+    g.fillEllipse(cx + 3, cy - 9, 4, 6);
+
+    // Cracks
+    g.lineStyle(1, 0xc0c0c0, 0.85);
+    g.lineBetween(cx - 5, cy - 13, cx + 2, cy + 4);
+    g.lineBetween(cx + 2, cy + 4, cx - 7, cy + 8);
+    g.lineBetween(cx - 1, cy - 9, cx + 5, cy - 2);
+
+    // Subtle amethyst halo
+    g.fillStyle(0xc864ff, 0.14);
+    g.fillEllipse(cx, cy - 4, 32, 38);
+
+    g.generateTexture(TextureKeys.CursedMirror, size, size);
+  }
+
+  /**
+   * Mansion Missile — amethyst magic-missile-style projectile fired by the
+   * Cursed Mirror. Round purple bullet with glow + sparkle pixel; mirrors
+   * the player's MagicMissile aesthetic in onyx palette.
+   */
+  private drawMansionMissileTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = 16;
+    g.clear();
+    const c = size / 2;
+
+    // Outer halo
+    g.fillStyle(0xc864ff, 0.32);
+    g.fillCircle(c, c, 7);
+    // Mid glow
+    g.fillStyle(0xc864ff, 0.85);
+    g.fillCircle(c, c, 4.5);
+    // Bright core
+    g.fillStyle(0xff64ff, 1);
+    g.fillCircle(c, c, 3);
+    // Highlight + sparkle
+    g.fillStyle(0xffaaff, 1);
+    g.fillRect(c - 2, c - 2, 2, 1);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(c - 1, c - 1, 1, 1);
+
+    g.generateTexture(TextureKeys.MansionMissile, size, size);
+  }
+
+  /**
+   * Flame Missile — small ember bullet fired by the Possessed Candelabra.
+   * Warm orange-yellow with a dark outer ring so it reads against both
+   * the bright candle aesthetic and the dark mansion floor.
+   */
+  private drawFlameMissileTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = 16;
+    g.clear();
+    const c = size / 2;
+
+    // Outer halo
+    g.fillStyle(0xff7a30, 0.32);
+    g.fillCircle(c, c, 7);
+    // Mid orange
+    g.fillStyle(0xff7a30, 0.95);
+    g.fillCircle(c, c, 4.5);
+    // Yellow core
+    g.fillStyle(0xffd84a, 1);
+    g.fillCircle(c, c, 3);
+    // Hot center
+    g.fillStyle(0xfff8a0, 1);
+    g.fillRect(c - 2, c - 2, 2, 1);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(c - 1, c - 1, 1, 1);
+
+    g.generateTexture(TextureKeys.FlameMissile, size, size);
+  }
+
+  /**
+   * Wax Puddle — flickering flame-pool dropped behind a Possessed
+   * Candelabra. Small radius (~14px), warm orange + yellow with a dark
+   * wax outer ring. Damages the player on overlap.
+   */
+  private drawWaxPuddleTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = 28;
+    g.clear();
+    const c = size / 2;
+
+    // Dark outer ring (wax pool)
+    g.fillStyle(0x180a08, 1);
+    g.fillEllipse(c, c, 24, 20);
+    // Mid orange flame body
+    g.fillStyle(0xff7a30, 0.95);
+    g.fillEllipse(c, c, 18, 14);
+    // Bright yellow core
+    g.fillStyle(0xffd84a, 1);
+    g.fillEllipse(c, c, 12, 9);
+    // Hot center
+    g.fillStyle(0xfff8a0, 1);
+    g.fillEllipse(c - 1, c - 1, 5, 4);
+    // Sparkle
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(c - 2, c - 2, 1, 1);
+
+    g.generateTexture(TextureKeys.WaxPuddle, size, size);
+  }
+
+  /**
+   * Crimson Lord — vampire warrior in red robes with gold trim, pale fanged
+   * face, hooded silhouette. Asymmetric pose (slight lean) so the dash
+   * direction reads. Boss-tier 36×42 px so the silhouette stands clearly
+   * apart from a Wraith.
+   */
+  private drawBossCrimsonLordTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 36;
+    const h = 42;
+    const cx = w / 2;
+    g.clear();
+
+    const OUT = 0x1a0008;
+    const ROBE_DARK = 0x4a0814;
+    const ROBE = 0x8a1424;
+    const ROBE_HI = 0xc8284a;
+    const TRIM_DARK = 0x7a5018;
+    const TRIM = 0xffc850;
+    const SKIN_OUT = 0x3a1818;
+    const SKIN = 0xe8c8b8;
+    const SKIN_HI = 0xffe8d8;
+    const EYE_OUT = 0x080000;
+    const EYE = 0xff2030;
+    const EYE_HI = 0xffd040;
+    const BLOOD = 0xc8284a;
+    const FANG = 0xfff0d0;
+
+    this.groundShadow(g, cx, h - 4, 14, 4, 0.55);
+
+    // Robe outline + body silhouette (cone tapering down to floor)
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx - 14, h - 4, cx + 14, h - 4, cx, 14);
+    g.fillRect(cx - 14, h - 5, 28, 1);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillTriangle(cx - 12, h - 5, cx + 12, h - 5, cx, 16);
+    g.fillStyle(ROBE, 1);
+    g.fillTriangle(cx - 10, h - 6, cx + 10, h - 6, cx, 18);
+    g.fillStyle(ROBE_HI, 1);
+    g.fillTriangle(cx - 4, h - 8, cx + 1, h - 8, cx - 2, 22);
+
+    // Gold trim hem at the bottom
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 13, h - 8, 26, 2);
+    g.fillStyle(TRIM_DARK, 1);
+    g.fillRect(cx - 12, h - 8, 24, 2);
+    g.fillStyle(TRIM, 1);
+    g.fillRect(cx - 12, h - 8, 24, 1);
+    // Trim tally marks (gold studs)
+    for (const tx of [cx - 9, cx - 4, cx + 1, cx + 6]) {
+      g.fillStyle(0xfff0a8, 1);
+      g.fillRect(tx, h - 8, 1, 1);
+    }
+
+    // High collar (cape upturned)
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 9, 12, 18, 5);
+    g.fillTriangle(cx - 9, 12, cx - 13, 18, cx - 9, 18);
+    g.fillTriangle(cx + 9, 12, cx + 13, 18, cx + 9, 18);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillRect(cx - 8, 13, 16, 4);
+    g.fillTriangle(cx - 8, 13, cx - 12, 18, cx - 8, 17);
+    g.fillTriangle(cx + 8, 13, cx + 12, 18, cx + 8, 17);
+    g.fillStyle(ROBE, 1);
+    g.fillRect(cx - 8, 13, 16, 2);
+
+    // Head — pale skin
+    g.fillStyle(SKIN_OUT, 1);
+    g.fillCircle(cx, 11, 7);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(cx, 11, 6);
+    g.fillStyle(SKIN_HI, 1);
+    g.fillCircle(cx - 2, 9, 1.5);
+
+    // Slicked-back hair (dark cap on top of head)
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 6, 5, 12, 3);
+    g.fillRect(cx - 7, 6, 14, 2);
+    g.fillStyle(0x180410, 1);
+    g.fillRect(cx - 5, 6, 10, 2);
+
+    // Eyes — glowing red with gold spark
+    g.fillStyle(EYE_OUT, 1);
+    g.fillRect(cx - 4, 11, 3, 2);
+    g.fillRect(cx + 1, 11, 3, 2);
+    g.fillStyle(EYE, 1);
+    g.fillRect(cx - 4, 11, 3, 2);
+    g.fillRect(cx + 1, 11, 3, 2);
+    g.fillStyle(EYE_HI, 1);
+    g.fillRect(cx - 4, 11, 1, 1);
+    g.fillRect(cx + 1, 11, 1, 1);
+
+    // Mouth — fanged grin
+    g.fillStyle(EYE_OUT, 1);
+    g.fillRect(cx - 3, 14, 6, 1);
+    g.fillStyle(FANG, 1);
+    g.fillRect(cx - 2, 15, 1, 1);
+    g.fillRect(cx + 1, 15, 1, 1);
+    // Single blood drip from corner of mouth
+    g.fillStyle(BLOOD, 1);
+    g.fillRect(cx + 2, 15, 1, 2);
+
+    // Center medallion on chest (gold + ruby)
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx, 22, 3);
+    g.fillStyle(TRIM, 1);
+    g.fillCircle(cx, 22, 2.2);
+    g.fillStyle(BLOOD, 1);
+    g.fillCircle(cx, 22, 1.2);
+
+    g.generateTexture(TextureKeys.BossCrimsonLord, w, h);
+  }
+
+  /**
+   * Sapphire Marquis — vampire mage in deep blue robes with ornate gold
+   * collar, holding a wand at the side. Pale face, single glowing red eye.
+   * 32×42 px — slightly slimmer than the Lord so the duo reads as
+   * "warrior + scholar" at a glance.
+   */
+  private drawBossSapphireMarquisTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 36;
+    const h = 42;
+    const cx = w / 2;
+    g.clear();
+
+    const OUT = 0x000814;
+    const ROBE_DARK = 0x101e44;
+    const ROBE = 0x1f3878;
+    const ROBE_HI = 0x4870c8;
+    const TRIM_DARK = 0x7a5018;
+    const TRIM = 0xffc850;
+    const SKIN_OUT = 0x281828;
+    const SKIN = 0xd8c0d0;
+    const SKIN_HI = 0xf0d8e0;
+    const EYE_OUT = 0x080000;
+    const EYE = 0xff2040;
+    const EYE_HI = 0xffd040;
+    const WAND_DARK = 0x180810;
+    const WAND = 0x4a2a18;
+    const WAND_TIP = 0xff4060;
+    const WAND_HALO = 0xff80a0;
+
+    this.groundShadow(g, cx, h - 4, 12, 4, 0.55);
+
+    // Robe — narrower bell shape
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx - 12, h - 4, cx + 12, h - 4, cx, 14);
+    g.fillRect(cx - 12, h - 5, 24, 1);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillTriangle(cx - 10, h - 5, cx + 10, h - 5, cx, 16);
+    g.fillStyle(ROBE, 1);
+    g.fillTriangle(cx - 8, h - 6, cx + 8, h - 6, cx, 18);
+    g.fillStyle(ROBE_HI, 1);
+    g.fillTriangle(cx - 3, h - 8, cx + 0, h - 8, cx - 2, 22);
+
+    // Gold trim hem with ornate diamond pattern
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 11, h - 8, 22, 2);
+    g.fillStyle(TRIM_DARK, 1);
+    g.fillRect(cx - 10, h - 8, 20, 2);
+    g.fillStyle(TRIM, 1);
+    g.fillRect(cx - 10, h - 8, 20, 1);
+    // Diamond accents
+    for (const dx of [-7, -2, 3, 8]) {
+      g.fillStyle(0xfff0a8, 1);
+      g.fillRect(cx + dx, h - 8, 1, 1);
+      g.fillStyle(0xff8080, 1);
+      g.fillRect(cx + dx, h - 7, 1, 1);
+    }
+
+    // Ornate collar — wider, gold-lined, V-cut
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 11, 12, 22, 6);
+    g.fillTriangle(cx - 11, 12, cx - 14, 18, cx - 11, 18);
+    g.fillTriangle(cx + 11, 12, cx + 14, 18, cx + 11, 18);
+    g.fillStyle(TRIM_DARK, 1);
+    g.fillRect(cx - 10, 13, 20, 5);
+    g.fillStyle(TRIM, 1);
+    g.fillRect(cx - 10, 13, 20, 2);
+    // V-cut showing inner robe
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillTriangle(cx - 4, 13, cx + 4, 13, cx, 19);
+    g.fillStyle(ROBE, 1);
+    g.fillTriangle(cx - 3, 13, cx + 3, 13, cx, 17);
+
+    // Head — pale, slightly narrower than the Lord
+    g.fillStyle(SKIN_OUT, 1);
+    g.fillCircle(cx, 10, 6);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(cx, 10, 5);
+    g.fillStyle(SKIN_HI, 1);
+    g.fillCircle(cx - 2, 9, 1.4);
+
+    // Long combed-back hair (longer than Lord, hint of widow's peak)
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 6, 4, 12, 3);
+    g.fillRect(cx - 7, 5, 14, 2);
+    g.fillTriangle(cx - 1, 6, cx + 1, 6, cx, 9);
+    g.fillStyle(0x100614, 1);
+    g.fillRect(cx - 5, 5, 10, 2);
+
+    // Single glowing red eye + closed/scarred eye
+    g.fillStyle(EYE_OUT, 1);
+    g.fillRect(cx - 3, 10, 2, 2);
+    g.fillRect(cx + 1, 10, 3, 2);
+    g.fillStyle(EYE, 1);
+    g.fillRect(cx + 1, 10, 3, 2);
+    g.fillStyle(EYE_HI, 1);
+    g.fillRect(cx + 1, 10, 1, 1);
+    // Scar across closed left eye
+    g.fillStyle(0x6a1818, 1);
+    g.fillRect(cx - 4, 9, 1, 4);
+
+    // Thin lips (no fangs visible — magic-wielder, not bruiser)
+    g.fillStyle(EYE_OUT, 1);
+    g.fillRect(cx - 2, 13, 4, 1);
+
+    // Wand at right side — held at hip, blood-red crystal tip
+    g.fillStyle(WAND_DARK, 1);
+    g.fillRect(cx + 10, 22, 2, 13);
+    g.fillStyle(WAND, 1);
+    g.fillRect(cx + 10, 22, 1, 13);
+    // Crystal tip (top)
+    g.fillStyle(WAND_DARK, 1);
+    g.fillRect(cx + 9, 19, 4, 4);
+    g.fillStyle(WAND_TIP, 1);
+    g.fillRect(cx + 10, 20, 2, 2);
+    g.fillStyle(0xffc0d0, 1);
+    g.fillRect(cx + 10, 20, 1, 1);
+    // Halo around wand tip
+    g.fillStyle(WAND_HALO, 0.35);
+    g.fillCircle(cx + 11, 21, 4);
+
+    // Center medallion (sapphire over gold to balance the Lord's ruby)
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx, 22, 3);
+    g.fillStyle(TRIM, 1);
+    g.fillCircle(cx, 22, 2.2);
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(cx, 22, 1.2);
+
+    g.generateTexture(TextureKeys.BossSapphireMarquis, w, h);
+  }
+
+  /**
+   * Blood Projectile — crimson droplet/orb with dark outer ring + bright
+   * core and a single white sparkle. Used by the Sapphire Marquis (his
+   * blood-magic) and visually distinct from the amethyst Mansion Missile.
+   */
+  private drawBloodProjectileTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = 16;
+    g.clear();
+    const c = size / 2;
+
+    // Outer halo
+    g.fillStyle(0xc8284a, 0.32);
+    g.fillCircle(c, c, 7);
+    // Mid red
+    g.fillStyle(0xa01030, 0.95);
+    g.fillCircle(c, c, 4.5);
+    // Bright crimson core
+    g.fillStyle(0xff4060, 1);
+    g.fillCircle(c, c, 3);
+    // Pink highlight + white sparkle
+    g.fillStyle(0xffa0b0, 1);
+    g.fillRect(c - 2, c - 2, 2, 1);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(c - 1, c - 1, 1, 1);
+
+    g.generateTexture(TextureKeys.BloodProjectile, size, size);
+  }
+
+  /**
+   * Blood Trail — crimson splat/pool dropped along the Crimson Lord's dash
+   * path in Phase 2+. Mirrors the Wax Puddle structurally (same hazard
+   * group lives downstream) but recoloured for blood + a slightly smaller
+   * footprint so the player can thread between consecutive drops.
+   */
+  private drawBloodTrailTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = 28;
+    g.clear();
+    const c = size / 2;
+
+    // Dark outer ring (clotted blood)
+    g.fillStyle(0x180408, 1);
+    g.fillEllipse(c, c, 22, 18);
+    // Mid crimson body
+    g.fillStyle(0x8a1424, 0.95);
+    g.fillEllipse(c, c, 17, 13);
+    // Bright red core
+    g.fillStyle(0xc8284a, 1);
+    g.fillEllipse(c, c, 11, 8);
+    // Hot pink center
+    g.fillStyle(0xff6080, 1);
+    g.fillEllipse(c - 1, c - 1, 5, 4);
+    // Sparkle
+    g.fillStyle(0xffd0d8, 1);
+    g.fillRect(c - 2, c - 2, 1, 1);
+
+    g.generateTexture(TextureKeys.BloodTrail, size, size);
+  }
+
+  /**
+   * Lord Onyx — secret endboss, gothic vampire-king silhouette. 64×88
+   * canvas (boss-tier, taller than the Vampire Twins so the size reads
+   * "you've reached the throne"). Floating posture (cloak fades to
+   * tatters at the bottom, no feet), gold crown with central amethyst,
+   * pale skeletal face with sunken glowing red eyes, scepter on the right
+   * with amethyst orb. Adapted from `StyleMockupScene.drawLordOnyx` with
+   * the silhouette tightened + tatter fringe + a faint amethyst aura
+   * outline so it pops against the dark mansion floor.
+   */
+  private drawBossLordOnyxTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 64;
+    const h = 88;
+    const cx = w / 2;
+    g.clear();
+
+    const OUT = 0x040208;
+    const CLOAK = 0x140820;
+    const CLOAK_DARK = 0x080410;
+    const CLOAK_HI = 0x261438;
+    const ROBE_INNER = 0x402030;
+    const TRIM_GOLD = 0xffd84a;
+    const TRIM_GOLD_DARK = 0x7a5018;
+    const SKIN = 0xe0d0e0;
+    const SKIN_HI = 0xf8e8f0;
+    const SKIN_SHADOW = 0xa890a8;
+    const EYE_OUT = 0x040208;
+    const EYE = 0xff3344;
+    const EYE_HI = 0xffaad8;
+    const HAIR = 0x100614;
+    const AMETHYST_DARK = 0x6a18a8;
+    const AMETHYST = 0xc864ff;
+    const AMETHYST_HI = 0xff64ff;
+    const SCEPTER_DARK = 0x402030;
+    const SCEPTER = 0x8a5a18;
+
+    // Faint amethyst aura ring — sits behind everything so the lord reads
+    // "wreathed in dark light" rather than a bare silhouette.
+    g.fillStyle(AMETHYST, 0.12);
+    g.fillEllipse(cx, h / 2 + 10, w - 4, h - 8);
+
+    // Ground shadow (no feet, but the cloak still casts under itself)
+    g.fillStyle(0x000000, 0.5);
+    g.fillEllipse(cx, h - 6, 36, 8);
+
+    // --- Cloak silhouette (tall trapezoid) ---------------------------------
+    // Left + right tapered sides
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx - 22, h - 8, cx + 22, h - 8, cx + 16, 28);
+    g.fillTriangle(cx - 22, h - 8, cx - 16, 28, cx + 16, 28);
+    g.fillStyle(CLOAK_DARK, 1);
+    g.fillTriangle(cx - 21, h - 9, cx + 21, h - 9, cx + 15, 29);
+    g.fillTriangle(cx - 21, h - 9, cx - 15, 29, cx + 15, 29);
+    g.fillStyle(CLOAK, 1);
+    g.fillTriangle(cx - 19, h - 10, cx + 19, h - 10, cx + 13, 30);
+    g.fillTriangle(cx - 19, h - 10, cx - 13, 30, cx + 13, 30);
+    // Inner-cloak shadow (right side darker — light from upper-left)
+    g.fillStyle(CLOAK_HI, 1);
+    g.fillTriangle(cx - 12, h - 12, cx - 4, h - 12, cx - 12, 32);
+
+    // Tatter fringe at the bottom — alternating points so the cloak reads
+    // as ragged / floating rather than a hard hem.
+    for (let i = -22; i <= 22; i += 5) {
+      const tipY = h - 4 + (i % 10 === 0 ? 0 : 2);
+      g.fillStyle(OUT, 1);
+      g.fillTriangle(cx + i - 2, h - 8, cx + i + 2, h - 8, cx + i, tipY);
+      g.fillStyle(CLOAK, 1);
+      g.fillTriangle(cx + i - 1, h - 9, cx + i + 1, h - 9, cx + i, tipY - 1);
+    }
+
+    // Gold trim across the cloak chest (where the robe folds)
+    g.fillStyle(TRIM_GOLD_DARK, 1);
+    g.fillRect(cx - 18, 28, 36, 2);
+    g.fillStyle(TRIM_GOLD, 1);
+    g.fillRect(cx - 18, 28, 36, 1);
+
+    // Inner robe collar (the V-cut showing the lord's chest)
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx - 8, 28, cx + 8, 28, cx, 44);
+    g.fillStyle(ROBE_INNER, 1);
+    g.fillTriangle(cx - 7, 28, cx + 7, 28, cx, 42);
+    // Gold pendant on the collar
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx, 36, 3);
+    g.fillStyle(TRIM_GOLD, 1);
+    g.fillCircle(cx, 36, 2.2);
+    g.fillStyle(AMETHYST, 1);
+    g.fillCircle(cx, 36, 1.2);
+
+    // --- Head + face --------------------------------------------------------
+    // Pale face, slightly angular for vampire-lord vibe
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx, 18, 18, 24);
+    g.fillStyle(SKIN_SHADOW, 1);
+    g.fillEllipse(cx, 18, 16, 22);
+    g.fillStyle(SKIN, 1);
+    g.fillEllipse(cx, 17, 14, 20);
+    g.fillStyle(SKIN_HI, 1);
+    g.fillEllipse(cx - 3, 14, 4, 6);
+
+    // Sunken eye sockets + glowing red eyes
+    g.fillStyle(EYE_OUT, 1);
+    g.fillRect(cx - 5, 14, 4, 3);
+    g.fillRect(cx + 1, 14, 4, 3);
+    g.fillStyle(EYE, 1);
+    g.fillRect(cx - 4, 15, 2, 1);
+    g.fillRect(cx + 2, 15, 2, 1);
+    g.fillStyle(EYE_HI, 1);
+    g.fillRect(cx - 4, 15, 1, 1);
+    g.fillRect(cx + 2, 15, 1, 1);
+    // Red eye glow halos
+    g.fillStyle(EYE, 0.35);
+    g.fillCircle(cx - 3, 15, 3);
+    g.fillCircle(cx + 3, 15, 3);
+
+    // Mouth — thin grim line with a tiny fang detail
+    g.fillStyle(EYE_OUT, 1);
+    g.fillRect(cx - 4, 22, 8, 1);
+    g.fillStyle(SKIN_HI, 1);
+    g.fillRect(cx - 2, 23, 1, 1);
+    g.fillRect(cx + 1, 23, 1, 1);
+
+    // Hair / shadow under the crown
+    g.fillStyle(HAIR, 1);
+    g.fillRect(cx - 9, 6, 18, 3);
+    g.fillRect(cx - 10, 7, 20, 2);
+
+    // --- Crown (5 spires + central amethyst) -------------------------------
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 13, 2, 26, 5);
+    g.fillStyle(TRIM_GOLD_DARK, 1);
+    g.fillRect(cx - 12, 2, 24, 5);
+    g.fillStyle(TRIM_GOLD, 1);
+    g.fillRect(cx - 12, 2, 24, 2);
+
+    const spires = [
+      { x: -10, h: 4 },
+      { x: -5, h: 6 },
+      { x: 0, h: 9 },
+      { x: 5, h: 6 },
+      { x: 10, h: 4 },
+    ];
+    for (const s of spires) {
+      g.fillStyle(OUT, 1);
+      g.fillTriangle(cx + s.x - 2, 2, cx + s.x + 2, 2, cx + s.x, 2 - s.h - 1);
+      g.fillStyle(TRIM_GOLD, 1);
+      g.fillTriangle(cx + s.x - 1, 2, cx + s.x + 1, 2, cx + s.x, 2 - s.h);
+    }
+    // Central amethyst gem on the crown peak (inset into the tallest spire)
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx - 4, -3, cx + 4, -3, cx, -10);
+    g.fillStyle(AMETHYST_DARK, 1);
+    g.fillTriangle(cx - 3, -3, cx + 3, -3, cx, -9);
+    g.fillStyle(AMETHYST, 1);
+    g.fillTriangle(cx - 2, -3, cx + 2, -3, cx, -8);
+    g.fillStyle(AMETHYST_HI, 1);
+    g.fillRect(cx - 1, -5, 2, 1);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(cx, -6, 1, 1);
+
+    // --- Scepter (right side, long staff with amethyst orb) ----------------
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx + 16, 28, 4, 50);
+    g.fillStyle(SCEPTER_DARK, 1);
+    g.fillRect(cx + 17, 28, 3, 50);
+    g.fillStyle(SCEPTER, 1);
+    g.fillRect(cx + 17, 28, 1, 50);
+    // Scepter orb at the top (above the staff)
+    g.fillStyle(AMETHYST, 0.32);
+    g.fillCircle(cx + 18, 26, 9);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx + 18, 26, 5);
+    g.fillStyle(AMETHYST_DARK, 1);
+    g.fillCircle(cx + 18, 26, 4);
+    g.fillStyle(AMETHYST, 1);
+    g.fillCircle(cx + 18, 26, 2.6);
+    g.fillStyle(AMETHYST_HI, 1);
+    g.fillRect(cx + 17, 25, 1, 1);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(cx + 18, 25, 1, 1);
+
+    g.generateTexture(TextureKeys.BossLordOnyx, w, h);
   }
 }

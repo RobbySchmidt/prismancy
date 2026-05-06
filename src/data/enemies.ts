@@ -133,6 +133,50 @@ export const ENEMIES = {
     floor: 'sapphire-swamp',
     coinDropChance: 0.7,
   },
+  wraith: {
+    id: 'wraith',
+    textureKey: TextureKeys.Wraith,
+    displayName: 'Wraith',
+    /** Onyx-tier chaser. HP scaled to floor 3: at endgame damage levels
+     * the original 2 HP got one-shot before the phasing mechanic could
+     * even read. At 5, the player has to time hits across multiple
+     * intangible cycles instead of burst-killing on appearance. */
+    hp: 5,
+    contactDamage: 1,
+    moveSpeed: 100,
+    hitboxRadius: 12,
+    floor: 'onyx-mansion',
+    coinDropChance: 0.5,
+  },
+  'possessed-candelabra': {
+    id: 'possessed-candelabra',
+    textureKey: TextureKeys.PossessedCandelabra,
+    displayName: 'Possessed Candelabra',
+    /** Slow tank — onyx-tier HP so its dual-threat layer (wax-puddle
+     * trail + flame cone) actually pressures the player long enough to
+     * matter. Was 5 — bumped to 9 for floor-3 damage scaling. */
+    hp: 9,
+    contactDamage: 1,
+    moveSpeed: 55,
+    hitboxRadius: 13,
+    floor: 'onyx-mansion',
+    coinDropChance: 0.65,
+  },
+  'cursed-mirror': {
+    id: 'cursed-mirror',
+    textureKey: TextureKeys.CursedMirror,
+    displayName: 'Cursed Mirror',
+    /** Rooted homing-shot mirror — telegraphs then fires a tracking
+     * missile. HP bumped from 3 → 7 for floor-3 scaling so the player
+     * has to dodge multiple homing shots per mirror, not just one. */
+    hp: 7,
+    contactDamage: 1,
+    /** Rooted — physics body has moves=false so this number doesn't apply. */
+    moveSpeed: 0,
+    hitboxRadius: 14,
+    floor: 'onyx-mansion',
+    coinDropChance: 0.6,
+  },
   'boss-vine-lord': {
     id: 'boss-vine-lord',
     /**
@@ -237,6 +281,40 @@ export const ENEMIES = {
     floor: 'sapphire-swamp',
     coinDropChance: 0,
   },
+  'boss-crimson-lord': {
+    id: 'boss-crimson-lord',
+    textureKey: TextureKeys.BossCrimsonLord,
+    displayName: 'Crimson Lord',
+    hp: 35,
+    contactDamage: 1,
+    moveSpeed: 100,
+    hitboxRadius: 18,
+    floor: 'onyx-mansion',
+    coinDropChance: 0,
+  },
+  'boss-sapphire-marquis': {
+    id: 'boss-sapphire-marquis',
+    textureKey: TextureKeys.BossSapphireMarquis,
+    displayName: 'Sapphire Marquis',
+    hp: 35,
+    contactDamage: 1,
+    moveSpeed: 60,
+    hitboxRadius: 16,
+    floor: 'onyx-mansion',
+    coinDropChance: 0,
+  },
+  'boss-lord-onyx': {
+    id: 'boss-lord-onyx',
+    textureKey: TextureKeys.BossLordOnyx,
+    displayName: 'Lord Onyx',
+    hp: 90,
+    contactDamage: 1,
+    /** Rooted at the seal — moves=false in the LordOnyx class. */
+    moveSpeed: 0,
+    hitboxRadius: 22,
+    floor: 'onyx-mansion',
+    coinDropChance: 0,
+  },
 } as const satisfies Record<string, EnemyDefinition>;
 
 export type EnemyId = keyof typeof ENEMIES;
@@ -244,4 +322,9 @@ export type EnemyId = keyof typeof ENEMIES;
 export interface EnemyRosterEntry {
   id: EnemyId;
   weight: number;
+  /** Force-spawn at least this many of this enemy in every combat room on
+   * the floor, before the weighted-pick fills remaining slots. Use to
+   * guarantee a niche threat type appears (e.g. one Cursed Mirror per
+   * mansion room so it can interact with the Wraiths). */
+  minPerRoom?: number;
 }

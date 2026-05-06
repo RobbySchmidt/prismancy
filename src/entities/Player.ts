@@ -9,9 +9,11 @@ import {
   PLAYER_INVINCIBILITY_MS,
   PLAYER_MAX_HEALTH,
   TextureKeys,
+  WORLD_SPRITE_SCALE,
 } from '../config/GameConfig';
 import { DepthLayers } from '../config/DepthLayers';
 import { type Direction, type Vector2 } from '../types';
+import { Cosmetics } from '../systems/Cosmetics';
 import { type InputManager } from '../systems/InputManager';
 import { PlayerHealth } from '../systems/PlayerHealth';
 import { type StatsSystem } from '../systems/StatsSystem';
@@ -34,7 +36,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     missilePool: MagicMissilePool,
     stats: StatsSystem,
   ) {
-    super(scene, x, y, TextureKeys.Player);
+    // Cosmetic skin lookup is one localStorage read at construction. The
+    // Prismancy red/gold palette swaps in once Lord Onyx is dead; PreloadScene
+    // generates both texture variants up front so the swap is just a key
+    // change with no runtime regeneration cost.
+    super(
+      scene,
+      x,
+      y,
+      Cosmetics.hasPrismancySkin() ? TextureKeys.PlayerPrismancy : TextureKeys.Player,
+    );
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
@@ -44,15 +55,26 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.health = new PlayerHealth(PLAYER_MAX_HEALTH, PLAYER_INVINCIBILITY_MS);
 
     this.setDepth(DepthLayers.Player);
+    this.setScale(WORLD_SPRITE_SCALE);
     // Hitbox sits on the wizard's robe (lower body), not the texture center —
     // otherwise the player feels like he's "standing on his hat". Y offset
     // pushes the circle down ~12 px from the texture center so it covers the
     // belt + legs region of the sprite.
-    const hitboxCenterY = this.height / 2 + 12;
+    //
+    // Phaser scales the physics body by `gameObject.scale` automatically. We
+    // want the body to stay at its authored *world* size (so collision +
+    // door-trigger overlap behaves identically regardless of WORLD_SPRITE_SCALE),
+    // so divide both radius and offsets by the scale before passing them in —
+    // they'll then come out at the original world dimensions after Phaser's
+    // auto-scale step.
+    const invScale = 1 / WORLD_SPRITE_SCALE;
+    const radius = PLAYER_HITBOX_RADIUS * invScale;
+    const halfW = this.width / 2;
+    const halfH = this.height / 2;
     this.setCircle(
-      PLAYER_HITBOX_RADIUS,
-      this.width / 2 - PLAYER_HITBOX_RADIUS,
-      hitboxCenterY - PLAYER_HITBOX_RADIUS,
+      radius,
+      halfW - radius,
+      halfH + 12 * invScale - radius,
     );
     this.setCollideWorldBounds(true);
   }

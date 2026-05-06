@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ITEM_FLOAT_OFFSET, TextureKeys } from '../../config/GameConfig';
+import { ITEM_FLOAT_OFFSET, TextureKeys, WORLD_SPRITE_SCALE } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
 import { PickupKind, type ItemDefinition } from '../../types';
 import { type Inventory } from '../../systems/Inventory';
@@ -36,13 +36,14 @@ export class ItemPickup extends BasePickup {
     // Item icons are 14×14 native — too tiny to read on the pedestal. Bumping
     // the visual scale here keeps the icon recognisable without touching the
     // physics hitbox (Arcade body stays at PICKUP_HITBOX_RADIUS).
-    this.setScale(1.8);
+    this.setScale(1.8 * WORLD_SPRITE_SCALE);
 
     // Pedestal sits at the original (x, y). One layer below the icon so the
     // icon clearly reads as "on top".
     this.pedestal = scene.add
       .image(x, y, TextureKeys.ItemPedestal)
-      .setDepth(DepthLayers.Pickup - 1);
+      .setDepth(DepthLayers.Pickup - 1)
+      .setScale(WORLD_SPRITE_SCALE);
 
     // Soft warm halo under the icon — same depth band as the pedestal so it
     // sits behind the icon but on top of the floor. Sized to roughly match

@@ -6,6 +6,7 @@ import {
   ROOM_WIDTH_TILES,
   SPAWN_SAFE_RADIUS_TILES,
   TILE_SIZE,
+  WORLD_SPRITE_SCALE,
   floorTileKey,
   mushroomDecoKey,
   rockDecoKey,
@@ -222,7 +223,8 @@ export class Room {
     this.atmosphere.paintDecorationHalo(this.scene, cx, cy, this.theme, 'medium');
     const rock = this.scene.add
       .image(cx, cy, rockDecoKey(this.theme.id))
-      .setDepth(DepthLayers.FloorDecoration);
+      .setDepth(DepthLayers.FloorDecoration)
+      .setScale(WORLD_SPRITE_SCALE);
     this.decorations.push(rock);
   }
 
@@ -232,7 +234,8 @@ export class Room {
     this.atmosphere.paintDecorationHalo(this.scene, cx, cy, this.theme, 'medium');
     const tree = this.scene.add
       .image(cx, cy, treeDecoKey(this.theme.id))
-      .setDepth(DepthLayers.FloorDecoration);
+      .setDepth(DepthLayers.FloorDecoration)
+      .setScale(WORLD_SPRITE_SCALE);
     this.decorations.push(tree);
     this.treePositions.push({ x: cx, y: cy });
   }
@@ -244,11 +247,12 @@ export class Room {
     const mushroom = this.scene.add
       .image(cx, cy, mushroomDecoKey(this.theme.id))
       .setDepth(DepthLayers.FloorDecoration)
+      .setScale(WORLD_SPRITE_SCALE)
       .setAlpha(0.85);
     this.scene.tweens.add({
       targets: mushroom,
       alpha: { from: 0.7, to: 1 },
-      scale: { from: 0.95, to: 1.08 },
+      scale: { from: 0.95 * WORLD_SPRITE_SCALE, to: 1.08 * WORLD_SPRITE_SCALE },
       duration: 1200 + rng.intBetween(0, 800),
       delay: rng.intBetween(0, 600),
       yoyo: true,
