@@ -5093,7 +5093,7 @@ export class PreloadScene extends Phaser.Scene {
     const cx = w / 2;
     g.clear();
 
-    const OUT = 0x1a0008;
+    const OUT = 0x180408;
     const ROBE_DARK = 0x4a0814;
     const ROBE = 0x8a1424;
     const ROBE_HI = 0xc8284a;
@@ -5102,93 +5102,125 @@ export class PreloadScene extends Phaser.Scene {
     const SKIN_OUT = 0x3a1818;
     const SKIN = 0xe8c8b8;
     const SKIN_HI = 0xffe8d8;
+    const HAIR_OUT = 0x080000;
+    const HAIR = 0x180410;
     const EYE_OUT = 0x080000;
     const EYE = 0xff2030;
     const EYE_HI = 0xffd040;
-    const BLOOD = 0xc8284a;
     const FANG = 0xfff0d0;
+    const BLOOD = 0xc8284a;
 
     this.groundShadow(g, cx, h - 4, 14, 4, 0.55);
 
-    // Robe outline + body silhouette (cone tapering down to floor)
+    // Bell-shape silhouette outer (rounded, replacing the old cone)
+    const outerBell = [
+      { x: cx + 8, y: 17 },
+      { x: cx + 10, y: 22 },
+      { x: cx + 12, y: 28 },
+      { x: cx + 14, y: 34 },
+      { x: cx + 16, y: 39 },
+      { x: cx + 8, y: 40 },
+      { x: cx, y: 40 },
+      { x: cx - 8, y: 40 },
+      { x: cx - 16, y: 39 },
+      { x: cx - 14, y: 34 },
+      { x: cx - 12, y: 28 },
+      { x: cx - 10, y: 22 },
+      { x: cx - 8, y: 17 },
+    ];
     g.fillStyle(OUT, 1);
-    g.fillTriangle(cx - 14, h - 4, cx + 14, h - 4, cx, 14);
-    g.fillRect(cx - 14, h - 5, 28, 1);
-    g.fillStyle(ROBE_DARK, 1);
-    g.fillTriangle(cx - 12, h - 5, cx + 12, h - 5, cx, 16);
-    g.fillStyle(ROBE, 1);
-    g.fillTriangle(cx - 10, h - 6, cx + 10, h - 6, cx, 18);
-    g.fillStyle(ROBE_HI, 1);
-    g.fillTriangle(cx - 4, h - 8, cx + 1, h - 8, cx - 2, 22);
+    g.fillPoints(outerBell, true);
 
-    // Gold trim hem at the bottom
+    // Inner bell — main robe-dark color
+    const innerBell = [
+      { x: cx + 7, y: 18 },
+      { x: cx + 9, y: 22 },
+      { x: cx + 11, y: 28 },
+      { x: cx + 13, y: 34 },
+      { x: cx + 14, y: 38 },
+      { x: cx, y: 39 },
+      { x: cx - 14, y: 38 },
+      { x: cx - 13, y: 34 },
+      { x: cx - 11, y: 28 },
+      { x: cx - 9, y: 22 },
+      { x: cx - 7, y: 18 },
+    ];
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(innerBell, true);
+
+    // Mid-tone fills (stacked ellipses for soft body shading)
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(cx, 24, 14, 10);
+    g.fillEllipse(cx, 30, 18, 10);
+    g.fillEllipse(cx, 36, 24, 8);
+
+    // Right-side rim highlight — soft red catch-light
+    g.fillStyle(ROBE_HI, 1);
+    g.fillTriangle(cx + 5, 20, cx + 9, 20, cx + 13, 36);
+
+    // Gold-trim hem (curved with the bell)
     g.fillStyle(OUT, 1);
-    g.fillRect(cx - 13, h - 8, 26, 2);
+    g.fillEllipse(cx, 36, 30, 5);
     g.fillStyle(TRIM_DARK, 1);
-    g.fillRect(cx - 12, h - 8, 24, 2);
+    g.fillEllipse(cx, 36, 28, 4);
     g.fillStyle(TRIM, 1);
-    g.fillRect(cx - 12, h - 8, 24, 1);
-    // Trim tally marks (gold studs)
-    for (const tx of [cx - 9, cx - 4, cx + 1, cx + 6]) {
+    g.fillEllipse(cx, 35, 26, 2);
+    // Gold studs along the trim
+    for (const tx of [-10, -4, 2, 8]) {
       g.fillStyle(0xfff0a8, 1);
-      g.fillRect(tx, h - 8, 1, 1);
+      g.fillRect(cx + tx, 35, 1, 1);
     }
 
-    // High collar (cape upturned)
+    // Ruby medallion at center-chest
     g.fillStyle(OUT, 1);
-    g.fillRect(cx - 9, 12, 18, 5);
-    g.fillTriangle(cx - 9, 12, cx - 13, 18, cx - 9, 18);
-    g.fillTriangle(cx + 9, 12, cx + 13, 18, cx + 9, 18);
+    g.fillCircle(cx, 24, 2.5);
+    g.fillStyle(TRIM, 1);
+    g.fillCircle(cx, 24, 1.8);
+    g.fillStyle(BLOOD, 1);
+    g.fillCircle(cx, 24, 1);
+
+    // Soft cape collar (rounded ellipse, no hard wedge)
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx, 17, 14, 5);
     g.fillStyle(ROBE_DARK, 1);
-    g.fillRect(cx - 8, 13, 16, 4);
-    g.fillTriangle(cx - 8, 13, cx - 12, 18, cx - 8, 17);
-    g.fillTriangle(cx + 8, 13, cx + 12, 18, cx + 8, 17);
+    g.fillEllipse(cx, 17, 12, 4);
     g.fillStyle(ROBE, 1);
-    g.fillRect(cx - 8, 13, 16, 2);
+    g.fillEllipse(cx, 16, 10, 2);
 
-    // Head — pale skin
+    // Head — pale skin, sits naturally on shoulders
     g.fillStyle(SKIN_OUT, 1);
-    g.fillCircle(cx, 11, 7);
-    g.fillStyle(SKIN, 1);
     g.fillCircle(cx, 11, 6);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(cx, 11, 5);
     g.fillStyle(SKIN_HI, 1);
-    g.fillCircle(cx - 2, 9, 1.5);
+    g.fillRect(cx - 3, 9, 1, 1);
 
-    // Slicked-back hair (dark cap on top of head)
-    g.fillStyle(OUT, 1);
-    g.fillRect(cx - 6, 5, 12, 3);
-    g.fillRect(cx - 7, 6, 14, 2);
-    g.fillStyle(0x180410, 1);
-    g.fillRect(cx - 5, 6, 10, 2);
+    // Slicked-back hair (rounded cap)
+    g.fillStyle(HAIR_OUT, 1);
+    g.fillEllipse(cx, 6, 12, 5);
+    g.fillStyle(HAIR, 1);
+    g.fillEllipse(cx, 6, 10, 4);
 
     // Eyes — glowing red with gold spark
     g.fillStyle(EYE_OUT, 1);
-    g.fillRect(cx - 4, 11, 3, 2);
-    g.fillRect(cx + 1, 11, 3, 2);
+    g.fillRect(cx - 4, 11, 2, 2);
+    g.fillRect(cx + 2, 11, 2, 2);
     g.fillStyle(EYE, 1);
-    g.fillRect(cx - 4, 11, 3, 2);
-    g.fillRect(cx + 1, 11, 3, 2);
+    g.fillRect(cx - 4, 11, 2, 2);
+    g.fillRect(cx + 2, 11, 2, 2);
     g.fillStyle(EYE_HI, 1);
     g.fillRect(cx - 4, 11, 1, 1);
-    g.fillRect(cx + 1, 11, 1, 1);
+    g.fillRect(cx + 2, 11, 1, 1);
 
-    // Mouth — fanged grin
+    // Fanged grin
     g.fillStyle(EYE_OUT, 1);
     g.fillRect(cx - 3, 14, 6, 1);
     g.fillStyle(FANG, 1);
     g.fillRect(cx - 2, 15, 1, 1);
     g.fillRect(cx + 1, 15, 1, 1);
-    // Single blood drip from corner of mouth
+    // Blood drip from corner
     g.fillStyle(BLOOD, 1);
     g.fillRect(cx + 2, 15, 1, 2);
-
-    // Center medallion on chest (gold + ruby)
-    g.fillStyle(OUT, 1);
-    g.fillCircle(cx, 22, 3);
-    g.fillStyle(TRIM, 1);
-    g.fillCircle(cx, 22, 2.2);
-    g.fillStyle(BLOOD, 1);
-    g.fillCircle(cx, 22, 1.2);
 
     g.generateTexture(TextureKeys.BossCrimsonLord, w, h);
   }
@@ -5214,112 +5246,145 @@ export class PreloadScene extends Phaser.Scene {
     const SKIN_OUT = 0x281828;
     const SKIN = 0xd8c0d0;
     const SKIN_HI = 0xf0d8e0;
+    const HAIR_OUT = 0x040208;
+    const HAIR = 0x100614;
     const EYE_OUT = 0x080000;
     const EYE = 0xff2040;
     const EYE_HI = 0xffd040;
-    const WAND_DARK = 0x180810;
+    const SCAR = 0x6a1818;
+    const WAND_OUT = 0x080004;
     const WAND = 0x4a2a18;
     const WAND_TIP = 0xff4060;
     const WAND_HALO = 0xff80a0;
+    const SAPPHIRE = 0x4ad8ff;
 
     this.groundShadow(g, cx, h - 4, 12, 4, 0.55);
 
-    // Robe — narrower bell shape
+    // Bell-shape silhouette outer (slimmer than the Lord — "scholar" frame)
+    const outerBell = [
+      { x: cx + 7, y: 17 },
+      { x: cx + 9, y: 22 },
+      { x: cx + 11, y: 28 },
+      { x: cx + 12, y: 34 },
+      { x: cx + 13, y: 39 },
+      { x: cx + 6, y: 40 },
+      { x: cx, y: 40 },
+      { x: cx - 6, y: 40 },
+      { x: cx - 13, y: 39 },
+      { x: cx - 12, y: 34 },
+      { x: cx - 11, y: 28 },
+      { x: cx - 9, y: 22 },
+      { x: cx - 7, y: 17 },
+    ];
     g.fillStyle(OUT, 1);
-    g.fillTriangle(cx - 12, h - 4, cx + 12, h - 4, cx, 14);
-    g.fillRect(cx - 12, h - 5, 24, 1);
-    g.fillStyle(ROBE_DARK, 1);
-    g.fillTriangle(cx - 10, h - 5, cx + 10, h - 5, cx, 16);
-    g.fillStyle(ROBE, 1);
-    g.fillTriangle(cx - 8, h - 6, cx + 8, h - 6, cx, 18);
-    g.fillStyle(ROBE_HI, 1);
-    g.fillTriangle(cx - 3, h - 8, cx + 0, h - 8, cx - 2, 22);
+    g.fillPoints(outerBell, true);
 
-    // Gold trim hem with ornate diamond pattern
+    // Inner bell — main robe-dark color
+    const innerBell = [
+      { x: cx + 6, y: 18 },
+      { x: cx + 8, y: 22 },
+      { x: cx + 10, y: 28 },
+      { x: cx + 11, y: 34 },
+      { x: cx + 11, y: 38 },
+      { x: cx, y: 39 },
+      { x: cx - 11, y: 38 },
+      { x: cx - 11, y: 34 },
+      { x: cx - 10, y: 28 },
+      { x: cx - 8, y: 22 },
+      { x: cx - 6, y: 18 },
+    ];
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(innerBell, true);
+
+    // Mid-tone fills (slimmer ellipses)
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(cx, 24, 12, 10);
+    g.fillEllipse(cx, 30, 16, 10);
+    g.fillEllipse(cx, 36, 20, 8);
+
+    // Right-side rim highlight — soft sapphire catch-light
+    g.fillStyle(ROBE_HI, 1);
+    g.fillTriangle(cx + 4, 20, cx + 7, 20, cx + 11, 36);
+
+    // Gold-trim hem with sapphire diamond pattern
     g.fillStyle(OUT, 1);
-    g.fillRect(cx - 11, h - 8, 22, 2);
+    g.fillEllipse(cx, 36, 26, 5);
     g.fillStyle(TRIM_DARK, 1);
-    g.fillRect(cx - 10, h - 8, 20, 2);
+    g.fillEllipse(cx, 36, 24, 4);
     g.fillStyle(TRIM, 1);
-    g.fillRect(cx - 10, h - 8, 20, 1);
-    // Diamond accents
-    for (const dx of [-7, -2, 3, 8]) {
-      g.fillStyle(0xfff0a8, 1);
-      g.fillRect(cx + dx, h - 8, 1, 1);
-      g.fillStyle(0xff8080, 1);
-      g.fillRect(cx + dx, h - 7, 1, 1);
+    g.fillEllipse(cx, 35, 22, 2);
+    // Sapphire studs along the trim
+    for (const tx of [-9, -3, 3, 9]) {
+      g.fillStyle(SAPPHIRE, 1);
+      g.fillRect(cx + tx, 35, 1, 1);
     }
 
-    // Ornate collar — wider, gold-lined, V-cut
+    // Sapphire medallion at chest (balance to the Lord's ruby)
     g.fillStyle(OUT, 1);
-    g.fillRect(cx - 11, 12, 22, 6);
-    g.fillTriangle(cx - 11, 12, cx - 14, 18, cx - 11, 18);
-    g.fillTriangle(cx + 11, 12, cx + 14, 18, cx + 11, 18);
-    g.fillStyle(TRIM_DARK, 1);
-    g.fillRect(cx - 10, 13, 20, 5);
+    g.fillCircle(cx, 24, 2.5);
     g.fillStyle(TRIM, 1);
-    g.fillRect(cx - 10, 13, 20, 2);
+    g.fillCircle(cx, 24, 1.8);
+    g.fillStyle(SAPPHIRE, 1);
+    g.fillCircle(cx, 24, 1);
+
+    // Soft V-cut collar (rounded ellipse with subtle V opening)
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx, 18, 14, 5);
+    g.fillStyle(TRIM_DARK, 1);
+    g.fillEllipse(cx, 18, 12, 4);
+    g.fillStyle(TRIM, 1);
+    g.fillEllipse(cx, 17, 10, 2);
     // V-cut showing inner robe
     g.fillStyle(ROBE_DARK, 1);
-    g.fillTriangle(cx - 4, 13, cx + 4, 13, cx, 19);
+    g.fillTriangle(cx - 2, 17, cx + 2, 17, cx, 21);
     g.fillStyle(ROBE, 1);
-    g.fillTriangle(cx - 3, 13, cx + 3, 13, cx, 17);
+    g.fillTriangle(cx - 1, 17, cx + 1, 17, cx, 20);
 
-    // Head — pale, slightly narrower than the Lord
+    // Head — pale, slightly slimmer than the Lord
     g.fillStyle(SKIN_OUT, 1);
-    g.fillCircle(cx, 10, 6);
+    g.fillCircle(cx, 11, 5.5);
     g.fillStyle(SKIN, 1);
-    g.fillCircle(cx, 10, 5);
+    g.fillCircle(cx, 11, 4.5);
     g.fillStyle(SKIN_HI, 1);
-    g.fillCircle(cx - 2, 9, 1.4);
+    g.fillRect(cx - 2, 9, 1, 1);
 
-    // Long combed-back hair (longer than Lord, hint of widow's peak)
-    g.fillStyle(OUT, 1);
-    g.fillRect(cx - 6, 4, 12, 3);
-    g.fillRect(cx - 7, 5, 14, 2);
-    g.fillTriangle(cx - 1, 6, cx + 1, 6, cx, 9);
-    g.fillStyle(0x100614, 1);
-    g.fillRect(cx - 5, 5, 10, 2);
+    // Long combed-back hair with widow's peak
+    g.fillStyle(HAIR_OUT, 1);
+    g.fillEllipse(cx, 6, 12, 5);
+    g.fillTriangle(cx - 1, 7, cx + 1, 7, cx, 10);
+    g.fillStyle(HAIR, 1);
+    g.fillEllipse(cx, 6, 10, 4);
 
-    // Single glowing red eye + closed/scarred eye
+    // Single glowing red eye + scarred closed eye
     g.fillStyle(EYE_OUT, 1);
-    g.fillRect(cx - 3, 10, 2, 2);
-    g.fillRect(cx + 1, 10, 3, 2);
+    g.fillRect(cx - 3, 11, 2, 2);
+    g.fillRect(cx + 1, 11, 2, 2);
     g.fillStyle(EYE, 1);
-    g.fillRect(cx + 1, 10, 3, 2);
+    g.fillRect(cx + 1, 11, 2, 2);
     g.fillStyle(EYE_HI, 1);
-    g.fillRect(cx + 1, 10, 1, 1);
-    // Scar across closed left eye
-    g.fillStyle(0x6a1818, 1);
-    g.fillRect(cx - 4, 9, 1, 4);
+    g.fillRect(cx + 1, 11, 1, 1);
+    // Scar across closed eye
+    g.fillStyle(SCAR, 1);
+    g.fillRect(cx - 4, 10, 1, 4);
 
-    // Thin lips (no fangs visible — magic-wielder, not bruiser)
+    // Thin lips (no fangs — magic-wielder)
     g.fillStyle(EYE_OUT, 1);
-    g.fillRect(cx - 2, 13, 4, 1);
+    g.fillRect(cx - 2, 14, 4, 1);
 
     // Wand at right side — held at hip, blood-red crystal tip
-    g.fillStyle(WAND_DARK, 1);
-    g.fillRect(cx + 10, 22, 2, 13);
+    g.fillStyle(WAND_OUT, 1);
+    g.fillRect(cx + 11, 22, 2, 13);
     g.fillStyle(WAND, 1);
-    g.fillRect(cx + 10, 22, 1, 13);
-    // Crystal tip (top)
-    g.fillStyle(WAND_DARK, 1);
-    g.fillRect(cx + 9, 19, 4, 4);
+    g.fillRect(cx + 11, 22, 1, 13);
+    // Crystal tip (top) with halo
+    g.fillStyle(WAND_HALO, 0.32);
+    g.fillCircle(cx + 12, 20, 5);
+    g.fillStyle(WAND_OUT, 1);
+    g.fillRect(cx + 10, 18, 5, 4);
     g.fillStyle(WAND_TIP, 1);
-    g.fillRect(cx + 10, 20, 2, 2);
+    g.fillRect(cx + 11, 19, 3, 2);
     g.fillStyle(0xffc0d0, 1);
-    g.fillRect(cx + 10, 20, 1, 1);
-    // Halo around wand tip
-    g.fillStyle(WAND_HALO, 0.35);
-    g.fillCircle(cx + 11, 21, 4);
-
-    // Center medallion (sapphire over gold to balance the Lord's ruby)
-    g.fillStyle(OUT, 1);
-    g.fillCircle(cx, 22, 3);
-    g.fillStyle(TRIM, 1);
-    g.fillCircle(cx, 22, 2.2);
-    g.fillStyle(0x4ad8ff, 1);
-    g.fillCircle(cx, 22, 1.2);
+    g.fillRect(cx + 11, 19, 1, 1);
 
     g.generateTexture(TextureKeys.BossSapphireMarquis, w, h);
   }
@@ -5383,14 +5448,13 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   /**
-   * Lord Onyx — secret endboss, gothic vampire-king silhouette. 64×88
-   * canvas (boss-tier, taller than the Vampire Twins so the size reads
-   * "you've reached the throne"). Floating posture (cloak fades to
-   * tatters at the bottom, no feet), gold crown with central amethyst,
-   * pale skeletal face with sunken glowing red eyes, scepter on the right
-   * with amethyst orb. Adapted from `StyleMockupScene.drawLordOnyx` with
-   * the silhouette tightened + tatter fringe + a faint amethyst aura
-   * outline so it pops against the dark mansion floor.
+   * Lord Onyx — secret endboss, High-Priest silhouette: tall hooded robe
+   * with completely shadowed face (only two amethyst pinpoint eyes deep
+   * in the hood-void), skeletal hands cradling a refracting prism in
+   * front of him. The prism is the hero element — closes the thematic
+   * ring with "Prismancy" + the three floor gems. No crown, no gold
+   * trim, no scepter. 64×88 canvas, hovering posture (no feet, frayed
+   * hem).
    */
   private drawBossLordOnyxTexture(g: Phaser.GameObjects.Graphics): void {
     const w = 64;
@@ -5398,170 +5462,168 @@ export class PreloadScene extends Phaser.Scene {
     const cx = w / 2;
     g.clear();
 
-    const OUT = 0x040208;
-    const CLOAK = 0x140820;
-    const CLOAK_DARK = 0x080410;
-    const CLOAK_HI = 0x261438;
-    const ROBE_INNER = 0x402030;
-    const TRIM_GOLD = 0xffd84a;
-    const TRIM_GOLD_DARK = 0x7a5018;
-    const SKIN = 0xe0d0e0;
-    const SKIN_HI = 0xf8e8f0;
-    const SKIN_SHADOW = 0xa890a8;
-    const EYE_OUT = 0x040208;
-    const EYE = 0xff3344;
-    const EYE_HI = 0xffaad8;
-    const HAIR = 0x100614;
-    const AMETHYST_DARK = 0x6a18a8;
-    const AMETHYST = 0xc864ff;
-    const AMETHYST_HI = 0xff64ff;
-    const SCEPTER_DARK = 0x402030;
-    const SCEPTER = 0x8a5a18;
+    const OUT = 0x000000;
+    const ROBE_DARK = 0x070310;
+    const ROBE = 0x110820;
+    const ROBE_HI = 0x281244;
+    const ROBE_RIM = 0x4a2070;
+    const EYE = 0xc864ff;
+    const EYE_HI = 0xff8aff;
+    const HAND_OUT = 0x040208;
+    const HAND = 0x4a3850;
+    const HAND_HI = 0x806878;
+    const PRISM_OUT = 0x000000;
+    const PRISM_R = 0xff4060;
+    const PRISM_G = 0x4afa80;
+    const PRISM_B = 0x4a80fa;
+    const PRISM_CORE = 0xffffff;
 
-    // Faint amethyst aura ring — sits behind everything so the lord reads
-    // "wreathed in dark light" rather than a bare silhouette.
-    g.fillStyle(AMETHYST, 0.12);
-    g.fillEllipse(cx, h / 2 + 10, w - 4, h - 8);
+    // 1) Floating amethyst aura under the hem — he hovers, no ground feet
+    g.fillStyle(0xc864ff, 0.10);
+    g.fillEllipse(cx, h - 4, 56, 14);
+    g.fillStyle(0xff8aff, 0.16);
+    g.fillEllipse(cx, h - 4, 28, 8);
 
-    // Ground shadow (no feet, but the cloak still casts under itself)
-    g.fillStyle(0x000000, 0.5);
-    g.fillEllipse(cx, h - 6, 36, 8);
-
-    // --- Cloak silhouette (tall trapezoid) ---------------------------------
-    // Left + right tapered sides
-    g.fillStyle(OUT, 1);
-    g.fillTriangle(cx - 22, h - 8, cx + 22, h - 8, cx + 16, 28);
-    g.fillTriangle(cx - 22, h - 8, cx - 16, 28, cx + 16, 28);
-    g.fillStyle(CLOAK_DARK, 1);
-    g.fillTriangle(cx - 21, h - 9, cx + 21, h - 9, cx + 15, 29);
-    g.fillTriangle(cx - 21, h - 9, cx - 15, 29, cx + 15, 29);
-    g.fillStyle(CLOAK, 1);
-    g.fillTriangle(cx - 19, h - 10, cx + 19, h - 10, cx + 13, 30);
-    g.fillTriangle(cx - 19, h - 10, cx - 13, 30, cx + 13, 30);
-    // Inner-cloak shadow (right side darker — light from upper-left)
-    g.fillStyle(CLOAK_HI, 1);
-    g.fillTriangle(cx - 12, h - 12, cx - 4, h - 12, cx - 12, 32);
-
-    // Tatter fringe at the bottom — alternating points so the cloak reads
-    // as ragged / floating rather than a hard hem.
-    for (let i = -22; i <= 22; i += 5) {
-      const tipY = h - 4 + (i % 10 === 0 ? 0 : 2);
-      g.fillStyle(OUT, 1);
-      g.fillTriangle(cx + i - 2, h - 8, cx + i + 2, h - 8, cx + i, tipY);
-      g.fillStyle(CLOAK, 1);
-      g.fillTriangle(cx + i - 1, h - 9, cx + i + 1, h - 9, cx + i, tipY - 1);
-    }
-
-    // Gold trim across the cloak chest (where the robe folds)
-    g.fillStyle(TRIM_GOLD_DARK, 1);
-    g.fillRect(cx - 18, 28, 36, 2);
-    g.fillStyle(TRIM_GOLD, 1);
-    g.fillRect(cx - 18, 28, 36, 1);
-
-    // Inner robe collar (the V-cut showing the lord's chest)
-    g.fillStyle(OUT, 1);
-    g.fillTriangle(cx - 8, 28, cx + 8, 28, cx, 44);
-    g.fillStyle(ROBE_INNER, 1);
-    g.fillTriangle(cx - 7, 28, cx + 7, 28, cx, 42);
-    // Gold pendant on the collar
-    g.fillStyle(OUT, 1);
-    g.fillCircle(cx, 36, 3);
-    g.fillStyle(TRIM_GOLD, 1);
-    g.fillCircle(cx, 36, 2.2);
-    g.fillStyle(AMETHYST, 1);
-    g.fillCircle(cx, 36, 1.2);
-
-    // --- Head + face --------------------------------------------------------
-    // Pale face, slightly angular for vampire-lord vibe
-    g.fillStyle(OUT, 1);
-    g.fillEllipse(cx, 18, 18, 24);
-    g.fillStyle(SKIN_SHADOW, 1);
-    g.fillEllipse(cx, 18, 16, 22);
-    g.fillStyle(SKIN, 1);
-    g.fillEllipse(cx, 17, 14, 20);
-    g.fillStyle(SKIN_HI, 1);
-    g.fillEllipse(cx - 3, 14, 4, 6);
-
-    // Sunken eye sockets + glowing red eyes
-    g.fillStyle(EYE_OUT, 1);
-    g.fillRect(cx - 5, 14, 4, 3);
-    g.fillRect(cx + 1, 14, 4, 3);
-    g.fillStyle(EYE, 1);
-    g.fillRect(cx - 4, 15, 2, 1);
-    g.fillRect(cx + 2, 15, 2, 1);
-    g.fillStyle(EYE_HI, 1);
-    g.fillRect(cx - 4, 15, 1, 1);
-    g.fillRect(cx + 2, 15, 1, 1);
-    // Red eye glow halos
-    g.fillStyle(EYE, 0.35);
-    g.fillCircle(cx - 3, 15, 3);
-    g.fillCircle(cx + 3, 15, 3);
-
-    // Mouth — thin grim line with a tiny fang detail
-    g.fillStyle(EYE_OUT, 1);
-    g.fillRect(cx - 4, 22, 8, 1);
-    g.fillStyle(SKIN_HI, 1);
-    g.fillRect(cx - 2, 23, 1, 1);
-    g.fillRect(cx + 1, 23, 1, 1);
-
-    // Hair / shadow under the crown
-    g.fillStyle(HAIR, 1);
-    g.fillRect(cx - 9, 6, 18, 3);
-    g.fillRect(cx - 10, 7, 20, 2);
-
-    // --- Crown (5 spires + central amethyst) -------------------------------
-    g.fillStyle(OUT, 1);
-    g.fillRect(cx - 13, 2, 26, 5);
-    g.fillStyle(TRIM_GOLD_DARK, 1);
-    g.fillRect(cx - 12, 2, 24, 5);
-    g.fillStyle(TRIM_GOLD, 1);
-    g.fillRect(cx - 12, 2, 24, 2);
-
-    const spires = [
-      { x: -10, h: 4 },
-      { x: -5, h: 6 },
-      { x: 0, h: 9 },
-      { x: 5, h: 6 },
-      { x: 10, h: 4 },
+    // 2) Outer silhouette — pure black outline, slightly larger bell
+    const outerPoints = [
+      { x: cx, y: 1 },
+      { x: cx + 5, y: 6 },
+      { x: cx + 9, y: 14 },
+      { x: cx + 12, y: 22 },
+      { x: cx + 12, y: 32 },
+      { x: cx + 14, y: 42 },
+      { x: cx + 16, y: 52 },
+      { x: cx + 19, y: 62 },
+      { x: cx + 23, y: 72 },
+      { x: cx + 28, y: 82 },
+      // frayed ragged hem
+      { x: cx + 24, y: 84 },
+      { x: cx + 18, y: 80 },
+      { x: cx + 12, y: 84 },
+      { x: cx + 4, y: 80 },
+      { x: cx - 4, y: 84 },
+      { x: cx - 12, y: 80 },
+      { x: cx - 18, y: 84 },
+      { x: cx - 24, y: 80 },
+      { x: cx - 28, y: 82 },
+      { x: cx - 23, y: 72 },
+      { x: cx - 19, y: 62 },
+      { x: cx - 16, y: 52 },
+      { x: cx - 14, y: 42 },
+      { x: cx - 12, y: 32 },
+      { x: cx - 12, y: 22 },
+      { x: cx - 9, y: 14 },
+      { x: cx - 5, y: 6 },
     ];
-    for (const s of spires) {
-      g.fillStyle(OUT, 1);
-      g.fillTriangle(cx + s.x - 2, 2, cx + s.x + 2, 2, cx + s.x, 2 - s.h - 1);
-      g.fillStyle(TRIM_GOLD, 1);
-      g.fillTriangle(cx + s.x - 1, 2, cx + s.x + 1, 2, cx + s.x, 2 - s.h);
-    }
-    // Central amethyst gem on the crown peak (inset into the tallest spire)
     g.fillStyle(OUT, 1);
-    g.fillTriangle(cx - 4, -3, cx + 4, -3, cx, -10);
-    g.fillStyle(AMETHYST_DARK, 1);
-    g.fillTriangle(cx - 3, -3, cx + 3, -3, cx, -9);
-    g.fillStyle(AMETHYST, 1);
-    g.fillTriangle(cx - 2, -3, cx + 2, -3, cx, -8);
-    g.fillStyle(AMETHYST_HI, 1);
-    g.fillRect(cx - 1, -5, 2, 1);
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(cx, -6, 1, 1);
+    g.fillPoints(outerPoints, true);
 
-    // --- Scepter (right side, long staff with amethyst orb) ----------------
+    // 3) Inner silhouette — robe dark fill (inset 1-2 px from outline)
+    const innerPoints = [
+      { x: cx, y: 3 },
+      { x: cx + 4, y: 8 },
+      { x: cx + 8, y: 14 },
+      { x: cx + 11, y: 22 },
+      { x: cx + 11, y: 32 },
+      { x: cx + 13, y: 42 },
+      { x: cx + 15, y: 52 },
+      { x: cx + 18, y: 62 },
+      { x: cx + 22, y: 72 },
+      { x: cx + 26, y: 80 },
+      { x: cx + 18, y: 78 },
+      { x: cx + 8, y: 80 },
+      { x: cx, y: 78 },
+      { x: cx - 8, y: 80 },
+      { x: cx - 18, y: 78 },
+      { x: cx - 26, y: 80 },
+      { x: cx - 22, y: 72 },
+      { x: cx - 18, y: 62 },
+      { x: cx - 15, y: 52 },
+      { x: cx - 13, y: 42 },
+      { x: cx - 11, y: 32 },
+      { x: cx - 11, y: 22 },
+      { x: cx - 8, y: 14 },
+      { x: cx - 4, y: 8 },
+    ];
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(innerPoints, true);
+
+    // 4) Mid-tone vertical band on right (suggests folds/depth)
+    g.fillStyle(ROBE, 1);
+    g.fillTriangle(cx + 2, 8, cx + 8, 8, cx + 14, 76);
+
+    // 5) Right-edge rim highlight — thin amethyst (catches dark light)
+    g.fillStyle(ROBE_HI, 1);
+    g.fillTriangle(cx + 9, 18, cx + 12, 18, cx + 19, 60);
+    g.fillStyle(ROBE_RIM, 0.5);
+    g.fillTriangle(cx + 11, 20, cx + 12, 22, cx + 22, 70);
+
+    // 6) Hood void — pure black ellipse where the face would be
     g.fillStyle(OUT, 1);
-    g.fillRect(cx + 16, 28, 4, 50);
-    g.fillStyle(SCEPTER_DARK, 1);
-    g.fillRect(cx + 17, 28, 3, 50);
-    g.fillStyle(SCEPTER, 1);
-    g.fillRect(cx + 17, 28, 1, 50);
-    // Scepter orb at the top (above the staff)
-    g.fillStyle(AMETHYST, 0.32);
-    g.fillCircle(cx + 18, 26, 9);
-    g.fillStyle(OUT, 1);
-    g.fillCircle(cx + 18, 26, 5);
-    g.fillStyle(AMETHYST_DARK, 1);
-    g.fillCircle(cx + 18, 26, 4);
-    g.fillStyle(AMETHYST, 1);
-    g.fillCircle(cx + 18, 26, 2.6);
-    g.fillStyle(AMETHYST_HI, 1);
-    g.fillRect(cx + 17, 25, 1, 1);
+    g.fillEllipse(cx, 14, 16, 14);
+
+    // 7) Two amethyst pinpoint eyes deep in hood shadow
+    g.fillStyle(EYE, 0.30);
+    g.fillCircle(cx - 3, 14, 3);
+    g.fillCircle(cx + 3, 14, 3);
+    g.fillStyle(EYE, 0.6);
+    g.fillCircle(cx - 3, 14, 1.5);
+    g.fillCircle(cx + 3, 14, 1.5);
+    g.fillStyle(EYE_HI, 1);
+    g.fillRect(cx - 4, 13, 2, 2);
+    g.fillRect(cx + 2, 13, 2, 2);
     g.fillStyle(0xffffff, 1);
-    g.fillRect(cx + 18, 25, 1, 1);
+    g.fillRect(cx - 3, 13, 1, 1);
+    g.fillRect(cx + 3, 13, 1, 1);
+
+    // 8) Sleeve drapes — visible at sides where arms extend forward
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx - 11, 28, cx - 6, 28, cx - 3, 48);
+    g.fillTriangle(cx + 11, 28, cx + 6, 28, cx + 3, 48);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillTriangle(cx - 10, 30, cx - 6, 30, cx - 4, 46);
+    g.fillTriangle(cx + 10, 30, cx + 6, 30, cx + 4, 46);
+
+    // 9) Skeletal hands cradling the prism — small bony forms
+    g.fillStyle(HAND_OUT, 1);
+    g.fillRect(cx - 6, 46, 3, 5);
+    g.fillRect(cx + 3, 46, 3, 5);
+    g.fillStyle(HAND, 1);
+    g.fillRect(cx - 5, 47, 2, 3);
+    g.fillRect(cx + 4, 47, 2, 3);
+    g.fillStyle(HAND_HI, 0.7);
+    g.fillRect(cx - 5, 47, 1, 2);
+    g.fillRect(cx + 4, 47, 1, 2);
+
+    // 10) PRISM — hero element, triangular crystal floating between hands
+    const px = cx;
+    const py = 54;
+    const ph = 14;
+    const pw = 12;
+
+    // Aura behind prism — multi-tone halo
+    g.fillStyle(0xffffff, 0.10);
+    g.fillCircle(px, py, 18);
+    g.fillStyle(0xc864ff, 0.18);
+    g.fillCircle(px, py, 12);
+    g.fillStyle(0xff8aff, 0.20);
+    g.fillCircle(px, py, 7);
+
+    // Prism outline — equilateral-ish triangle, point up
+    g.fillStyle(PRISM_OUT, 1);
+    g.fillTriangle(px, py - ph / 2 - 1, px + pw / 2 + 1, py + ph / 2, px - pw / 2 - 1, py + ph / 2);
+    // Inner prism — three vertical bands for chromatic split
+    g.fillStyle(PRISM_R, 1);
+    g.fillTriangle(px - 1, py - ph / 2 + 2, px - pw / 2 + 2, py + ph / 2 - 1, px + 1, py + ph / 2 - 1);
+    g.fillStyle(PRISM_B, 1);
+    g.fillTriangle(px + 1, py - ph / 2 + 2, px + pw / 2 - 2, py + ph / 2 - 1, px - 1, py + ph / 2 - 1);
+    g.fillStyle(PRISM_G, 0.7);
+    g.fillTriangle(px, py - ph / 2 + 3, px - 2, py + ph / 2 - 3, px + 2, py + ph / 2 - 3);
+    // Top-vertex sparkle + bottom-edge highlight
+    g.fillStyle(PRISM_CORE, 1);
+    g.fillRect(px, py - ph / 2 + 1, 1, 2);
+    g.fillStyle(0xffffff, 0.7);
+    g.fillRect(px - pw / 2 + 2, py + ph / 2 - 1, pw - 4, 1);
 
     g.generateTexture(TextureKeys.BossLordOnyx, w, h);
   }

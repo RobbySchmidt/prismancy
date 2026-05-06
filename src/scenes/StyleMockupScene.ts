@@ -26,9 +26,9 @@ const PAGE_COUNT = 4;
  *   - Page 1 (Emerald showcase): full-screen painterly room with wizard,
  *     Pixie Queen mid-fight, mobs, item pedestal, drops + combat trails.
  *   - Page 2 (Sapphire showcase): same composition recoloured for the
- *     Sapphire Swamp — lily pads, mangrove roots, Toad Sovereign, swamp mobs.
+ *     Sapphire Swamp â€” lily pads, mangrove roots, Toad Sovereign, swamp mobs.
  *   - Page 3 (Onyx showcase): final-floor mockup, designed from scratch
- *     since the Onyx Mansion isn't implemented yet — gothic mansion
+ *     since the Onyx Mansion isn't implemented yet â€” gothic mansion
  *     parquet, candle-sconce walls, Lord Onyx + mansion mob roster all
  *     painted procedurally to scope the floor's identity.
  *
@@ -78,24 +78,24 @@ export class StyleMockupScene extends Phaser.Scene {
       case 1:
         this.paintHeader(
           cx,
-          'STYLE MOCKUP — EMERALD FOREST',
-          `Page 2/${PAGE_COUNT} · Wizard vs. Pixie Queen, painted`,
+          'STYLE MOCKUP â€” EMERALD FOREST',
+          `Page 2/${PAGE_COUNT} Â· Wizard vs. Pixie Queen, painted`,
         );
         this.paintShowcaseEmerald();
         break;
       case 2:
         this.paintHeader(
           cx,
-          'STYLE MOCKUP — SAPPHIRE SWAMP',
-          `Page 3/${PAGE_COUNT} · Wizard vs. Toad Sovereign, painted`,
+          'STYLE MOCKUP â€” SAPPHIRE SWAMP',
+          `Page 3/${PAGE_COUNT} Â· Wizard vs. Toad Sovereign, painted`,
         );
         this.paintShowcaseSapphire();
         break;
       case 3:
         this.paintHeader(
           cx,
-          'STYLE MOCKUP — ONYX MANSION',
-          `Page 4/${PAGE_COUNT} · Wizard vs. Lord Onyx, painted (final floor)`,
+          'STYLE MOCKUP â€” ONYX MANSION',
+          `Page 4/${PAGE_COUNT} Â· Wizard vs. Lord Onyx, painted (final floor)`,
         );
         this.paintShowcaseOnyx();
         break;
@@ -106,8 +106,8 @@ export class StyleMockupScene extends Phaser.Scene {
   private paintComparisonPage(cx: number): void {
     this.paintHeader(
       cx,
-      'STYLE MOCKUP — EMERALD FOREST BACKDROP',
-      `Page 1/${PAGE_COUNT} · Backdrop comparison`,
+      'STYLE MOCKUP â€” EMERALD FOREST BACKDROP',
+      `Page 1/${PAGE_COUNT} Â· Backdrop comparison`,
     );
 
     const topY = 130;
@@ -168,7 +168,7 @@ export class StyleMockupScene extends Phaser.Scene {
 
   private paintFooter(cx: number): void {
     this.add
-      .text(cx, GAME_HEIGHT - 40, '[TAB] SWITCH PAGE     ·     [ESC] OR [M] CLOSE', {
+      .text(cx, GAME_HEIGHT - 40, '[TAB] SWITCH PAGE     Â·     [ESC] OR [M] CLOSE', {
         fontSize: '14px',
         fontStyle: 'bold',
         color: '#aab8c0',
@@ -191,7 +191,7 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillCircle(cx, cy, 16);
 
     const arrow = this.add
-      .text(cx, cy, '→', {
+      .text(cx, cy, 'â†’', {
         fontSize: '36px',
         fontStyle: 'bold',
         color: '#fff8c0',
@@ -211,7 +211,7 @@ export class StyleMockupScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------------
-  // CURRENT — actual in-game textures on a 6×5 mini room
+  // CURRENT â€” actual in-game textures on a 6Ã—5 mini room
   // ---------------------------------------------------------------------------
 
   private paintCurrent(originX: number, originY: number): void {
@@ -221,7 +221,7 @@ export class StyleMockupScene extends Phaser.Scene {
     const themeId = StyleMockupScene.FLOOR_ID;
     const half = TILE_SIZE / 2;
 
-    // Floor tiles (inner 4×3 area)
+    // Floor tiles (inner 4Ã—3 area)
     for (let ty = 1; ty < tilesH - 1; ty++) {
       for (let tx = 1; tx < tilesW - 1; tx++) {
         const variant = layout.floorVariants[ty * tilesW + tx]!;
@@ -275,7 +275,7 @@ export class StyleMockupScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------------
-  // PROPOSED — painterly re-imagining (Title-Screen-DNA on a top-down room)
+  // PROPOSED â€” painterly re-imagining (Title-Screen-DNA on a top-down room)
   // ---------------------------------------------------------------------------
 
   private paintProposed(originX: number, originY: number): void {
@@ -285,7 +285,7 @@ export class StyleMockupScene extends Phaser.Scene {
     const layout = StyleMockupScene.LAYOUT;
     const half = TILE_SIZE / 2;
 
-    // 1) Base floor — radial vignette, warm-green core fading to deep forest.
+    // 1) Base floor â€” radial vignette, warm-green core fading to deep forest.
     const floorG = this.add.graphics();
     container.add(floorG);
     floorG.fillStyle(0x040a0a, 1);
@@ -305,7 +305,7 @@ export class StyleMockupScene extends Phaser.Scene {
       floorG.fillEllipse(cx, cy, rx * 2, ry * 2);
     }
 
-    // 2) Painterly mossy patches — scattered 3-tone blobs over the floor.
+    // 2) Painterly mossy patches â€” scattered 3-tone blobs over the floor.
     const patchG = this.add.graphics();
     container.add(patchG);
     const patchRng = new RNG('mockup-patches');
@@ -323,7 +323,7 @@ export class StyleMockupScene extends Phaser.Scene {
       patchG.fillEllipse(px - 1, py - 2, size * 0.55, size * 0.32);
     }
 
-    // 3) Top wall — distant-forest canopy band (Title-style, painterly).
+    // 3) Top wall â€” distant-forest canopy band (Title-style, painterly).
     const canopyG = this.add.graphics();
     container.add(canopyG);
     // Ground anchor for canopy
@@ -335,7 +335,7 @@ export class StyleMockupScene extends Phaser.Scene {
       const th = 12 + ((x * 7919) % 14);
       canopyG.fillTriangle(x - 3, 30, x + 9, 30, x + 3, 30 - th);
     }
-    // Mid canopy — overlapping foliage circles, three tones
+    // Mid canopy â€” overlapping foliage circles, three tones
     canopyG.fillStyle(0x0a1a18, 1);
     for (let x = -10; x < w + 10; x += 22) {
       const fh = 22 + ((x * 4421) % 16);
@@ -359,7 +359,7 @@ export class StyleMockupScene extends Phaser.Scene {
       canopyG.fillEllipse(x + 4, 32, 6, 2);
     }
 
-    // 4) Bottom wall — grounded mossy band.
+    // 4) Bottom wall â€” grounded mossy band.
     const bottomG = this.add.graphics();
     container.add(bottomG);
     bottomG.fillStyle(0x040a0a, 1);
@@ -379,7 +379,7 @@ export class StyleMockupScene extends Phaser.Scene {
       bottomG.fillEllipse(x + 12, h - 48, 5, 1.6);
     }
 
-    // 5) Side walls — vertical bark slivers with a moss-edge highlight.
+    // 5) Side walls â€” vertical bark slivers with a moss-edge highlight.
     const sideG = this.add.graphics();
     container.add(sideG);
     for (const sx of [0, w - 36]) {
@@ -407,7 +407,7 @@ export class StyleMockupScene extends Phaser.Scene {
       }
     }
 
-    // 6) Light shafts — 2 diagonal warm-green bands from the canopy.
+    // 6) Light shafts â€” 2 diagonal warm-green bands from the canopy.
     const lightG = this.add.graphics();
     container.add(lightG);
     lightG.fillStyle(0x88c060, 0.07);
@@ -417,7 +417,7 @@ export class StyleMockupScene extends Phaser.Scene {
     lightG.fillStyle(0x88c060, 0.06);
     this.fillSlantedBand(lightG, w - 120, 30, 60, h - 60, 70);
 
-    // 7) Decorations — actual textures + a glow halo painted underneath.
+    // 7) Decorations â€” actual textures + a glow halo painted underneath.
     for (const d of layout.decorations) {
       const haloG = this.add.graphics();
       haloG.fillStyle(0x88c060, 0.10);
@@ -439,7 +439,7 @@ export class StyleMockupScene extends Phaser.Scene {
       container.add(img);
     }
 
-    // 8) Mist bands — thin alpha strips across the lower floor.
+    // 8) Mist bands â€” thin alpha strips across the lower floor.
     const mistG = this.add.graphics();
     container.add(mistG);
     mistG.fillStyle(0xc0eadd, 0.06);
@@ -449,7 +449,7 @@ export class StyleMockupScene extends Phaser.Scene {
     mistG.fillStyle(0xc0eadd, 0.05);
     mistG.fillRect(0, h - 70, w, 10);
 
-    // 9) Fireflies — outline + glow + sparkle pixel.
+    // 9) Fireflies â€” outline + glow + sparkle pixel.
     const flyG = this.add.graphics();
     container.add(flyG);
     const fireflies: ReadonlyArray<readonly [number, number, number, number]> = [
@@ -483,7 +483,7 @@ export class StyleMockupScene extends Phaser.Scene {
       ease: 'Sine.InOut',
     });
 
-    // 10) Vignette overlay — final cinematic edge dim.
+    // 10) Vignette overlay â€” final cinematic edge dim.
     const vignG = this.add.graphics();
     container.add(vignG);
     for (let i = 0; i < 18; i++) {
@@ -499,11 +499,11 @@ export class StyleMockupScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------------
-  // PAGE 1 — full-screen Wizard-vs-Pixie-Queen showcase, painted
+  // PAGE 1 â€” full-screen Wizard-vs-Pixie-Queen showcase, painted
   // ---------------------------------------------------------------------------
 
   private paintShowcaseEmerald(): void {
-    // Native canvas: 14 × 7 tiles = 896 × 448, anchored at (32, 100).
+    // Native canvas: 14 Ã— 7 tiles = 896 Ã— 448, anchored at (32, 100).
     const w = 14 * TILE_SIZE; // 896
     const h = 7 * TILE_SIZE; // 448
     const originX = (GAME_WIDTH - w) / 2; // 32
@@ -546,7 +546,7 @@ export class StyleMockupScene extends Phaser.Scene {
       patchG.fillEllipse(px - 1, py - 2, size * 0.55, size * 0.32);
     }
 
-    // ---- 3) Top wall — Title-style layered canopy -----------------------
+    // ---- 3) Top wall â€” Title-style layered canopy -----------------------
     const canopyG = this.add.graphics();
     container.add(canopyG);
     canopyG.fillStyle(0x040a0a, 1);
@@ -578,7 +578,7 @@ export class StyleMockupScene extends Phaser.Scene {
       canopyG.fillEllipse(x + 4, 42, 7, 2);
     }
 
-    // ---- 4) Bottom wall — grounded mossy band ---------------------------
+    // ---- 4) Bottom wall â€” grounded mossy band ---------------------------
     const bottomG = this.add.graphics();
     container.add(bottomG);
     bottomG.fillStyle(0x040a0a, 1);
@@ -598,7 +598,7 @@ export class StyleMockupScene extends Phaser.Scene {
       bottomG.fillEllipse(x + 14, h - 54, 6, 2);
     }
 
-    // ---- 5) Side walls — vertical bark slivers --------------------------
+    // ---- 5) Side walls â€” vertical bark slivers --------------------------
     const sideG = this.add.graphics();
     container.add(sideG);
     for (const sx of [0, w - 38]) {
@@ -776,7 +776,7 @@ export class StyleMockupScene extends Phaser.Scene {
       ease: 'Sine.InOut',
     });
 
-    // ---- 13) Combat — magic missile arc + thorn volley -----------------
+    // ---- 13) Combat â€” magic missile arc + thorn volley -----------------
     const combatG = this.add.graphics();
     container.add(combatG);
     const wandX = wizardX + 30;
@@ -888,7 +888,7 @@ export class StyleMockupScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------------
-  // PAGE 2 — Sapphire Swamp showcase (Wizard vs. Toad Sovereign)
+  // PAGE 2 â€” Sapphire Swamp showcase (Wizard vs. Toad Sovereign)
   // ---------------------------------------------------------------------------
 
   private paintShowcaseSapphire(): void {
@@ -898,7 +898,7 @@ export class StyleMockupScene extends Phaser.Scene {
     const originY = 100;
     const container = this.add.container(originX, originY);
 
-    // 1) Floor — murky teal pool with sapphire-glow vignette.
+    // 1) Floor â€” murky teal pool with sapphire-glow vignette.
     const floorG = this.add.graphics();
     container.add(floorG);
     floorG.fillStyle(0x02060a, 1);
@@ -918,7 +918,7 @@ export class StyleMockupScene extends Phaser.Scene {
       floorG.fillEllipse(fcx, fcy, rx * 2, ry * 2);
     }
 
-    // 2) Algae patches — teal blobs with cyan highlight pixels.
+    // 2) Algae patches â€” teal blobs with cyan highlight pixels.
     const patchG = this.add.graphics();
     container.add(patchG);
     const patchRng = new RNG('mockup-sapphire-patches');
@@ -939,14 +939,14 @@ export class StyleMockupScene extends Phaser.Scene {
       }
     }
 
-    // 3) Top wall — dripping algae from a stone arch (cave-mouth feel).
+    // 3) Top wall â€” dripping algae from a stone arch (cave-mouth feel).
     const archG = this.add.graphics();
     container.add(archG);
     archG.fillStyle(0x02060a, 1);
     archG.fillRect(0, 0, w, 38);
     archG.fillStyle(0x0a1218, 1);
     archG.fillRect(0, 0, w, 30);
-    // Stone arch ridge — irregular dome silhouette
+    // Stone arch ridge â€” irregular dome silhouette
     archG.fillStyle(0x1a2230, 1);
     for (let x = 0; x < w; x += 16) {
       const fh = 14 + ((x * 7919) % 12);
@@ -989,7 +989,7 @@ export class StyleMockupScene extends Phaser.Scene {
       archG.fillRect(nx, ny - 1, 1, 1);
     }
 
-    // 4) Bottom wall — muddy bank with algae fringe.
+    // 4) Bottom wall â€” muddy bank with algae fringe.
     const bankG = this.add.graphics();
     container.add(bankG);
     bankG.fillStyle(0x02060a, 1);
@@ -1009,7 +1009,7 @@ export class StyleMockupScene extends Phaser.Scene {
       bankG.fillEllipse(x + 14, h - 54, 6, 2);
     }
 
-    // 5) Side walls — mangrove root pillars with sapphire glow knots.
+    // 5) Side walls â€” mangrove root pillars with sapphire glow knots.
     const sideG = this.add.graphics();
     container.add(sideG);
     for (const sx of [0, w - 38]) {
@@ -1045,7 +1045,7 @@ export class StyleMockupScene extends Phaser.Scene {
       }
     }
 
-    // 6) Light shafts — cool moonlight beams.
+    // 6) Light shafts â€” cool moonlight beams.
     const lightG = this.add.graphics();
     container.add(lightG);
     lightG.fillStyle(0x4ad8ff, 0.05);
@@ -1055,7 +1055,7 @@ export class StyleMockupScene extends Phaser.Scene {
     lightG.fillStyle(0x4ad8ff, 0.05);
     this.fillSlantedBand(lightG, w - 240, 38, 90, h - 80, 70);
 
-    // 7) Decorations — lily pads + mangrove root textures (sapphire variants).
+    // 7) Decorations â€” lily pads + mangrove root textures (sapphire variants).
     const decoSpec: ReadonlyArray<{
       kind: 'tree' | 'rock' | 'mushroom';
       x: number;
@@ -1134,7 +1134,7 @@ export class StyleMockupScene extends Phaser.Scene {
       container.add(img);
     }
 
-    // 10) Sapphire mobs — bog frog, snapper bloom, damselfly, bog tortoise.
+    // 10) Sapphire mobs â€” bog frog, snapper bloom, damselfly, bog tortoise.
     const mobs: Array<{ key: string; x: number; y: number; halo: number }> = [
       { key: TextureKeys.BogFrog, x: 360, y: 200, halo: 0x4ad8ff },
       { key: TextureKeys.Damselfly, x: 540, y: 240, halo: 0x4ad8ff },
@@ -1169,7 +1169,7 @@ export class StyleMockupScene extends Phaser.Scene {
     wizard.setRotation(-0.06);
     container.add(wizard);
 
-    // 12) Toad Sovereign — chunky toad boss with cyan halo.
+    // 12) Toad Sovereign â€” chunky toad boss with cyan halo.
     const toadX = w - 200;
     const toadY = 250;
     const toadHaloG = this.add.graphics();
@@ -1192,7 +1192,7 @@ export class StyleMockupScene extends Phaser.Scene {
       ease: 'Sine.InOut',
     });
 
-    // 13) Combat — magic missile arc + sapphire spit globs.
+    // 13) Combat â€” magic missile arc + sapphire spit globs.
     const combatG = this.add.graphics();
     container.add(combatG);
     const wandX = wizardX + 30;
@@ -1215,7 +1215,7 @@ export class StyleMockupScene extends Phaser.Scene {
       combatG.fillStyle(0xffffff, alpha);
       combatG.fillRect(px, py - 1, 1, 1);
     }
-    // Toad spits — 3 sapphire-tinted globs flying toward the wizard.
+    // Toad spits â€” 3 sapphire-tinted globs flying toward the wizard.
     const globs: ReadonlyArray<readonly [number, number]> = [
       [toadX - 100, toadY - 30],
       [toadX - 170, toadY + 30],
@@ -1247,7 +1247,7 @@ export class StyleMockupScene extends Phaser.Scene {
     mistG.fillStyle(0xc0eadd, 0.05);
     mistG.fillRect(0, h - 78, w, 12);
 
-    // 15) Fireflies — sapphire + cyan with a few warm pricks.
+    // 15) Fireflies â€” sapphire + cyan with a few warm pricks.
     const flyG = this.add.graphics();
     container.add(flyG);
     const fireflies: ReadonlyArray<readonly [number, number, number, number]> = [
@@ -1300,9 +1300,9 @@ export class StyleMockupScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------------
-  // PAGE 3 — Onyx Mansion showcase (Wizard vs. Lord Onyx)
+  // PAGE 3 â€” Onyx Mansion showcase (Wizard vs. Lord Onyx)
   //
-  // Designed from scratch since Onyx Mansion isn't built yet — palette,
+  // Designed from scratch since Onyx Mansion isn't built yet â€” palette,
   // walls, decorations, mobs, and boss are all painted procedurally so this
   // mockup serves as a design proposal for Phase 5 Chunk 4.
   // ---------------------------------------------------------------------------
@@ -1314,7 +1314,7 @@ export class StyleMockupScene extends Phaser.Scene {
     const originY = 100;
     const container = this.add.container(originX, originY);
 
-    // 1) Floor — ornate parquet with amethyst vignette.
+    // 1) Floor â€” ornate parquet with amethyst vignette.
     const floorG = this.add.graphics();
     container.add(floorG);
     floorG.fillStyle(0x0a0410, 1);
@@ -1334,11 +1334,11 @@ export class StyleMockupScene extends Phaser.Scene {
       floorG.fillEllipse(fcx, fcy, rx * 2, ry * 2);
     }
 
-    // 2) Parquet planks — diagonal wood pattern with gold inlay seams.
+    // 2) Parquet planks â€” diagonal wood pattern with gold inlay seams.
     const parquetG = this.add.graphics();
     container.add(parquetG);
     parquetG.fillStyle(0x140820, 0.55);
-    // Diagonal seam grid (45°)
+    // Diagonal seam grid (45Â°)
     for (let i = -h; i < w + h; i += 28) {
       parquetG.fillRect(i, 0, 1, h * 2);
     }
@@ -1364,7 +1364,7 @@ export class StyleMockupScene extends Phaser.Scene {
       parquetG.fillRect(sx, sy, 1, 1);
     }
 
-    // 3) Top wall — stone vault with hanging chandelier.
+    // 3) Top wall â€” stone vault with hanging chandelier.
     const vaultG = this.add.graphics();
     container.add(vaultG);
     vaultG.fillStyle(0x040208, 1);
@@ -1382,7 +1382,7 @@ export class StyleMockupScene extends Phaser.Scene {
       vaultG.fillRect(bx + 2, 4, 36, 1);
       vaultG.fillRect(bx + 22, 14, 36, 1);
     }
-    // Gothic moldings — gold trim line
+    // Gothic moldings â€” gold trim line
     vaultG.fillStyle(0x8a5a18, 1);
     vaultG.fillRect(0, 28, w, 2);
     vaultG.fillStyle(0xffd84a, 0.85);
@@ -1395,7 +1395,7 @@ export class StyleMockupScene extends Phaser.Scene {
       this.paintWallSconce(container, sx, 38);
     }
 
-    // 4) Bottom wall — red velvet runner edge.
+    // 4) Bottom wall â€” red velvet runner edge.
     const bottomG = this.add.graphics();
     container.add(bottomG);
     bottomG.fillStyle(0x040208, 1);
@@ -1416,13 +1416,13 @@ export class StyleMockupScene extends Phaser.Scene {
     for (let x = 0; x < w; x += 12) {
       bottomG.fillRect(x, h - 42, 6, 1);
     }
-    // Tassels — small pendant shapes
+    // Tassels â€” small pendant shapes
     bottomG.fillStyle(0xffd84a, 0.85);
     for (let x = 12; x < w; x += 60) {
       bottomG.fillTriangle(x - 2, h - 40, x + 2, h - 40, x, h - 36);
     }
 
-    // 5) Side walls — tall stone columns with portraits.
+    // 5) Side walls â€” tall stone columns with portraits.
     const sideG = this.add.graphics();
     container.add(sideG);
     for (const sx of [0, w - 40]) {
@@ -1446,13 +1446,13 @@ export class StyleMockupScene extends Phaser.Scene {
       sideG.fillStyle(0xffd84a, 0.85);
       sideG.fillRect(hiX, 32, 1, h - 88);
     }
-    // Portraits — gilt frames with painted figures
+    // Portraits â€” gilt frames with painted figures
     this.paintPortrait(container, 20, 110);
     this.paintPortrait(container, w - 20, 110);
     this.paintPortrait(container, 20, 270);
     this.paintPortrait(container, w - 20, 270);
 
-    // 6) Light shafts — warm candle-light beams from sconces.
+    // 6) Light shafts â€” warm candle-light beams from sconces.
     const lightG = this.add.graphics();
     container.add(lightG);
     lightG.fillStyle(0xffd84a, 0.05);
@@ -1460,7 +1460,7 @@ export class StyleMockupScene extends Phaser.Scene {
     lightG.fillStyle(0xfff8a0, 0.06);
     this.fillSlantedBand(lightG, 600, 38, 80, h - 80, 110);
 
-    // 7) Decorations — broken column, candelabrum stands, vase.
+    // 7) Decorations â€” broken column, candelabrum stands, vase.
     this.paintBrokenColumn(container, 100, 170);
     this.paintCandelabrum(container, 280, 200);
     this.paintCandelabrum(container, w - 220, 180);
@@ -1516,7 +1516,7 @@ export class StyleMockupScene extends Phaser.Scene {
       container.add(img);
     }
 
-    // 10) Mansion mobs (painted) — Wraith, Possessed Candelabra, Cursed Mirror.
+    // 10) Mansion mobs (painted) â€” Wraith, Possessed Candelabra, Cursed Mirror.
     this.paintWraith(container, 360, 200);
     this.paintWraith(container, 560, 240);
     this.paintPossessedCandelabra(container, 700, 360);
@@ -1538,7 +1538,7 @@ export class StyleMockupScene extends Phaser.Scene {
     wizard.setRotation(-0.06);
     container.add(wizard);
 
-    // 12) Lord Onyx — final boss, painted.
+    // 12) Lord Onyx â€” final boss, painted.
     const onyxX = w - 200;
     const onyxY = 240;
     const lordHaloG = this.add.graphics();
@@ -1561,7 +1561,7 @@ export class StyleMockupScene extends Phaser.Scene {
       ease: 'Sine.InOut',
     });
 
-    // 13) Combat — magic missile arc + Lord Onyx's amethyst-shard volley.
+    // 13) Combat â€” magic missile arc + Lord Onyx's amethyst-shard volley.
     const combatG = this.add.graphics();
     container.add(combatG);
     const wandX = wizardX + 30;
@@ -1591,7 +1591,7 @@ export class StyleMockupScene extends Phaser.Scene {
       [onyxX - 240, onyxY + 80],
     ];
     for (const [sx, sy] of shards) {
-      // Shard body — small dark diamond
+      // Shard body â€” small dark diamond
       combatG.fillStyle(0x040208, 1);
       combatG.fillTriangle(sx + 12, sy - 6, sx + 12, sy + 6, sx - 8, sy);
       combatG.fillStyle(0xc864ff, 1);
@@ -1607,7 +1607,7 @@ export class StyleMockupScene extends Phaser.Scene {
       combatG.fillRect(sx + 38, sy - 1, 30, 2);
     }
 
-    // 14) Mist bands — purple-tinted dust drift.
+    // 14) Mist bands â€” purple-tinted dust drift.
     const mistG = this.add.graphics();
     container.add(mistG);
     mistG.fillStyle(0xc8a0e0, 0.06);
@@ -1670,7 +1670,7 @@ export class StyleMockupScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------------
-  // Onyx Mansion painted assets — boss, mobs, props, decor.
+  // Onyx Mansion painted assets â€” boss, mobs, props, decor.
   //
   // The Onyx Mansion has no in-game textures yet; everything below is
   // drawn directly into Graphics objects so the showcase can stand in
@@ -1759,7 +1759,7 @@ export class StyleMockupScene extends Phaser.Scene {
     // Canvas
     g.fillStyle(0x18102a, 1);
     g.fillRect(cx - 11, cy - 15, 22, 30);
-    // Sketchy figure — head + shoulders silhouette
+    // Sketchy figure â€” head + shoulders silhouette
     g.fillStyle(0x402060, 1);
     g.fillCircle(cx, cy - 4, 4);
     g.fillTriangle(cx - 8, cy + 14, cx + 8, cy + 14, cx, cy + 2);
@@ -1793,7 +1793,7 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillRect(cx - 7, cy - 18, 2, 28);
     g.fillStyle(0x140820, 1);
     g.fillRect(cx + 5, cy - 18, 2, 28);
-    // Jagged break — replace the top row with diagonal jags
+    // Jagged break â€” replace the top row with diagonal jags
     g.fillStyle(0x0a0410, 1);
     g.fillTriangle(cx - 8, cy - 18, cx - 4, cy - 22, cx, cy - 18);
     g.fillTriangle(cx, cy - 18, cx + 4, cy - 14, cx + 8, cy - 18);
@@ -1861,7 +1861,7 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillStyle(0xffd84a, 1);
     g.fillRect(cx - 8, cy - 12, 16, 1);
     g.fillRect(cx - 6, cy + 10, 12, 1);
-    // Crack — jagged line
+    // Crack â€” jagged line
     g.fillStyle(0x040208, 1);
     g.fillRect(cx - 1, cy - 8, 1, 4);
     g.fillRect(cx, cy - 4, 1, 4);
@@ -1879,7 +1879,7 @@ export class StyleMockupScene extends Phaser.Scene {
     // Halo
     g.fillStyle(0xc864ff, 0.16);
     g.fillEllipse(cx, cy + 18, 42, 16);
-    // Tattered robe — wispy bottom
+    // Tattered robe â€” wispy bottom
     g.fillStyle(0x180a28, 0.88);
     g.fillTriangle(cx - 12, cy + 10, cx + 12, cy + 10, cx, cy - 12);
     g.fillStyle(0x261438, 0.82);
@@ -1916,7 +1916,7 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillEllipse(cx, cy + 16, 50, 18);
     g.fillStyle(0xff7a30, 0.22);
     g.fillEllipse(cx, cy + 16, 30, 12);
-    // Skull base — staring upward
+    // Skull base â€” staring upward
     g.fillStyle(0x261438, 1);
     g.fillEllipse(cx, cy + 8, 18, 10);
     g.fillStyle(0xe0d0c0, 1);
@@ -1930,7 +1930,7 @@ export class StyleMockupScene extends Phaser.Scene {
     // Spine (stem)
     g.fillStyle(0xe0d0c0, 1);
     g.fillRect(cx - 1, cy - 10, 2, 14);
-    // Arms — bone-y
+    // Arms â€” bone-y
     g.fillRect(cx - 10, cy - 8, 20, 1);
     g.fillRect(cx - 10, cy - 8, 1, 4);
     g.fillRect(cx + 9, cy - 8, 1, 4);
@@ -1969,7 +1969,7 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillEllipse(cx, cy - 4, 20, 28);
     g.lineStyle(1, 0xffd84a, 1);
     g.strokeEllipse(cx, cy - 4, 20, 28);
-    // Mirror surface — dark with gradient
+    // Mirror surface â€” dark with gradient
     g.fillStyle(0x0a0410, 1);
     g.fillEllipse(cx, cy - 4, 16, 24);
     g.fillStyle(0x261438, 0.85);
@@ -1995,7 +1995,7 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillRect(cx - 11, cy + 4, 22, 4);
     g.fillStyle(0xffd84a, 1);
     g.fillRect(cx - 11, cy + 4, 22, 1);
-    // 5 spires — center tallest
+    // 5 spires â€” center tallest
     const spires = [
       { x: -10, h: 4 },
       { x: -5, h: 6 },
@@ -2024,7 +2024,7 @@ export class StyleMockupScene extends Phaser.Scene {
     // Cloak shadow on the ground
     g.fillStyle(0x040208, 0.55);
     g.fillEllipse(cx, cy + 56, 68, 18);
-    // Cloak body — tall trapezoidal silhouette
+    // Cloak body â€” tall trapezoidal silhouette
     g.fillStyle(0x140820, 1);
     g.fillTriangle(cx - 36, cy + 50, cx + 36, cy + 50, cx + 24, cy - 30);
     g.fillTriangle(cx - 36, cy + 50, cx - 24, cy - 30, cx + 24, cy - 30);
@@ -2035,7 +2035,7 @@ export class StyleMockupScene extends Phaser.Scene {
     // Highlight strip on the right side of the cloak
     g.fillStyle(0x402060, 1);
     g.fillTriangle(cx + 14, cy + 44, cx + 22, cy + 44, cx + 14, cy - 22);
-    // Cloak fringe at the bottom — wavy edge
+    // Cloak fringe at the bottom â€” wavy edge
     for (let i = -36; i <= 36; i += 8) {
       g.fillStyle(0x140820, 1);
       g.fillTriangle(cx + i - 4, cy + 50, cx + i + 4, cy + 50, cx + i, cy + 56);
@@ -2053,7 +2053,7 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillEllipse(cx, cy - 36, 16, 22);
     g.fillStyle(0xc8a8c0, 1);
     g.fillEllipse(cx + 4, cy - 32, 6, 12);
-    // Eye sockets — sunken with glowing red eyes
+    // Eye sockets â€” sunken with glowing red eyes
     g.fillStyle(0x040208, 1);
     g.fillRect(cx - 5, cy - 38, 4, 3);
     g.fillRect(cx + 1, cy - 38, 4, 3);
@@ -2063,7 +2063,7 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillStyle(0xffaad8, 1);
     g.fillRect(cx - 4, cy - 37, 1, 1);
     g.fillRect(cx + 2, cy - 37, 1, 1);
-    // Mouth — thin grim line
+    // Mouth â€” thin grim line
     g.fillStyle(0x402030, 1);
     g.fillRect(cx - 3, cy - 30, 6, 1);
     // Hair / shadow under the crown
@@ -2098,7 +2098,7 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillRect(cx - 1, cy - 52, 2, 1);
     g.fillStyle(0xffffff, 1);
     g.fillRect(cx, cy - 53, 1, 1);
-    // Scepter in his right hand — long staff with amethyst orb
+    // Scepter in his right hand â€” long staff with amethyst orb
     g.fillStyle(0x402030, 1);
     g.fillRect(cx + 22, cy - 18, 3, 60);
     g.fillStyle(0x8a5a18, 1);
@@ -2192,7 +2192,7 @@ export class StyleMockupScene extends Phaser.Scene {
     container.add(g);
   }
 
-  /** Paint a rotated rectangular band — used for diagonal light shafts. */
+  /** Paint a rotated rectangular band â€” used for diagonal light shafts. */
   private fillSlantedBand(
     g: Phaser.GameObjects.Graphics,
     x: number,
@@ -2221,7 +2221,7 @@ export class StyleMockupScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------------
-  // Layout (deterministic — both sides paint the exact same composition)
+  // Layout (deterministic â€” both sides paint the exact same composition)
   // ---------------------------------------------------------------------------
 
   private static dimsTiles(): { tilesW: number; tilesH: number } {
@@ -2261,7 +2261,7 @@ export class StyleMockupScene extends Phaser.Scene {
   }
 }
 
-/** Quadratic Bézier point on axis: p0 + (p1-p0)·2t(1-t) + (p2-p0)·t². */
+/** Quadratic BÃ©zier point on axis: p0 + (p1-p0)Â·2t(1-t) + (p2-p0)Â·tÂ². */
 function quadBezier(p0: number, p1: number, p2: number, t: number): number {
   const u = 1 - t;
   return u * u * p0 + 2 * u * t * p1 + t * t * p2;
