@@ -22,6 +22,24 @@ export interface VampireFightCoordinator {
    * when the partner is dead (solo mode), so it has no effect post Phase 1.
    */
   isPartnerInDangerZone(self: VampireBody): boolean;
+  /**
+   * Returns the OTHER live body, or null if `self` is alone (solo mode) or
+   * the partner is somehow inactive. Marquis uses this to read Lord's
+   * position + berserker state for predictable teleport placement (Phase 1
+   * = behind the Lord on the player axis; Lord-in-berserker = lock to room
+   * center).
+   */
+  getPartner(self: VampireBody): VampireBody | null;
+  /**
+   * Shared-pool damage gate — coordinator returns true when `body` should
+   * not take any damage right now. Used to make the Sapphire Marquis
+   * invulnerable while the Crimson Lord is alive: the fight has one
+   * effective HP pool that drains through the Lord first, then the
+   * Marquis. Bodies that take this hit visually flash a "shielded" tint
+   * so the player gets feedback that their missiles aren't working on
+   * the Marquis yet.
+   */
+  shouldBlockDamage(body: VampireBody): boolean;
 }
 
 /**
@@ -77,11 +95,21 @@ export abstract class VampireBody extends BaseEnemy {
   /**
    * Drop the knockback parameter (boss-tier — see BossEnemy.takeDamage for
    * the rationale on why knockback locks the AI under sustained fire).
-   * After the hit lands, notify the coordinator so it can update the combined
-   * HP bar, and check the berserker threshold for Phase 3.
+   *
+   * Shared-pool gating: if the coordinator says this body's damage should
+   * be blocked (e.g. Marquis while Lord is alive), the hit short-circuits
+   * with a "shielded" gold flash and zero HP loss. Player gets visual
+   * feedback that this body isn't currently a valid target.
+   *
+   * After the hit lands, notify the coordinator so it can update the
+   * combined HP bar, and check the berserker threshold for Phase 3.
    */
   override takeDamage(amount: number, _knockback?: Vector2): boolean {
-    if (amount <= 0 || this.hp <= 0) return super.takeDamage(amount, undefined);
+    if (amount <= 0 || this.hp <= 0) return false;
+    if (this.coordinator?.shouldBlockDamage(this) === true) {
+      this.flashShielded();
+      return false;
+    }
     const killed = super.takeDamage(amount, undefined);
     if (this.hp > 0) {
       this.coordinator?.onBodyDamaged(this);
@@ -94,6 +122,16 @@ export abstract class VampireBody extends BaseEnemy {
       }
     }
     return killed;
+  }
+
+  /** Brief gold tint on shielded hits — same visual idiom Prismarch uses
+   * for its invulnerable-during-special hits, so the player reads "this
+   * target isn't taking damage right now". */
+  private flashShielded(): void {
+    this.setTintFill(0xffd84a);
+    this.scene.time.delayedCall(60, () => {
+      if (this.active) this.clearTint();
+    });
   }
 
   /**
@@ -130,4 +168,13 @@ export abstract class VampireBody extends BaseEnemy {
    * needs to defer for).
    */
   abstract isInDangerZone(): boolean;
+
+  /**
+   * Public accessor for `berserkerEntered`. Marquis reads this off the Lord
+   * to switch its teleport target into "lock at room center" mode when the
+   * Lord enters berserker (Phase 3-of-Lord while Marquis still alive).
+   */
+  isBerserker(): boolean {
+    return this.berserkerEntered;
+  }
 }

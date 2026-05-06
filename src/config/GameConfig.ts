@@ -468,7 +468,15 @@ export const SAPPHIRE_MARQUIS_VISUAL_SCALE = 1.6 * WORLD_SPRITE_SCALE;
 export const VAMPIRE_SPAWN_OFFSET_TILES = 1.8;
 
 /** HP-fraction at which the surviving body enters Berserker (Phase 3). */
-export const VAMPIRE_BERSERKER_HP_FRACTION = 0.3;
+/**
+ * HP fraction below which a Vampire body enters berserker. Bumped 0.3 → 0.25
+ * with the shared-pool refactor (Marquis-invulnerable-while-Lord-alive). The
+ * Lord now soaks all damage in Phase 1; berserker triggers later in his bar
+ * (last quarter instead of last third) so the Lord-berserker window is
+ * shorter and less punishing. Same threshold gates Marquis's berserker once
+ * the Lord is dead and Marquis becomes targetable.
+ */
+export const VAMPIRE_BERSERKER_HP_FRACTION = 0.25;
 
 // Crimson Lord (melee, dash chaser). Tuned so the dash is consistently
 // dodgeable: telegraph long enough to read at point-blank range, chase
@@ -907,6 +915,7 @@ export const SceneKeys = {
   Game: 'GameScene',
   UI: 'UIScene',
   GameOver: 'GameOverScene',
+  End: 'EndScene',
   StyleMockup: 'StyleMockupScene',
 } as const;
 

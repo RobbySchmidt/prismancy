@@ -93,10 +93,31 @@ export class VampireFight {
    * has died — solo mode has nothing to defer for.
    */
   isPartnerInDangerZone(self: VampireBody): boolean {
+    const partner = this.getPartner(self);
+    return partner !== null && partner.isInDangerZone();
+  }
+
+  /** Returns the OTHER live body, or null. See interface doc. */
+  getPartner(self: VampireBody): VampireBody | null {
     for (const partner of this.bodies) {
       if (partner === self) continue;
       if (!partner.active) continue;
-      return partner.isInDangerZone();
+      return partner;
+    }
+    return null;
+  }
+
+  /**
+   * Shared-pool gate: the Sapphire Marquis is invulnerable while the
+   * Crimson Lord is alive. The combined HP bar then drains through the
+   * Lord's HP first; once the Lord dies, hits register on the Marquis
+   * normally. Player-facing feedback comes from `flashShielded` in
+   * VampireBody.takeDamage.
+   */
+  shouldBlockDamage(body: VampireBody): boolean {
+    if (!(body instanceof SapphireMarquis)) return false;
+    for (const partner of this.bodies) {
+      if (partner instanceof CrimsonLord && partner.active) return true;
     }
     return false;
   }

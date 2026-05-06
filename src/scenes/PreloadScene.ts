@@ -3640,6 +3640,18 @@ export class PreloadScene extends Phaser.Scene {
    * white rim glow telegraphs "you can interact with this". Floor-agnostic
    * (no theme palette) so the same sprite works on every floor.
    */
+  /**
+   * Magical sigil-portal — the descend-to-next-floor anchor. Top-down view
+   * of an inscribed gold rune disc with a 6-pointed star, cardinal spikes,
+   * and a soft glowing halo. Replaces the prior stone-stair texture, which
+   * read as "dungeon steps" and felt out of place in the wizard-themed
+   * forest / swamp / mansion floors. The disc itself is symmetric so an
+   * in-scene rotation tween lands cleanly without visual hitching.
+   *
+   * Palette is intentionally floor-neutral (warm gold + ivory) so the same
+   * texture works across every floor; adding a per-floor tint later only
+   * needs `setTint` on the sprite, no per-floor texture variants.
+   */
   private drawStairsTexture(g: Phaser.GameObjects.Graphics): void {
     const w = 44;
     const h = 44;
@@ -3647,48 +3659,63 @@ export class PreloadScene extends Phaser.Scene {
     const cy = h / 2;
     g.clear();
 
-    // Glow halo (cyan-white) so the player's eye snaps to it.
-    g.fillStyle(0x9ad8ff, 0.18);
-    g.fillCircle(cx, cy, w / 2);
-    g.fillStyle(0xb0e8ff, 0.28);
-    g.fillCircle(cx, cy, w / 2 - 4);
+    // 1) Soft halo — three concentric alpha discs, ascending opacity.
+    g.fillStyle(0xffd84a, 0.10);
+    g.fillCircle(cx, cy, 22);
+    g.fillStyle(0xffd84a, 0.18);
+    g.fillCircle(cx, cy, 17);
+    g.fillStyle(0xfff4c0, 0.28);
+    g.fillCircle(cx, cy, 12);
 
-    // Stone frame (dark grey)
-    g.fillStyle(0x14161e, 1);
-    g.fillRect(4, 4, w - 8, h - 8);
-    g.fillStyle(0x2c303a, 1);
-    g.fillRect(6, 6, w - 12, h - 12);
-    // Frame highlight + shadow strips (chiseled feel)
-    g.fillStyle(0x4a4e58, 1);
-    g.fillRect(4, 4, w - 8, 2);
-    g.fillRect(4, 4, 2, h - 8);
-    g.fillStyle(0x080a10, 1);
-    g.fillRect(4, h - 6, w - 8, 2);
-    g.fillRect(w - 6, 4, 2, h - 8);
+    // 2) Outer ring stroke (gold band, ~2 px). Drawn as filled-disc minus
+    //    inner-disc so the ring sits cleanly on the dark interior.
+    g.fillStyle(0xffe78a, 1);
+    g.fillCircle(cx, cy, 19);
+    g.fillStyle(0x14100a, 1);
+    g.fillCircle(cx, cy, 17);
 
-    // Pit darkness — pure black inset rectangle the steps "descend" into
-    g.fillStyle(0x000000, 1);
-    g.fillRect(8, 8, w - 16, h - 16);
-
-    // Stone step bands receding into the pit (top edge is widest = nearest
-    // to the player; subsequent bands narrower + darker = deeper).
-    const stepOuter = 8;
-    const drawStep = (inset: number, color: number, depthY: number): void => {
-      g.fillStyle(color, 1);
-      g.fillRect(stepOuter + inset, stepOuter + depthY, w - 16 - inset * 2, 3);
+    // 3) Cardinal spikes — four small gold triangles poking outward at
+    //    N/E/S/W. Visually "ties" the inscribed disc to the four directions.
+    const drawSpike = (a: number): void => {
+      const tipR = 22;
+      const baseR = 18;
+      const halfBase = 2;
+      const cosA = Math.cos(a);
+      const sinA = Math.sin(a);
+      const perpX = -sinA;
+      const perpY = cosA;
+      const tipX = cx + cosA * tipR;
+      const tipY = cy + sinA * tipR;
+      const aX = cx + cosA * baseR + perpX * halfBase;
+      const aY = cy + sinA * baseR + perpY * halfBase;
+      const bX = cx + cosA * baseR - perpX * halfBase;
+      const bY = cy + sinA * baseR - perpY * halfBase;
+      g.fillStyle(0xffe78a, 1);
+      g.fillTriangle(tipX, tipY, aX, aY, bX, bY);
     };
-    drawStep(0, 0x6a6e7a, 0);  // top step (lightest, nearest)
-    drawStep(2, 0x4a4e58, 4);
-    drawStep(4, 0x2c303a, 8);
-    drawStep(6, 0x14161e, 12); // deepest step (darkest, fades into the pit)
+    for (let i = 0; i < 4; i++) {
+      // Start at -PI/2 (north) and step a quarter-turn.
+      drawSpike(-Math.PI / 2 + (i / 4) * Math.PI * 2);
+    }
 
-    // Glow rim along the top edge of the pit (inviting "step in" beat).
-    g.fillStyle(0x9ad8ff, 0.55);
-    g.fillRect(stepOuter + 1, stepOuter + 1, w - 16 - 2, 1);
+    // 4) Six-pointed star (two overlapping equilateral triangles). The
+    //    classic "wizard inscription" look. Slightly translucent so the
+    //    dark interior shows through as a faint shadow.
+    g.fillStyle(0xffe78a, 0.85);
+    g.fillTriangle(cx, cy - 11, cx - 9, cy + 5, cx + 9, cy + 5);
+    g.fillTriangle(cx, cy + 11, cx - 9, cy - 5, cx + 9, cy - 5);
 
-    // Outline
-    g.lineStyle(2, 0x000000, 1);
-    g.strokeRect(0, 0, w, h);
+    // 5) Inner ring — small gold band around the central glow dot.
+    g.fillStyle(0xffe78a, 1);
+    g.fillCircle(cx, cy, 5);
+    g.fillStyle(0x14100a, 1);
+    g.fillCircle(cx, cy, 4);
+
+    // 6) Central glow dot + sparkle pixel — the "step on me" beacon.
+    g.fillStyle(0xfff4c0, 1);
+    g.fillCircle(cx, cy, 2);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(cx - 1, cy - 1, 1, 1);
 
     g.generateTexture(TextureKeys.Stairs, w, h);
   }

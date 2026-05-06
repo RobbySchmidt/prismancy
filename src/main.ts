@@ -6,6 +6,7 @@ import { MainMenuScene } from './scenes/MainMenuScene';
 import { GameScene } from './scenes/GameScene';
 import { UIScene } from './scenes/UIScene';
 import { GameOverScene } from './scenes/GameOverScene';
+import { EndScene } from './scenes/EndScene';
 import { StyleMockupScene } from './scenes/StyleMockupScene';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -33,6 +34,7 @@ const config: Phaser.Types.Core.GameConfig = {
     GameScene,
     UIScene,
     GameOverScene,
+    EndScene,
     StyleMockupScene,
   ],
 };

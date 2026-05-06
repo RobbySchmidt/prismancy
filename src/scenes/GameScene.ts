@@ -1354,7 +1354,7 @@ export class GameScene extends Phaser.Scene {
       .setScale(WORLD_SPRITE_SCALE);
     this.physics.add.existing(this.stairsSprite, true);
 
-    // Subtle pulse so the stairs telegraph "step on me".
+    // Subtle pulse so the sigil telegraphs "step on me".
     this.tweens.add({
       targets: this.stairsSprite,
       scale: { from: 0.96 * WORLD_SPRITE_SCALE, to: 1.04 * WORLD_SPRITE_SCALE },
@@ -1362,6 +1362,15 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
       ease: 'Sine.InOut',
+    });
+    // Slow rotation so the rune-disc reads as "actively channelling magic"
+    // rather than a static decal. Independent tween from the scale pulse —
+    // Phaser merges them on the same target without conflict.
+    this.tweens.add({
+      targets: this.stairsSprite,
+      rotation: Math.PI * 2,
+      duration: 8000,
+      repeat: -1,
     });
 
     const action = onOverlap ?? (() => this.advanceToNextFloor());
@@ -1472,22 +1481,44 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.shake(360, 0.006);
 
     EventBus.emit('run:onyxFullVictory');
+    // Brief celebration window so the player reads "VICTORY" + the skin
+    // toast before the EndScene takes over and fades to black. Time tuned
+    // against the 600 ms Back.Out tween + 700 ms toast delay above.
+    this.time.delayedCall(2400, () => this.transitionToEndScene('full'));
     void payload;
   }
 
   /**
-   * Placeholder reaction to the no-gems exit on Onyx — fires the
-   * `run:onyxExitTaken` event so the win-screen-incomplete in Phase 5
-   * Chunk 4 #5 can hook in. For now it logs in dev and visually flashes
-   * the camera so the trigger is at least observable while testing.
+   * No-gems exit on Onyx Mansion. Fade to black, fire the
+   * `run:onyxExitTaken` event for any listeners, then transition to the
+   * EndScene with the "incomplete" variant — the run is over but the
+   * player skipped the Prismarch fight.
    */
   private handleOnyxExit(): void {
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
       console.log('[run:onyxExitTaken] No-gems exit taken on Onyx Mansion.');
     }
-    this.cameras.main.flash(280, 80, 80, 120, false);
     EventBus.emit('run:onyxExitTaken');
+    this.transitionToEndScene('incomplete');
+  }
+
+  /**
+   * Tear down GameScene + UIScene and start EndScene with the given
+   * variant, gated by an `inTransition` latch so a double-trigger (e.g.
+   * stairs overlap firing twice in a frame) doesn't double-stop the
+   * scenes. Camera fades to black first so the EndScene's all-black
+   * backdrop reads as a continuous fade rather than a hard cut.
+   */
+  private transitionToEndScene(variant: 'incomplete' | 'full'): void {
+    if (this.inTransition) return;
+    this.inTransition = true;
+    this.cameras.main.fadeOut(600, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.stop(SceneKeys.UI);
+      this.scene.stop(SceneKeys.Game);
+      this.scene.start(SceneKeys.End, { variant });
+    });
   }
 
   /**

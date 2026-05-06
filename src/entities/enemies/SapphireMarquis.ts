@@ -65,6 +65,16 @@ export class SapphireMarquis extends VampireBody {
   private nextBerserkerFireAt = 0;
   /** Locked while teleport-fade tween is mid-flight. */
   private teleporting = false;
+  /**
+   * Latch flag: once we've seen the Lord enter berserker we kick off a
+   * forced center teleport exactly once. After that the Marquis stays put
+   * at center and skips further teleports — gives the Lord-berserker
+   * window a fixed Marquis position so the player only has to track one
+   * unpredictable threat (the Lord) at a time. Reset is unnecessary —
+   * Lord exits berserker only by dying, at which point Marquis is in
+   * solo mode and the field doesn't gate anything.
+   */
+  private lordBerserkerHandled = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number, host: SapphireMarquisHost) {
     super(scene, x, y, ENEMIES['boss-sapphire-marquis']);
@@ -90,14 +100,41 @@ export class SapphireMarquis extends VampireBody {
       return;
     }
 
-    this.kiteToward(player);
+    // Force-center teleport when Lord enters berserker. Done exactly once
+    // (latched by `lordBerserkerHandled`) so the Marquis doesn't keep
+    // re-teleporting back to center. After this fires the Marquis stays at
+    // center, stops kiting, and the regular teleport timer is suppressed
+    // for the duration of the Lord-berserker window — gives the player a
+    // fixed mage position to plan around while the unpredictable Lord
+    // berserker dashes happen.
+    const partner = this.coordinator?.getPartner(this) ?? null;
+    const partnerBerserker =
+      !this.soloMode && partner !== null && partner.isBerserker();
+    if (
+      partnerBerserker &&
+      !this.lordBerserkerHandled &&
+      !this.teleporting
+    ) {
+      this.lordBerserkerHandled = true;
+      this.beginTeleport(time);
+      this.nextTeleportAt = time + SAPPHIRE_MARQUIS_TELEPORT_INTERVAL_MS;
+      return;
+    }
+
+    // Locked at center during Lord-berserker — no kite, no jitter. Otherwise
+    // normal kite-to-distance behaviour against the player.
+    if (partnerBerserker) {
+      this.setVelocity(0, 0);
+    } else {
+      this.kiteToward(player);
+    }
 
     // Phase 1 cross-body gating: defer fan + teleport while Crimson Lord is
-    // mid-telegraph / mid-dash so the player isn't reading two simultaneous
-    // threats. Solo mode (partner dead) bypasses the check, since
-    // `isPartnerInDangerZone` returns false there anyway. Timers don't get
-    // reset on a deferral — when the Lord exits the danger window, the
-    // overdue fan / teleport fires immediately the next frame.
+    // mid-telegraph / mid-dash (or in the late-idle pre-telegraph buffer)
+    // so the player isn't reading two simultaneous threats. Solo mode
+    // (partner dead) bypasses the check. Timers don't get reset on a
+    // deferral — when the Lord exits the danger window, the overdue fan /
+    // teleport fires immediately the next frame.
     const partnerDanger =
       !this.soloMode &&
       this.coordinator?.isPartnerInDangerZone(this) === true;
@@ -108,8 +145,13 @@ export class SapphireMarquis extends VampireBody {
       this.nextFanAt = time + SAPPHIRE_MARQUIS_PHASE1_FAN_INTERVAL_MS;
     }
 
-    // Teleport (Phase 1 + 2).
-    if (time >= this.nextTeleportAt && !partnerDanger) {
+    // Teleport (Phase 1 + 2). Suppress while Lord is in berserker — Marquis
+    // is locked at center for that window.
+    if (
+      time >= this.nextTeleportAt &&
+      !partnerDanger &&
+      !partnerBerserker
+    ) {
       this.beginTeleport(time);
       this.nextTeleportAt = time + SAPPHIRE_MARQUIS_TELEPORT_INTERVAL_MS;
     }
@@ -257,12 +299,60 @@ export class SapphireMarquis extends VampireBody {
   private pickTeleportTarget(): { x: number; y: number } {
     const bounds = this.host.getRoomBounds();
     const player = this.host.getPlayer();
+    const margin = 40;
+    const clamp = (x: number, y: number): { x: number; y: number } => ({
+      x: Math.max(bounds.minX + margin, Math.min(bounds.maxX - margin, x)),
+      y: Math.max(bounds.minY + margin, Math.min(bounds.maxY - margin, y)),
+    });
+
+    // Phase 1 behaviour is determined by the partner's state — predictable
+    // placement instead of random rolls so the player can plan around it.
+    if (!this.soloMode) {
+      const partner = this.coordinator?.getPartner(this) ?? null;
+      if (partner !== null) {
+        // Lord in berserker → lock to room center. Combined with the
+        // tickAI suppression of further teleports this means Marquis sits
+        // at one fixed spot for the entire Lord-berserker window. Also
+        // set the latch here in case Lord went berserker MID-fade-out of
+        // a regular timer-fired teleport: without this the next tickAI
+        // would still force another center teleport (latch was false at
+        // that point) and the player sees a redundant fade-out/in chain.
+        if (partner.isBerserker()) {
+          this.lordBerserkerHandled = true;
+          return clamp(
+            (bounds.minX + bounds.maxX) / 2,
+            (bounds.minY + bounds.maxY) / 2,
+          );
+        }
+        // Lord normal → place Marquis on the player→Lord ray, at the
+        // Marquis's kite distance from the player. The Lord normally
+        // chases at less than that distance, so this puts Marquis behind
+        // the Lord from the player's perspective: the player + Marquis +
+        // Lord roughly line up. The player can deal with two threats on
+        // one axis instead of pinch-attack from two corners (the
+        // user-flagged "only got hit when the mage went to the opposite
+        // corner" case).
+        const dx = partner.x - player.x;
+        const dy = partner.y - player.y;
+        const len = Math.hypot(dx, dy);
+        if (len > 0.01) {
+          const ux = dx / len;
+          const uy = dy / len;
+          return clamp(
+            player.x + ux * SAPPHIRE_MARQUIS_KITE_DISTANCE,
+            player.y + uy * SAPPHIRE_MARQUIS_KITE_DISTANCE,
+          );
+        }
+      }
+    }
+
+    // Solo mode (or no live partner / degenerate same-position case):
+    // existing random pick with a min-distance safety net. Track the
+    // farthest candidate so even if 10 rolls all land near the player we
+    // still pick the safest.
     const minDistSq =
       SAPPHIRE_MARQUIS_TELEPORT_MIN_PLAYER_DISTANCE *
       SAPPHIRE_MARQUIS_TELEPORT_MIN_PLAYER_DISTANCE;
-    // Track the candidate that's farthest from the player as the fallback,
-    // so even if 10 random rolls all happen to land near the player we
-    // still pick the safest one.
     let bestX = bounds.minX;
     let bestY = bounds.minY;
     let bestDistSq = -1;

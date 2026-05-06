@@ -327,18 +327,10 @@ export class MainMenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setAlpha(0.85);
-
-    if (import.meta.env.DEV) {
-      this.add
-        .text(cx, GAME_HEIGHT - 22, '[M] STYLE MOCKUP', {
-          fontSize: '11px',
-          color: '#88c060',
-          stroke: '#000000',
-          strokeThickness: 2,
-        })
-        .setOrigin(0.5)
-        .setAlpha(0.6);
-    }
+    // [M] StyleMockupScene keybind is still wired in DEV (see `create()`)
+    // so the mockup viewer remains accessible for design work, but the
+    // visible hint is intentionally omitted now that the game is closer
+    // to a finished state.
   }
 }
 
