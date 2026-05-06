@@ -39,12 +39,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // Cosmetic skin lookup is one localStorage read at construction. The
     // Prismancy red/gold palette swaps in once Lord Onyx is dead; PreloadScene
     // generates both texture variants up front so the swap is just a key
-    // change with no runtime regeneration cost.
+    // change with no runtime regeneration cost. Players can toggle back to
+    // the default skin from the main menu — `getSelectedSkin` resolves that
+    // preference (and gracefully falls back if the unlock was reset).
     super(
       scene,
       x,
       y,
-      Cosmetics.hasPrismancySkin() ? TextureKeys.PlayerPrismancy : TextureKeys.Player,
+      Cosmetics.getSelectedSkin() === 'prismancy'
+        ? TextureKeys.PlayerPrismancy
+        : TextureKeys.Player,
     );
     scene.add.existing(this);
     scene.physics.add.existing(this);

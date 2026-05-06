@@ -544,8 +544,12 @@ export const VAMPIRE_PHASE_FLASH_MS = 220;
 // by activating the gem seal with all 3 floor trophies.
 
 export const LORD_ONYX_HP = 90;
-/** Visual scale — chunky boss-tier silhouette so he dominates the room. */
-export const LORD_ONYX_VISUAL_SCALE = 1.7 * WORLD_SPRITE_SCALE;
+/** Visual scale — boss-tier silhouette but slightly smaller than the
+ * original 1.7× pass. User-flagged the V2 sprite as a touch too dominant
+ * compared to other rooted bosses (Forest Heart, Bloomheart) — 1.5×
+ * brings him in line while the V3 "Tattered Cultist" texture (taller
+ * 64×96 canvas with hem streamers) keeps the silhouette presence. */
+export const LORD_ONYX_VISUAL_SCALE = 1.5 * WORLD_SPRITE_SCALE;
 
 /** Slower turn rate than Cursed Mirror (110°/s) so even an end-game player
  * with stat-pumped move speed can sharp-cut around it. */

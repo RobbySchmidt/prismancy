@@ -327,4 +327,11 @@ export interface EnemyRosterEntry {
    * guarantee a niche threat type appears (e.g. one Cursed Mirror per
    * mansion room so it can interact with the Wraiths). */
   minPerRoom?: number;
+  /** Cap how often this enemy can appear in a single room. The weighted
+   * picker re-rolls when a pick would exceed the cap; if every roster
+   * entry is capped out, the loop bails and fewer enemies spawn rather
+   * than violating a cap. Use for threat types that gang up unfairly
+   * (e.g. Snapper Bloom — multiple rooted 3-thorn fans overlap into
+   * undodgable bullet patterns). */
+  maxPerRoom?: number;
 }

@@ -5485,10 +5485,20 @@ export class PreloadScene extends Phaser.Scene {
    */
   private drawBossLordOnyxTexture(g: Phaser.GameObjects.Graphics): void {
     const w = 64;
-    const h = 88;
+    const h = 88; // matches V2 — the BaseEnemy hitbox-centering uses this
     const cx = w / 2;
     g.clear();
 
+    // V3 = "Tattered Cultist" direction (chosen from StyleMockupScene
+    // page 5 variant comparison). Same V2 bell-shape silhouette + V2 robe
+    // colours so the figure stays continuous, but the face read swaps to
+    // a Trinity of vertical eye pinpoints (one per consumed gem), the
+    // chest carries three runic sigils stitched in dark amethyst thread
+    // (Emerald cross / Sapphire wave / Amethyst diamond), the hem is more
+    // aggressively shredded with long ragged streamers trailing past the
+    // bell, and the prism is no longer "displayed" — it is bound, with
+    // three coiling shadow chains wrapping it. Story beat: he absorbed
+    // the gems and now imprisons the Prism rather than wielding it.
     const OUT = 0x000000;
     const ROBE_DARK = 0x070310;
     const ROBE = 0x110820;
@@ -5504,6 +5514,11 @@ export class PreloadScene extends Phaser.Scene {
     const PRISM_G = 0x4afa80;
     const PRISM_B = 0x4a80fa;
     const PRISM_CORE = 0xffffff;
+    const SHADOW = 0x100008;
+    const RUNE_THREAD = 0x6a4080;
+    const EMERALD = 0x4afa80;
+    const SAPPHIRE = 0x4a80fa;
+    const AMETHYST = 0xc864ff;
 
     // 1) Floating amethyst aura under the hem — he hovers, no ground feet
     g.fillStyle(0xc864ff, 0.10);
@@ -5511,7 +5526,8 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0xff8aff, 0.16);
     g.fillEllipse(cx, h - 4, 28, 8);
 
-    // 2) Outer silhouette — pure black outline, slightly larger bell
+    // 2) Outer silhouette — V2 bell-shape, identical points so the
+    //    overall figure stays continuous with previous runs.
     const outerPoints = [
       { x: cx, y: 1 },
       { x: cx + 5, y: 6 },
@@ -5579,39 +5595,91 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(ROBE, 1);
     g.fillTriangle(cx + 2, 8, cx + 8, 8, cx + 14, 76);
 
-    // 5) Right-edge rim highlight — thin amethyst (catches dark light)
+    // 5) Right-edge rim highlight
     g.fillStyle(ROBE_HI, 1);
     g.fillTriangle(cx + 9, 18, cx + 12, 18, cx + 19, 60);
     g.fillStyle(ROBE_RIM, 0.5);
     g.fillTriangle(cx + 11, 20, cx + 12, 22, cx + 22, 70);
 
-    // 6) Hood void — pure black ellipse where the face would be
+    // 6) Tattered hem streamers — short triangles trailing past the
+    //    silhouette's deep-hem points (y=80) into the bottom 7 px of the
+    //    canvas (texture bottom at y=88, kept identical to V2 so the
+    //    BaseEnemy hitbox centring still aligns with the body). Slight
+    //    side-bias on each tip so they look windblown, not symmetric.
+    const streamerXs: ReadonlyArray<number> = [-22, -14, -5, 5, 14, 22];
+    for (const offset of streamerXs) {
+      const tx = cx + offset;
+      const baseY = 80;
+      const tipY = 87;
+      const tipBias = offset < 0 ? -1 : 1;
+      g.fillStyle(OUT, 1);
+      g.fillTriangle(tx - 2, baseY, tx + 2, baseY, tx + tipBias, tipY);
+      g.fillStyle(ROBE_DARK, 1);
+      g.fillTriangle(tx - 1, baseY + 1, tx + 1, baseY + 1, tx + tipBias, tipY - 1);
+    }
+
+    // 7) Hood void — pure black ellipse where the face would be
     g.fillStyle(OUT, 1);
     g.fillEllipse(cx, 14, 16, 14);
 
-    // 7) Two amethyst pinpoint eyes deep in hood shadow
-    g.fillStyle(EYE, 0.30);
-    g.fillCircle(cx - 3, 14, 3);
-    g.fillCircle(cx + 3, 14, 3);
-    g.fillStyle(EYE, 0.6);
-    g.fillCircle(cx - 3, 14, 1.5);
-    g.fillCircle(cx + 3, 14, 1.5);
-    g.fillStyle(EYE_HI, 1);
-    g.fillRect(cx - 4, 13, 2, 2);
-    g.fillRect(cx + 2, 13, 2, 2);
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(cx - 3, 13, 1, 1);
-    g.fillRect(cx + 3, 13, 1, 1);
+    // 8) Trinity eyes — three vertical amethyst pinpoints deep in the
+    //    hood shadow. One per consumed floor gem (Emerald / Sapphire /
+    //    Amethyst). Centred horizontally instead of two side-by-side.
+    for (let i = 0; i < 3; i++) {
+      const ey = 11 + i * 3; // 11, 14, 17
+      g.fillStyle(EYE, 0.32);
+      g.fillCircle(cx, ey, 1.8);
+      g.fillStyle(EYE, 0.7);
+      g.fillCircle(cx, ey, 1);
+      g.fillStyle(EYE_HI, 1);
+      g.fillRect(cx, ey, 1, 1);
+    }
+    // Faint center-vertical glow strip linking the three eyes (subtle).
+    g.fillStyle(EYE, 0.18);
+    g.fillRect(cx, 11, 1, 7);
 
-    // 8) Sleeve drapes — visible at sides where arms extend forward
-    g.fillStyle(OUT, 1);
-    g.fillTriangle(cx - 11, 28, cx - 6, 28, cx - 3, 48);
-    g.fillTriangle(cx + 11, 28, cx + 6, 28, cx + 3, 48);
-    g.fillStyle(ROBE_DARK, 1);
-    g.fillTriangle(cx - 10, 30, cx - 6, 30, cx - 4, 46);
-    g.fillTriangle(cx + 10, 30, cx + 6, 30, cx + 4, 46);
+    // 9) Three runic sigils stitched into the chest in dark thread.
+    //    Each ends in a tiny gem-coloured node so the sigils read as the
+    //    "captured" gems. Positions sit just above the upper-chest level
+    //    so they don't clash with the prism + bound-chains below.
+    const sigilY = 26;
+    // 9a) Emerald — leaf-cross sigil at left
+    g.fillStyle(RUNE_THREAD, 1);
+    g.fillRect(cx - 11, sigilY - 3, 1, 7);
+    g.fillRect(cx - 13, sigilY, 5, 1);
+    g.fillStyle(EMERALD, 0.95);
+    g.fillRect(cx - 11, sigilY, 1, 1);
+    // 9b) Sapphire — small sine wave at center
+    g.fillStyle(RUNE_THREAD, 1);
+    g.fillRect(cx - 3, sigilY + 1, 1, 1);
+    g.fillRect(cx - 2, sigilY, 1, 1);
+    g.fillRect(cx - 1, sigilY - 1, 1, 1);
+    g.fillRect(cx, sigilY, 1, 1);
+    g.fillRect(cx + 1, sigilY + 1, 1, 1);
+    g.fillRect(cx + 2, sigilY, 1, 1);
+    g.fillRect(cx + 3, sigilY - 1, 1, 1);
+    g.fillStyle(SAPPHIRE, 0.95);
+    g.fillRect(cx, sigilY, 1, 1);
+    // 9c) Amethyst — 4-point diamond at right
+    g.fillStyle(RUNE_THREAD, 1);
+    g.fillRect(cx + 11, sigilY - 3, 1, 1);
+    g.fillRect(cx + 10, sigilY - 2, 1, 1);
+    g.fillRect(cx + 12, sigilY - 2, 1, 1);
+    g.fillRect(cx + 9, sigilY - 1, 1, 1);
+    g.fillRect(cx + 13, sigilY - 1, 1, 1);
+    g.fillRect(cx + 8, sigilY, 1, 1);
+    g.fillRect(cx + 14, sigilY, 1, 1);
+    g.fillRect(cx + 9, sigilY + 1, 1, 1);
+    g.fillRect(cx + 13, sigilY + 1, 1, 1);
+    g.fillRect(cx + 10, sigilY + 2, 1, 1);
+    g.fillRect(cx + 12, sigilY + 2, 1, 1);
+    g.fillRect(cx + 11, sigilY + 3, 1, 1);
+    g.fillStyle(AMETHYST, 0.95);
+    g.fillRect(cx + 11, sigilY, 1, 1);
 
-    // 9) Skeletal hands cradling the prism — small bony forms
+    // 10) Skeletal hands cradling the prism — kept from V2, but the
+    //     prism is now wrapped in shadow chains so the hands read as the
+    //     vessel that imprisons rather than the priest that displays.
     g.fillStyle(HAND_OUT, 1);
     g.fillRect(cx - 6, 46, 3, 5);
     g.fillRect(cx + 3, 46, 3, 5);
@@ -5622,21 +5690,46 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(cx - 5, 47, 1, 2);
     g.fillRect(cx + 4, 47, 1, 2);
 
-    // 10) PRISM — hero element, triangular crystal floating between hands
+    // 11) PRISM — same chromatic split as V2, but dimmed halo + bound by
+    //     three coiling shadow chains that wrap it.
     const px = cx;
     const py = 54;
     const ph = 14;
     const pw = 12;
 
-    // Aura behind prism — multi-tone halo
-    g.fillStyle(0xffffff, 0.10);
-    g.fillCircle(px, py, 18);
-    g.fillStyle(0xc864ff, 0.18);
+    // Dimmer halo (more ominous than V2's bright multi-tone ring).
+    g.fillStyle(0x000000, 0.30);
     g.fillCircle(px, py, 12);
-    g.fillStyle(0xff8aff, 0.20);
-    g.fillCircle(px, py, 7);
+    g.fillStyle(AMETHYST, 0.18);
+    g.fillCircle(px, py, 8);
 
-    // Prism outline — equilateral-ish triangle, point up
+    // 11a) Three shadow-chain loops coiling the prism. At native 64×88
+    //      a full ellipse-loop would be ~7 px wide, so the chains are
+    //      drawn as small dotted/ribbon segments along sine paths above,
+    //      across, and below the prism.
+    const chainY = py;
+    g.fillStyle(SHADOW, 1);
+    for (let loop = 0; loop < 3; loop++) {
+      const yOff = (loop - 1) * 4; // -4, 0, +4
+      const ySpan = chainY + yOff;
+      // 12-segment ribbon scribbled across the prism width
+      const segs = 12;
+      for (let s = 0; s < segs; s++) {
+        const t = s / (segs - 1);
+        const ang = t * Math.PI * 2 + loop * 0.9;
+        const r = 7 + Math.sin(ang * 2) * 1.5;
+        const x = px + (t * 2 - 1) * r;
+        const y = ySpan + Math.sin(ang) * 1.5;
+        g.fillRect(Math.round(x), Math.round(y), 1, 1);
+      }
+    }
+    // Faint amethyst leak between chain links so the prism is "trying
+    // to escape".
+    g.fillStyle(AMETHYST, 0.45);
+    g.fillRect(px - 1, py - 6, 1, 1);
+    g.fillRect(px + 1, py + 6, 1, 1);
+
+    // 11b) Prism outline — equilateral-ish triangle, point up
     g.fillStyle(PRISM_OUT, 1);
     g.fillTriangle(px, py - ph / 2 - 1, px + pw / 2 + 1, py + ph / 2, px - pw / 2 - 1, py + ph / 2);
     // Inner prism — three vertical bands for chromatic split

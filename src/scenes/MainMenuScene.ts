@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, SceneKeys, TextureKeys } from '../config/GameConfig';
-import { Cosmetics } from '../systems/Cosmetics';
+import { Cosmetics, type SkinId } from '../systems/Cosmetics';
 
 /**
  * Title screen styled as a key-art illustration: the wizard duels the
@@ -39,14 +39,16 @@ export class MainMenuScene extends Phaser.Scene {
     });
 
     // 3) Wizard (left side) — heroic stance with magic glow underfoot.
-    // Uses the Prismancy red/gold skin if Lord Onyx has ever been beaten,
-    // matching the in-game player. The title screen reads as a permanent
-    // trophy of the player's run history.
+    // Uses the Prismancy red/gold skin if the player has selected it (auto-
+    // applied on first Lord Onyx kill, manually toggleable from here on
+    // out). The title screen reads as a permanent trophy of the player's
+    // run history.
     this.paintWizardAura();
-    const wizardKey = Cosmetics.hasPrismancySkin()
-      ? TextureKeys.PlayerPrismancy
-      : TextureKeys.Player;
-    const wizard = this.add.image(240, GAME_HEIGHT / 2 + 60, wizardKey);
+    const wizard = this.add.image(
+      240,
+      GAME_HEIGHT / 2 + 60,
+      this.skinTextureKey(Cosmetics.getSelectedSkin()),
+    );
     wizard.setScale(4);
     wizard.setRotation(-0.08);
 
@@ -55,6 +57,9 @@ export class MainMenuScene extends Phaser.Scene {
 
     // 5) Title + subtitle on top of everything ------------------------------
     this.paintTitle(cx);
+
+    // 6) Skin toggle (only if Prismancy is unlocked).
+    this.setupSkinToggle(wizard);
 
     const startGame = (): void => {
       this.scene.start(SceneKeys.Game);
@@ -70,6 +75,48 @@ export class MainMenuScene extends Phaser.Scene {
         this.scene.start(SceneKeys.StyleMockup);
       });
     }
+  }
+
+  private skinTextureKey(skin: SkinId): string {
+    return skin === 'prismancy' ? TextureKeys.PlayerPrismancy : TextureKeys.Player;
+  }
+
+  /**
+   * If the Prismancy skin is unlocked, paint a small hint above the
+   * controls line and bind the [S] key to swap the wizard texture. The
+   * choice persists via Cosmetics so future runs and the in-game Player
+   * sprite read the same selection.
+   *
+   * If the skin isn't unlocked, this is a no-op — the toggle stays
+   * invisible until the player has earned the option.
+   */
+  private setupSkinToggle(wizard: Phaser.GameObjects.Image): void {
+    if (!Cosmetics.hasPrismancySkin()) return;
+
+    let current: SkinId = Cosmetics.getSelectedSkin();
+    const cx = GAME_WIDTH / 2;
+
+    const label = this.add
+      .text(cx, GAME_HEIGHT - 22, this.skinHintText(current), {
+        fontSize: '14px',
+        color: '#e9d5ff',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.85);
+
+    this.input.keyboard?.on('keydown-S', () => {
+      current = current === 'prismancy' ? 'default' : 'prismancy';
+      Cosmetics.setSelectedSkin(current);
+      wizard.setTexture(this.skinTextureKey(current));
+      label.setText(this.skinHintText(current));
+    });
+  }
+
+  private skinHintText(skin: SkinId): string {
+    const name = skin === 'prismancy' ? 'PRISMANCY' : 'WIZARD';
+    return `[S] SKIN: ${name}`;
   }
 
   // ---------------------------------------------------------------------------

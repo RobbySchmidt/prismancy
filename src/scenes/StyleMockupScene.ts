@@ -14,8 +14,8 @@ import {
 import { FLOORS } from '../data/floors';
 import { RNG } from '../utils/RNG';
 
-type MockupPage = 0 | 1 | 2 | 3;
-const PAGE_COUNT = 4;
+type MockupPage = 0 | 1 | 2 | 3 | 4;
+const PAGE_COUNT = 5;
 
 /**
  * Visual mockup with four pages, switched via TAB:
@@ -98,6 +98,14 @@ export class StyleMockupScene extends Phaser.Scene {
           `Page 4/${PAGE_COUNT} Â· Wizard vs. Lord Onyx, painted (final floor)`,
         );
         this.paintShowcaseOnyx();
+        break;
+      case 4:
+        this.paintHeader(
+          cx,
+          'PRISMARCH VARIANT MOCKUP',
+          `Page 5/${PAGE_COUNT} Â· Current vs. 3 design directions`,
+        );
+        this.paintShowcasePrismarchVariants();
         break;
     }
     this.paintFooter(cx);
@@ -2114,6 +2122,875 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillCircle(cx + 24, cy - 22, 2.5);
     g.fillStyle(0xffffff, 1);
     g.fillRect(cx + 24, cy - 23, 1, 1);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Prismarch variants (Page 5) — current ingame texture + 3 design directions
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Lays out four slots horizontally: the live ingame V2 texture on the
+   * left, then three fully-redrawn design directions. Each slot shows the
+   * boss centered with a subtle dark vignette frame, a title above and a
+   * three-line description below so the user can compare silhouettes,
+   * ornaments, and gem-references at a glance.
+   */
+  private paintShowcasePrismarchVariants(): void {
+    const slots: Array<{
+      title: string;
+      lines: readonly string[];
+      paint: (cx: number, cy: number) => void;
+    }> = [
+      {
+        title: 'CURRENT  (V2)',
+        lines: ['Hooded silhouette,', 'skeletal hands, prism.', 'Plain ragged hem.'],
+        paint: (cx, cy) => this.paintPrismarchCurrent(cx, cy),
+      },
+      {
+        title: 'A — RELIQUARY',
+        lines: [
+          'Gold trim + filigree cage.',
+          '3 gem cabochons on chest.',
+          'Holy / authority feel.',
+        ],
+        paint: (cx, cy) => this.drawPrismarchVariantReliquary(this.add.graphics(), cx, cy),
+      },
+      {
+        title: 'B — TATTERED',
+        lines: [
+          'Trinity eyes, runic sigils.',
+          'Shadow chains on prism.',
+          'Cultist / sinister feel.',
+        ],
+        paint: (cx, cy) => this.drawPrismarchVariantTattered(this.add.graphics(), cx, cy),
+      },
+      {
+        title: 'C — CROWNED',
+        lines: [
+          'Levitating prism + 3 shards.',
+          'Channeling palms, gem clasps.',
+          'Cosmic / mage feel.',
+        ],
+        paint: (cx, cy) => this.drawPrismarchVariantCrowned(this.add.graphics(), cx, cy),
+      },
+      {
+        title: 'CURRENT + C',
+        lines: [
+          'Current robe + hood + eyes.',
+          'Floating prism, channel threads.',
+          'Orbit shards + diamond clasps.',
+        ],
+        paint: (cx, cy) =>
+          this.drawPrismarchVariantCurrentHybrid(this.add.graphics(), cx, cy),
+      },
+    ];
+
+    // Symmetric centers across GAME_WIDTH (960): step 192, margins 96 each side.
+    const centers = [96, 288, 480, 672, 864];
+    const slotHalfW = 86;
+    const slotTopY = 110;
+    const slotH = 350;
+    const titleY = slotTopY + 14;
+    const bossY = slotTopY + 200;
+    const descTopY = slotTopY + 280;
+
+    for (let i = 0; i < slots.length; i++) {
+      const sx = centers[i];
+      const slot = slots[i];
+
+      // Frame box — subtle dark backdrop + amethyst border.
+      const frame = this.add.graphics();
+      frame.fillStyle(0x0a0418, 0.6);
+      frame.fillRect(sx - slotHalfW, slotTopY, slotHalfW * 2, slotH);
+      frame.lineStyle(1, 0xc864ff, 0.45);
+      frame.strokeRect(sx - slotHalfW, slotTopY, slotHalfW * 2, slotH);
+
+      // Floor shadow + amethyst pad — gives every variant the same "hover"
+      // baseline so silhouette differences read clearly.
+      const pad = this.add.graphics();
+      pad.fillStyle(0x000000, 0.55);
+      pad.fillEllipse(sx, bossY + 86, 76, 13);
+      pad.fillStyle(0xc864ff, 0.16);
+      pad.fillEllipse(sx, bossY + 86, 56, 9);
+      pad.fillStyle(0xff8aff, 0.22);
+      pad.fillEllipse(sx, bossY + 86, 26, 5);
+
+      // Title above the slot.
+      this.add
+        .text(sx, titleY, slot.title, {
+          fontSize: '15px',
+          fontStyle: 'bold',
+          color: '#e9d5ff',
+          stroke: '#1a0828',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5, 0);
+
+      // Hero rendering.
+      slot.paint(sx, bossY);
+
+      // Three-line description.
+      for (let li = 0; li < slot.lines.length; li++) {
+        this.add
+          .text(sx, descTopY + li * 16, slot.lines[li], {
+            fontSize: '11px',
+            color: '#aab8c0',
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5, 0)
+          .setAlpha(0.9);
+      }
+    }
+  }
+
+  /**
+   * Renders the live ingame V2 Prismarch texture as an Image so the
+   * comparison against the three redrawn variants is honest. Scaled 2.5×
+   * to roughly match the painted variants' apparent size.
+   */
+  private paintPrismarchCurrent(cx: number, cy: number): void {
+    const img = this.add.image(cx, cy, TextureKeys.BossLordOnyx);
+    img.setScale(2.5);
+    // Soft amethyst glow behind the sprite for parity with the painted
+    // variants (which all bake their own glow).
+    const halo = this.add.graphics();
+    halo.fillStyle(0xc864ff, 0.10);
+    halo.fillCircle(cx, cy, 90);
+    halo.fillStyle(0x4a2070, 0.18);
+    halo.fillCircle(cx, cy, 60);
+    halo.setDepth(img.depth - 1);
+  }
+
+  /**
+   * Shared bell-shape silhouette + hood void used as the base layer for
+   * all four painted variants. Geometry is the live ingame V2 texture's
+   * exact outer + inner point list scaled by 2.05× (V2 is 64×88, this
+   * helper paints at ~131×170) so the witch-hat hood point reads sharp
+   * and identical to the actual sprite — the previous version
+   * paraphrased the points and ended up rounding the hood's peak into a
+   * dome. Returns the hood centre / radii so variants can drop eyes,
+   * trim, ornaments at consistent positions.
+   */
+  private drawPrismarchBaseSilhouette(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    options: {
+      robeOuter: number;
+      robeInner: number;
+      robeMid: number;
+      robeRim: number;
+    },
+  ): { hoodCenterY: number; hoodRX: number; hoodRY: number } {
+    const outline = 0x000000;
+    // Scale so V2's 83-pixel silhouette span maps to ~170 px in mockup.
+    // V2 first outer point is at y=1 (sharp peak) and last at y=84.
+    const SCALE = 2.05;
+    const top = cy - 85; // maps V2's silhouette-center to cy
+
+    // V2 outer point list (from PreloadScene.drawBossLordOnyxTexture),
+    // expressed as offsets-from-center + y-from-V2-top so the mockup
+    // helper stays a strict scale of the ingame texture.
+    const v2Outer: ReadonlyArray<readonly [number, number]> = [
+      [0, 1], [5, 6], [9, 14], [12, 22], [12, 32],
+      [14, 42], [16, 52], [19, 62], [23, 72], [28, 82],
+      // ragged hem
+      [24, 84], [18, 80], [12, 84], [4, 80], [-4, 84],
+      [-12, 80], [-18, 84], [-24, 80], [-28, 82],
+      [-23, 72], [-19, 62], [-16, 52], [-14, 42],
+      [-12, 32], [-12, 22], [-9, 14], [-5, 6],
+    ];
+    const outer = v2Outer.map(([dx, y]) => ({
+      x: cx + dx * SCALE,
+      y: top + (y - 1) * SCALE,
+    }));
+    g.fillStyle(outline, 1);
+    g.fillPoints(outer, true);
+
+    // V2 inner point list — sits 1-2 px inside the outline; gives the
+    // bell-shape its dark robe fill instead of staying outline-only.
+    const v2Inner: ReadonlyArray<readonly [number, number]> = [
+      [0, 3], [4, 8], [8, 14], [11, 22], [11, 32],
+      [13, 42], [15, 52], [18, 62], [22, 72], [26, 80],
+      [18, 78], [8, 80], [0, 78], [-8, 80], [-18, 78],
+      [-26, 80], [-22, 72], [-18, 62], [-15, 52],
+      [-13, 42], [-11, 32], [-11, 22], [-8, 14], [-4, 8],
+    ];
+    const inner = v2Inner.map(([dx, y]) => ({
+      x: cx + dx * SCALE,
+      y: top + (y - 1) * SCALE,
+    }));
+    g.fillStyle(options.robeOuter, 1);
+    g.fillPoints(inner, true);
+
+    // Mid-tone vertical band on right (V2: triangle 2,8 → 8,8 → 14,76).
+    g.fillStyle(options.robeMid, 1);
+    g.fillTriangle(
+      cx + 2 * SCALE, top + (8 - 1) * SCALE,
+      cx + 8 * SCALE, top + (8 - 1) * SCALE,
+      cx + 14 * SCALE, top + (76 - 1) * SCALE,
+    );
+
+    // Right-edge rim highlight (V2: 9,18 → 12,18 → 19,60 + 11,20 → 12,22 → 22,70).
+    g.fillStyle(options.robeInner, 1);
+    g.fillTriangle(
+      cx + 9 * SCALE, top + (18 - 1) * SCALE,
+      cx + 12 * SCALE, top + (18 - 1) * SCALE,
+      cx + 19 * SCALE, top + (60 - 1) * SCALE,
+    );
+    g.fillStyle(options.robeRim, 0.5);
+    g.fillTriangle(
+      cx + 11 * SCALE, top + (20 - 1) * SCALE,
+      cx + 12 * SCALE, top + (22 - 1) * SCALE,
+      cx + 22 * SCALE, top + (70 - 1) * SCALE,
+    );
+
+    // Hood void (V2: ellipse at y=14, rx=8, ry=7 → scaled 16.4 × 14.35).
+    const hoodY = top + (14 - 1) * SCALE;
+    const hoodRX = 8 * SCALE;
+    const hoodRY = 7 * SCALE;
+    g.fillStyle(outline, 1);
+    g.fillEllipse(cx, hoodY, hoodRX * 2, hoodRY * 2);
+    return { hoodCenterY: hoodY, hoodRX, hoodRY };
+  }
+
+  /**
+   * VARIANT A — Reliquary High-Priest. Holy / authority direction:
+   *  - Gold trim along hood opening + hem fringe (gold thread tassels).
+   *  - 3 gem cabochons on a chest collar (Emerald top, Sapphire mid,
+   *    Amethyst bottom — references the 3 floors the player consumed).
+   *  - Skeletal hands hold the prism inside a curved gold filigree cage.
+   *  - Eye pinpoints are flame-wick-shaped (vertical thin halos) instead
+   *    of round, reinforcing the candlelit-cathedral feel.
+   */
+  private drawPrismarchVariantReliquary(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const GOLD = 0xffd84a;
+    const GOLD_DEEP = 0xa56a18;
+    const EMERALD = 0x4afa80;
+    const SAPPHIRE = 0x4a80fa;
+    const AMETHYST = 0xc864ff;
+    const PRISM_R = 0xff4060;
+
+    const hood = this.drawPrismarchBaseSilhouette(g, cx, cy, {
+      robeOuter: 0x0c0418,
+      robeInner: 0x2a1248,
+      robeMid: 0x140828,
+      robeRim: 0x4a2070,
+    });
+
+    // Gold hood-trim — runs around the hood opening.
+    g.lineStyle(2, GOLD, 0.95);
+    g.strokeEllipse(cx, hood.hoodCenterY, hood.hoodRX * 2, hood.hoodRY * 2);
+    g.lineStyle(1, GOLD_DEEP, 0.7);
+    g.strokeEllipse(cx, hood.hoodCenterY + 1, hood.hoodRX * 2 - 4, hood.hoodRY * 2 - 4);
+
+    // Vertical flame-wick eyes (taller than wide).
+    for (const eyeX of [cx - 6, cx + 6]) {
+      g.fillStyle(AMETHYST, 0.4);
+      g.fillEllipse(eyeX, hood.hoodCenterY, 3, 8);
+      g.fillStyle(0xff8aff, 0.95);
+      g.fillEllipse(eyeX, hood.hoodCenterY, 1.5, 5);
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(eyeX, hood.hoodCenterY - 2, 1, 1);
+    }
+
+    // Chest collar — gold band with three gem cabochons.
+    const collarY = cy - 28;
+    g.fillStyle(GOLD_DEEP, 1);
+    g.fillRect(cx - 22, collarY - 4, 44, 8);
+    g.fillStyle(GOLD, 1);
+    g.fillRect(cx - 21, collarY - 4, 42, 2);
+    // Emerald cabochon (top of chain — but here arranged horizontally).
+    const cabPositions = [
+      { x: cx - 14, color: EMERALD },
+      { x: cx, color: SAPPHIRE },
+      { x: cx + 14, color: AMETHYST },
+    ];
+    for (const cab of cabPositions) {
+      g.fillStyle(0x000000, 1);
+      g.fillCircle(cab.x, collarY, 4);
+      g.fillStyle(cab.color, 1);
+      g.fillCircle(cab.x, collarY, 3);
+      g.fillStyle(0xffffff, 0.85);
+      g.fillRect(cab.x - 1, collarY - 2, 1, 1);
+    }
+    // Vertical chain dropping from collar to filigree cage.
+    g.fillStyle(GOLD_DEEP, 1);
+    g.fillRect(cx - 1, collarY + 4, 2, 10);
+    g.fillStyle(GOLD, 0.9);
+    g.fillRect(cx, collarY + 4, 1, 10);
+
+    // Skeletal hands — bony fingers cradling the cage.
+    g.fillStyle(0x000000, 1);
+    g.fillRect(cx - 14, cy + 10, 6, 9);
+    g.fillRect(cx + 8, cy + 10, 6, 9);
+    g.fillStyle(0x6a587a, 1);
+    g.fillRect(cx - 13, cy + 11, 4, 6);
+    g.fillRect(cx + 9, cy + 11, 4, 6);
+    g.fillStyle(0xa898b8, 0.7);
+    g.fillRect(cx - 13, cy + 11, 1, 5);
+    g.fillRect(cx + 9, cy + 11, 1, 5);
+
+    // Gold filigree cage around the prism (curved bracket lines).
+    const px = cx;
+    const py = cy + 18;
+    g.lineStyle(2, GOLD, 0.95);
+    g.strokeEllipse(px, py, 22, 28);
+    g.lineStyle(1, GOLD_DEEP, 0.7);
+    g.strokeEllipse(px, py, 18, 24);
+    g.lineStyle(1, GOLD, 0.85);
+    // Cross filigree
+    g.beginPath();
+    g.moveTo(px - 11, py - 8);
+    g.lineTo(px + 11, py + 8);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(px + 11, py - 8);
+    g.lineTo(px - 11, py + 8);
+    g.strokePath();
+
+    // Halo behind the prism.
+    g.fillStyle(0xffffff, 0.14);
+    g.fillCircle(px, py, 22);
+    g.fillStyle(AMETHYST, 0.22);
+    g.fillCircle(px, py, 14);
+    g.fillStyle(0xff8aff, 0.28);
+    g.fillCircle(px, py, 8);
+
+    // Prism itself — chromatic split.
+    const ph = 18;
+    const pw = 14;
+    g.fillStyle(0x000000, 1);
+    g.fillTriangle(px, py - ph / 2 - 1, px + pw / 2 + 1, py + ph / 2, px - pw / 2 - 1, py + ph / 2);
+    g.fillStyle(PRISM_R, 1);
+    g.fillTriangle(px - 1, py - ph / 2 + 2, px - pw / 2 + 2, py + ph / 2 - 1, px + 1, py + ph / 2 - 1);
+    g.fillStyle(SAPPHIRE, 1);
+    g.fillTriangle(px + 1, py - ph / 2 + 2, px + pw / 2 - 2, py + ph / 2 - 1, px - 1, py + ph / 2 - 1);
+    g.fillStyle(EMERALD, 0.7);
+    g.fillTriangle(px, py - ph / 2 + 3, px - 2, py + ph / 2 - 3, px + 2, py + ph / 2 - 3);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(px, py - ph / 2 + 1, 1, 2);
+
+    // Gold-thread tassels on the hem (8 short tassels along bottom).
+    for (let i = -3; i <= 3; i++) {
+      const tx = cx + i * 14 + (i === 0 ? 0 : 0);
+      const ty = cy + 78;
+      g.fillStyle(GOLD_DEEP, 1);
+      g.fillRect(tx - 1, ty, 1, 7);
+      g.fillStyle(GOLD, 0.9);
+      g.fillRect(tx, ty, 1, 5);
+    }
+  }
+
+  /**
+   * VARIANT B — Tattered Cultist. Sinister / twisted direction:
+   *  - More aggressively shredded hem (long tail strips trailing past the
+   *    bell silhouette).
+   *  - Trinity eyes (3 vertical pinpoints) — one per consumed gem.
+   *  - 3 distinct embroidered runes on the chest:
+   *      • Emerald = leaf-cross sigil
+   *      • Sapphire = wave / sine sigil
+   *      • Amethyst = star / 4-point diamond sigil
+   *  - Bone hands cradle the prism, but dark-smoke chains coil around the
+   *    prism (the gems are imprisoned, not displayed).
+   */
+  private drawPrismarchVariantTattered(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const EMERALD = 0x4afa80;
+    const SAPPHIRE = 0x4a80fa;
+    const AMETHYST = 0xc864ff;
+    const PRISM_R = 0xff4060;
+    const SHADOW = 0x100008;
+    const RUNE_THREAD = 0x6a4080;
+
+    const hood = this.drawPrismarchBaseSilhouette(g, cx, cy, {
+      robeOuter: 0x080210,
+      robeInner: 0x1c0a30,
+      robeMid: 0x0e0420,
+      robeRim: 0x2a1248,
+    });
+
+    // Long tattered streamers trailing from the hem (past the silhouette).
+    for (const offset of [-44, -26, -8, 12, 30, 46]) {
+      const tx = cx + offset;
+      const ty = cy + 78;
+      const len = 16 + Math.abs(offset) * 0.15;
+      g.fillStyle(0x000000, 1);
+      g.fillTriangle(tx - 3, ty, tx + 3, ty, tx + (offset < 0 ? -1 : 1), ty + len);
+      g.fillStyle(0x080210, 1);
+      g.fillTriangle(tx - 2, ty + 1, tx + 2, ty + 1, tx + (offset < 0 ? -1 : 1), ty + len - 2);
+    }
+
+    // Three vertical eye pinpoints (trinity) inside the hood.
+    for (let i = 0; i < 3; i++) {
+      const ey = hood.hoodCenterY - 6 + i * 7;
+      g.fillStyle(AMETHYST, 0.4);
+      g.fillCircle(cx, ey, 2.4);
+      g.fillStyle(0xff8aff, 1);
+      g.fillCircle(cx, ey, 1.2);
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(cx, ey - 1, 1, 1);
+    }
+
+    // Chest sigils (3 stitched runes side-by-side).
+    const sigilY = cy - 26;
+    // Emerald — leaf-cross sigil
+    g.lineStyle(1.5, RUNE_THREAD, 1);
+    g.beginPath();
+    g.moveTo(cx - 22, sigilY - 6);
+    g.lineTo(cx - 22, sigilY + 6);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(cx - 27, sigilY);
+    g.lineTo(cx - 17, sigilY);
+    g.strokePath();
+    g.fillStyle(EMERALD, 0.95);
+    g.fillCircle(cx - 22, sigilY, 1.6);
+    // Sapphire — sine wave sigil
+    g.lineStyle(1.5, RUNE_THREAD, 1);
+    g.beginPath();
+    g.moveTo(cx - 6, sigilY + 4);
+    g.lineTo(cx - 3, sigilY - 4);
+    g.lineTo(cx, sigilY + 4);
+    g.lineTo(cx + 3, sigilY - 4);
+    g.lineTo(cx + 6, sigilY + 4);
+    g.strokePath();
+    g.fillStyle(SAPPHIRE, 0.95);
+    g.fillCircle(cx, sigilY, 1.4);
+    // Amethyst — 4-point star/diamond sigil
+    g.lineStyle(1.5, RUNE_THREAD, 1);
+    g.beginPath();
+    g.moveTo(cx + 22, sigilY - 6);
+    g.lineTo(cx + 28, sigilY);
+    g.lineTo(cx + 22, sigilY + 6);
+    g.lineTo(cx + 16, sigilY);
+    g.closePath();
+    g.strokePath();
+    g.fillStyle(AMETHYST, 0.95);
+    g.fillCircle(cx + 22, sigilY, 1.6);
+
+    // Bone hands cradling the prism.
+    g.fillStyle(0x000000, 1);
+    g.fillRect(cx - 14, cy + 10, 6, 9);
+    g.fillRect(cx + 8, cy + 10, 6, 9);
+    g.fillStyle(0x504058, 1);
+    g.fillRect(cx - 13, cy + 11, 4, 6);
+    g.fillRect(cx + 9, cy + 11, 4, 6);
+
+    // Prism with smoke-chain coil around it.
+    const px = cx;
+    const py = cy + 18;
+
+    // Halo (dimmer, more ominous).
+    g.fillStyle(0x000000, 0.3);
+    g.fillCircle(px, py, 22);
+    g.fillStyle(AMETHYST, 0.18);
+    g.fillCircle(px, py, 14);
+
+    // Smoke chains — wavy dark bands wrapping the prism (3 loops).
+    g.lineStyle(2.2, SHADOW, 0.95);
+    for (let loop = 0; loop < 3; loop++) {
+      const phase = loop * 0.9;
+      g.beginPath();
+      const segs = 24;
+      for (let s = 0; s <= segs; s++) {
+        const t = s / segs;
+        const ang = t * Math.PI * 2 + phase;
+        const r = 14 + Math.sin(ang * 2) * 3;
+        const x = px + Math.cos(ang) * r;
+        const y = py + Math.sin(ang) * r * 0.6 + (loop - 1) * 4;
+        if (s === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.strokePath();
+    }
+
+    // Prism itself.
+    const ph = 18;
+    const pw = 14;
+    g.fillStyle(0x000000, 1);
+    g.fillTriangle(px, py - ph / 2 - 1, px + pw / 2 + 1, py + ph / 2, px - pw / 2 - 1, py + ph / 2);
+    g.fillStyle(PRISM_R, 1);
+    g.fillTriangle(px - 1, py - ph / 2 + 2, px - pw / 2 + 2, py + ph / 2 - 1, px + 1, py + ph / 2 - 1);
+    g.fillStyle(SAPPHIRE, 1);
+    g.fillTriangle(px + 1, py - ph / 2 + 2, px + pw / 2 - 2, py + ph / 2 - 1, px - 1, py + ph / 2 - 1);
+    g.fillStyle(EMERALD, 0.7);
+    g.fillTriangle(px, py - ph / 2 + 3, px - 2, py + ph / 2 - 3, px + 2, py + ph / 2 - 3);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(px, py - ph / 2 + 1, 1, 2);
+  }
+
+  /**
+   * VARIANT C — Crowned Conjurer. Cosmic / mage direction:
+   *  - Prism levitates in front of the hood between the eyes (no hands
+   *    holding it — telekinetic / channeled).
+   *  - 3 small gem-shards orbit at chest level (Emerald left, Sapphire
+   *    front-bottom, Amethyst right) — visualizes "consumed gems still
+   *    answering to him".
+   *  - Hands extended outward at sides, palms up, with energy threads
+   *    rising from each palm to the floating prism.
+   *  - 3 gem-shaped clasps run vertically down the chest (button-like).
+   *  - Slimmer slit-style hood opening (two thin amethyst slits) so the
+   *    prism reads as the face.
+   */
+  private drawPrismarchVariantCrowned(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const EMERALD = 0x4afa80;
+    const SAPPHIRE = 0x4a80fa;
+    const AMETHYST = 0xc864ff;
+    const PRISM_R = 0xff4060;
+    const GOLD = 0xffd84a;
+
+    this.drawPrismarchBaseSilhouette(g, cx, cy, {
+      robeOuter: 0x0a0420,
+      robeInner: 0x2c1850,
+      robeMid: 0x140830,
+      robeRim: 0x5a2880,
+    });
+
+    // Slim slit eyes — two thin amethyst horizontal lines instead of round dots.
+    const slitY = cy - 70;
+    g.fillStyle(AMETHYST, 0.35);
+    g.fillRect(cx - 9, slitY - 1, 7, 3);
+    g.fillRect(cx + 2, slitY - 1, 7, 3);
+    g.fillStyle(0xff8aff, 1);
+    g.fillRect(cx - 8, slitY, 5, 1);
+    g.fillRect(cx + 3, slitY, 5, 1);
+
+    // 3 gem-shaped clasps vertically down the chest.
+    const claspGems = [
+      { y: cy - 30, color: EMERALD },
+      { y: cy - 12, color: SAPPHIRE },
+      { y: cy + 6, color: AMETHYST },
+    ];
+    for (const c of claspGems) {
+      // Gold setting (small diamond shape).
+      g.fillStyle(GOLD, 1);
+      g.fillTriangle(cx, c.y - 5, cx + 5, c.y, cx - 5, c.y);
+      g.fillTriangle(cx - 5, c.y, cx + 5, c.y, cx, c.y + 5);
+      g.fillStyle(0xa56a18, 1);
+      g.fillTriangle(cx, c.y - 4, cx + 4, c.y, cx - 4, c.y);
+      g.fillTriangle(cx - 4, c.y, cx + 4, c.y, cx, c.y + 4);
+      // Gem.
+      g.fillStyle(c.color, 1);
+      g.fillCircle(cx, c.y, 2);
+      g.fillStyle(0xffffff, 0.95);
+      g.fillRect(cx - 1, c.y - 1, 1, 1);
+    }
+
+    // Hands extended outward — palms-up channeling pose.
+    const handLY = cy + 14;
+    const handRY = cy + 14;
+    const handLX = cx - 38;
+    const handRX = cx + 38;
+    // Outline
+    g.fillStyle(0x000000, 1);
+    g.fillRect(handLX - 4, handLY - 3, 8, 7);
+    g.fillRect(handRX - 4, handRY - 3, 8, 7);
+    // Pale skeletal palm
+    g.fillStyle(0x6a587a, 1);
+    g.fillRect(handLX - 3, handLY - 2, 6, 5);
+    g.fillRect(handRX - 3, handRY - 2, 6, 5);
+    // Palm highlight
+    g.fillStyle(0xa898b8, 0.7);
+    g.fillRect(handLX - 3, handLY - 2, 5, 1);
+    g.fillRect(handRX - 3, handRY - 2, 5, 1);
+
+    // Levitating prism between the eyes — moves up to the hood opening.
+    const px = cx;
+    const py = cy - 36;
+
+    // Energy threads — 4-segment polyline from each palm rising up to the prism.
+    const drawThread = (sx: number, sy: number, color: number): void => {
+      g.lineStyle(1.5, color, 0.6);
+      g.beginPath();
+      const segs = 8;
+      for (let s = 0; s <= segs; s++) {
+        const t = s / segs;
+        const ux = sx + (px - sx) * t;
+        const uy = sy + (py - sy) * t + Math.sin(t * Math.PI * 3) * 4;
+        if (s === 0) g.moveTo(ux, uy);
+        else g.lineTo(ux, uy);
+      }
+      g.strokePath();
+    };
+    drawThread(handLX, handLY - 2, EMERALD);
+    drawThread(handRX, handRY - 2, SAPPHIRE);
+
+    // 3 orbiting gem-shards around the boss at chest level.
+    const orbitR = 50;
+    const orbitY = cy + 4;
+    const orbits = [
+      { ang: -2.2, color: EMERALD },
+      { ang: 0.4, color: SAPPHIRE },
+      { ang: 2.6, color: AMETHYST },
+    ];
+    for (const o of orbits) {
+      const ox = cx + Math.cos(o.ang) * orbitR;
+      const oy = orbitY + Math.sin(o.ang) * orbitR * 0.45;
+      // Glow
+      g.fillStyle(o.color, 0.3);
+      g.fillCircle(ox, oy, 6);
+      // Shard — small triangle pointing outward.
+      const angOut = Math.atan2(oy - orbitY, ox - cx);
+      const tip = { x: ox + Math.cos(angOut) * 5, y: oy + Math.sin(angOut) * 5 };
+      const baseA = {
+        x: ox + Math.cos(angOut + Math.PI * 0.65) * 4,
+        y: oy + Math.sin(angOut + Math.PI * 0.65) * 4,
+      };
+      const baseB = {
+        x: ox + Math.cos(angOut - Math.PI * 0.65) * 4,
+        y: oy + Math.sin(angOut - Math.PI * 0.65) * 4,
+      };
+      g.fillStyle(0x000000, 1);
+      g.fillTriangle(tip.x, tip.y, baseA.x, baseA.y, baseB.x, baseB.y);
+      g.fillStyle(o.color, 1);
+      g.fillTriangle(
+        tip.x * 0.85 + ox * 0.15,
+        tip.y * 0.85 + oy * 0.15,
+        baseA.x * 0.85 + ox * 0.15,
+        baseA.y * 0.85 + oy * 0.15,
+        baseB.x * 0.85 + ox * 0.15,
+        baseB.y * 0.85 + oy * 0.15,
+      );
+      g.fillStyle(0xffffff, 0.9);
+      g.fillRect(Math.round(ox), Math.round(oy - 1), 1, 1);
+    }
+
+    // Prism halo — bigger because the prism is the focal point now.
+    g.fillStyle(0xffffff, 0.16);
+    g.fillCircle(px, py, 28);
+    g.fillStyle(AMETHYST, 0.28);
+    g.fillCircle(px, py, 18);
+    g.fillStyle(0xff8aff, 0.32);
+    g.fillCircle(px, py, 10);
+
+    // Prism — slightly larger than other variants since it's the face.
+    const ph = 22;
+    const pw = 18;
+    g.fillStyle(0x000000, 1);
+    g.fillTriangle(px, py - ph / 2 - 1, px + pw / 2 + 1, py + ph / 2, px - pw / 2 - 1, py + ph / 2);
+    g.fillStyle(PRISM_R, 1);
+    g.fillTriangle(px - 1, py - ph / 2 + 2, px - pw / 2 + 2, py + ph / 2 - 1, px + 1, py + ph / 2 - 1);
+    g.fillStyle(SAPPHIRE, 1);
+    g.fillTriangle(px + 1, py - ph / 2 + 2, px + pw / 2 - 2, py + ph / 2 - 1, px - 1, py + ph / 2 - 1);
+    g.fillStyle(EMERALD, 0.75);
+    g.fillTriangle(px, py - ph / 2 + 3, px - 3, py + ph / 2 - 3, px + 3, py + ph / 2 - 3);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(px, py - ph / 2 + 1, 1, 2);
+    g.fillRect(px - pw / 2 + 3, py + ph / 2 - 2, pw - 6, 1);
+  }
+
+  /**
+   * CURRENT + C — keeps the live ingame V2 silhouette (robe colors,
+   * hood void, two amethyst pinpoint eyes, ragged hem, floating amethyst
+   * aura) and integrates the three Crowned-Conjurer prism systems:
+   *  - Floating prism in front of the hood (no skeletal hands holding it).
+   *  - Hands extended outward at sides palms-up, with two sine-wave
+   *    energy threads (Emerald + Sapphire) rising from each palm to the
+   *    floating prism.
+   *  - Three orbiting gem-shards at chest level, small outward-pointing
+   *    triangles in Emerald / Sapphire / Amethyst.
+   *  - Three diamond-shaped gem-clasps vertically down the chest
+   *    (Emerald top, Sapphire middle, Amethyst bottom).
+   * Eye treatment stays the round V2 pinpoints — the user's spec called
+   * out the prism / hands / orbits / clasps from C, not the slit eyes.
+   */
+  private drawPrismarchVariantCurrentHybrid(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const EMERALD = 0x4afa80;
+    const SAPPHIRE = 0x4a80fa;
+    const AMETHYST = 0xc864ff;
+    const PRISM_R = 0xff4060;
+    const GOLD = 0xffd84a;
+    const GOLD_DEEP = 0xa56a18;
+
+    // Reuse the shared bell-shape with the Current V2 robe colors so this
+    // hybrid reads as a direct continuation of the ingame texture, not a
+    // new direction.
+    const hood = this.drawPrismarchBaseSilhouette(g, cx, cy, {
+      robeOuter: 0x070310,
+      robeInner: 0x281244,
+      robeMid: 0x110820,
+      robeRim: 0x4a2070,
+    });
+
+    // Two round amethyst pinpoint eyes deep in hood shadow — exact V2
+    // treatment so the face read stays continuous.
+    for (const eyeX of [cx - 7, cx + 7]) {
+      g.fillStyle(AMETHYST, 0.30);
+      g.fillCircle(eyeX, hood.hoodCenterY, 6);
+      g.fillStyle(AMETHYST, 0.7);
+      g.fillCircle(eyeX, hood.hoodCenterY, 3);
+      g.fillStyle(0xff8aff, 1);
+      g.fillRect(eyeX - 1, hood.hoodCenterY - 1, 2, 2);
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(eyeX, hood.hoodCenterY - 1, 1, 1);
+    }
+
+    // 3 diamond-shaped gem-clasps running vertically down the chest.
+    // Pushed below the floating prism so the prism reads as the focal
+    // element above them, the clasps as a matching column below.
+    const claspGems = [
+      { y: cy - 4, color: EMERALD },
+      { y: cy + 14, color: SAPPHIRE },
+      { y: cy + 32, color: AMETHYST },
+    ];
+    for (const c of claspGems) {
+      // Gold setting (small diamond shape, two stacked triangles).
+      g.fillStyle(GOLD, 1);
+      g.fillTriangle(cx, c.y - 5, cx + 5, c.y, cx - 5, c.y);
+      g.fillTriangle(cx - 5, c.y, cx + 5, c.y, cx, c.y + 5);
+      g.fillStyle(GOLD_DEEP, 1);
+      g.fillTriangle(cx, c.y - 4, cx + 4, c.y, cx - 4, c.y);
+      g.fillTriangle(cx - 4, c.y, cx + 4, c.y, cx, c.y + 4);
+      // Gem cabochon centered.
+      g.fillStyle(c.color, 1);
+      g.fillCircle(cx, c.y, 2);
+      g.fillStyle(0xffffff, 0.95);
+      g.fillRect(cx - 1, c.y - 1, 1, 1);
+    }
+
+    // Hands extended outward at sides — palms-up channeling pose.
+    // Pushed slightly higher than C's pose (cy - 4 instead of cy + 14) so
+    // the threads have a longer arc up to the prism above the hood.
+    const handY = cy - 4;
+    const handLX = cx - 38;
+    const handRX = cx + 38;
+    g.fillStyle(0x000000, 1);
+    g.fillRect(handLX - 4, handY - 3, 8, 7);
+    g.fillRect(handRX - 4, handY - 3, 8, 7);
+    g.fillStyle(0x4a3850, 1);
+    g.fillRect(handLX - 3, handY - 2, 6, 5);
+    g.fillRect(handRX - 3, handY - 2, 6, 5);
+    g.fillStyle(0x806878, 0.7);
+    g.fillRect(handLX - 3, handY - 2, 5, 1);
+    g.fillRect(handRX - 3, handY - 2, 5, 1);
+
+    // Floating prism position — in front of the hood opening, between/
+    // just below the eyes. cy - 50 places it overlapping the hood lower
+    // edge so it reads as channeled-into-place rather than worn.
+    const px = cx;
+    const py = cy - 50;
+
+    // Sine-wave energy threads from each palm rising up to the prism.
+    // Emerald on the left palm, Sapphire on the right — the third gem
+    // (Amethyst) is "stored" in the clasps + the prism core itself.
+    const drawThread = (sx: number, sy: number, color: number, phase: number): void => {
+      g.lineStyle(1.6, color, 0.65);
+      g.beginPath();
+      const segs = 12;
+      for (let s = 0; s <= segs; s++) {
+        const t = s / segs;
+        const ux = sx + (px - sx) * t;
+        const baseY = sy + (py - sy) * t;
+        const wobble = Math.sin(t * Math.PI * 3 + phase) * 5 * (1 - Math.abs(t - 0.5) * 0.6);
+        const uy = baseY + wobble;
+        if (s === 0) g.moveTo(ux, uy);
+        else g.lineTo(ux, uy);
+      }
+      g.strokePath();
+      // Bright core re-trace at half alpha, thinner — gives the thread a
+      // glow-pixel core instead of a flat line.
+      g.lineStyle(0.6, 0xffffff, 0.7);
+      g.beginPath();
+      const segs2 = 12;
+      for (let s = 0; s <= segs2; s++) {
+        const t = s / segs2;
+        const ux = sx + (px - sx) * t;
+        const baseY = sy + (py - sy) * t;
+        const wobble = Math.sin(t * Math.PI * 3 + phase) * 5 * (1 - Math.abs(t - 0.5) * 0.6);
+        const uy = baseY + wobble;
+        if (s === 0) g.moveTo(ux, uy);
+        else g.lineTo(ux, uy);
+      }
+      g.strokePath();
+    };
+    drawThread(handLX, handY - 2, EMERALD, 0);
+    drawThread(handRX, handY - 2, SAPPHIRE, Math.PI);
+
+    // 3 orbiting gem-shards at chest level — small outward-pointing
+    // triangles in the three gem colors. Same orbit math as variant C
+    // so the visual idiom matches.
+    const orbitR = 44;
+    const orbitY = cy + 8;
+    const orbits = [
+      { ang: Math.PI - 0.4, color: EMERALD }, // left side
+      { ang: -Math.PI / 2 + 0.1, color: SAPPHIRE }, // bottom-front (slight offset so it's visible)
+      { ang: 0.4, color: AMETHYST }, // right side
+    ];
+    for (const o of orbits) {
+      const ox = cx + Math.cos(o.ang) * orbitR;
+      const oy = orbitY + Math.sin(o.ang) * orbitR * 0.45;
+      // Soft glow halo behind the shard.
+      g.fillStyle(o.color, 0.32);
+      g.fillCircle(ox, oy, 6);
+      // Shard — triangle pointing radially outward from chest.
+      const angOut = Math.atan2(oy - orbitY, ox - cx);
+      const tip = { x: ox + Math.cos(angOut) * 6, y: oy + Math.sin(angOut) * 6 };
+      const baseA = {
+        x: ox + Math.cos(angOut + Math.PI * 0.65) * 4,
+        y: oy + Math.sin(angOut + Math.PI * 0.65) * 4,
+      };
+      const baseB = {
+        x: ox + Math.cos(angOut - Math.PI * 0.65) * 4,
+        y: oy + Math.sin(angOut - Math.PI * 0.65) * 4,
+      };
+      g.fillStyle(0x000000, 1);
+      g.fillTriangle(tip.x, tip.y, baseA.x, baseA.y, baseB.x, baseB.y);
+      g.fillStyle(o.color, 1);
+      g.fillTriangle(
+        tip.x * 0.85 + ox * 0.15,
+        tip.y * 0.85 + oy * 0.15,
+        baseA.x * 0.85 + ox * 0.15,
+        baseA.y * 0.85 + oy * 0.15,
+        baseB.x * 0.85 + ox * 0.15,
+        baseB.y * 0.85 + oy * 0.15,
+      );
+      g.fillStyle(0xffffff, 0.95);
+      g.fillRect(Math.round(ox), Math.round(oy - 1), 1, 1);
+    }
+
+    // Prism halo — slightly larger than V2's so the floating prism reads
+    // as the focal point even with all the new ornaments around it.
+    g.fillStyle(0xffffff, 0.14);
+    g.fillCircle(px, py, 24);
+    g.fillStyle(AMETHYST, 0.24);
+    g.fillCircle(px, py, 16);
+    g.fillStyle(0xff8aff, 0.30);
+    g.fillCircle(px, py, 9);
+
+    // Prism — same chromatic-split treatment as the V2 ingame texture
+    // so the prism itself reads identical, just floating instead of
+    // hand-cradled.
+    const ph = 18;
+    const pw = 14;
+    g.fillStyle(0x000000, 1);
+    g.fillTriangle(px, py - ph / 2 - 1, px + pw / 2 + 1, py + ph / 2, px - pw / 2 - 1, py + ph / 2);
+    g.fillStyle(PRISM_R, 1);
+    g.fillTriangle(px - 1, py - ph / 2 + 2, px - pw / 2 + 2, py + ph / 2 - 1, px + 1, py + ph / 2 - 1);
+    g.fillStyle(SAPPHIRE, 1);
+    g.fillTriangle(px + 1, py - ph / 2 + 2, px + pw / 2 - 2, py + ph / 2 - 1, px - 1, py + ph / 2 - 1);
+    g.fillStyle(EMERALD, 0.7);
+    g.fillTriangle(px, py - ph / 2 + 3, px - 2, py + ph / 2 - 3, px + 2, py + ph / 2 - 3);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(px, py - ph / 2 + 1, 1, 2);
+    g.fillStyle(0xffffff, 0.7);
+    g.fillRect(px - pw / 2 + 2, py + ph / 2 - 1, pw - 4, 1);
   }
 
   // ---------------------------------------------------------------------------

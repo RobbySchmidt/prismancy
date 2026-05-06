@@ -77,7 +77,12 @@ export interface FloorTheme {
    * `types/` without depending on `data/enemies.ts` (which would cycle).
    * Concrete data files use the stricter `EnemyRosterEntry` from `data/enemies.ts`.
    */
-  enemyRoster: ReadonlyArray<{ id: string; weight: number; minPerRoom?: number }>;
+  enemyRoster: ReadonlyArray<{
+    id: string;
+    weight: number;
+    minPerRoom?: number;
+    maxPerRoom?: number;
+  }>;
   /**
    * Per-floor HP multiplier applied to all NON-boss enemies on this floor.
    * 1.0 = baseline, 1.5 = +50 %, etc. Bosses ignore this — they get their

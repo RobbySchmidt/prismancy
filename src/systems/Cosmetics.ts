@@ -9,6 +9,9 @@
  * additional getter/setter pairs against new keys.
  */
 const STORAGE_KEY_LORD_ONYX = 'prismancy.unlocks.lordOnyxBeaten';
+const STORAGE_KEY_SELECTED_SKIN = 'prismancy.cosmetics.selectedSkin';
+
+export type SkinId = 'default' | 'prismancy';
 
 function safeRead(key: string): string | null {
   try {
@@ -50,5 +53,32 @@ export const Cosmetics = {
    * default state is one console call away. */
   resetAll(): void {
     safeRemove(STORAGE_KEY_LORD_ONYX);
+    safeRemove(STORAGE_KEY_SELECTED_SKIN);
+  },
+
+  /**
+   * The skin the player has chosen for the wizard. If no explicit choice
+   * has ever been made, the unlock-state decides the default: a fresh
+   * Prismancy unlock auto-applies (preserves the trophy reveal moment),
+   * everyone else gets the default purple/white wizard. Once the player
+   * makes a manual choice via the main-menu toggle, that choice sticks
+   * across sessions until they toggle again.
+   *
+   * If the player has Prismancy stored as their preference but the skin
+   * isn't unlocked (e.g. localStorage edited / unlocks reset), we fall
+   * back to the default skin so the cosmetic stays earned.
+   */
+  getSelectedSkin(): SkinId {
+    const stored = safeRead(STORAGE_KEY_SELECTED_SKIN);
+    const unlocked = safeRead(STORAGE_KEY_LORD_ONYX) === 'true';
+    if (stored === 'prismancy') return unlocked ? 'prismancy' : 'default';
+    if (stored === 'default') return 'default';
+    // No explicit preference yet — auto-apply the unlock.
+    return unlocked ? 'prismancy' : 'default';
+  },
+
+  /** Persist the player's skin choice. The main-menu toggle calls this. */
+  setSelectedSkin(skin: SkinId): void {
+    safeWrite(STORAGE_KEY_SELECTED_SKIN, skin);
   },
 };

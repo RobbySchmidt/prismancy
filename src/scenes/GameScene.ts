@@ -1006,13 +1006,22 @@ export class GameScene extends Phaser.Scene {
     // TypeScript treats every floor's tuple type as incompatible with the
     // others.
     const roster = FLOORS[this.currentFloorId]
-      .enemyRoster as readonly { id: EnemyId; weight: number; minPerRoom?: number }[];
+      .enemyRoster as readonly {
+        id: EnemyId;
+        weight: number;
+        minPerRoom?: number;
+        maxPerRoom?: number;
+      }[];
     const ctx = {
       scene: this,
       target: this.player,
       enemyProjectilePool: this.enemyProjectilePool,
       waxPuddleGroup: this.waxPuddleGroup,
     };
+
+    // Track how many of each id have spawned so `maxPerRoom` caps can be
+    // enforced both during forced spawns and weighted-pick fills.
+    const spawnedById = new Map<EnemyId, number>();
 
     const spawnAt = (id: EnemyId): void => {
       let x = 0;
@@ -1027,6 +1036,7 @@ export class GameScene extends Phaser.Scene {
         if (dx * dx + dy * dy >= minDistSq) break;
       }
       this.enemies.add(createEnemy(id, ctx, x, y));
+      spawnedById.set(id, (spawnedById.get(id) ?? 0) + 1);
     };
 
     // Force-spawn `minPerRoom` instances of any roster entry that requests
@@ -1043,7 +1053,16 @@ export class GameScene extends Phaser.Scene {
 
     const remaining = Math.max(0, desc.enemySpawnCount - forcedCount);
     for (let i = 0; i < remaining; i++) {
-      const pick = rng.pickWeighted(roster);
+      // Build the eligible roster for this slot — drop any entry whose
+      // `maxPerRoom` cap is already reached. If everything is capped out,
+      // we'd rather spawn fewer enemies than violate a cap.
+      const eligible = roster.filter((entry) => {
+        const cap = entry.maxPerRoom;
+        if (cap == null) return true;
+        return (spawnedById.get(entry.id) ?? 0) < cap;
+      });
+      if (eligible.length === 0) break;
+      const pick = rng.pickWeighted(eligible);
       spawnAt(pick.id as EnemyId);
     }
   }

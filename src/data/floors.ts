@@ -60,7 +60,9 @@ export const FLOORS = {
     decorationStyle: 'swamp',
     enemyRoster: [
       { id: 'bog-frog', weight: 4 },
-      { id: 'snapper-bloom', weight: 2 },
+      // Cap Snapper Bloom at 2 per room — three rooted 3-thorn fans
+      // overlap into undodgable bullet patterns at endgame fire-rates.
+      { id: 'snapper-bloom', weight: 2, maxPerRoom: 2 },
       { id: 'damselfly', weight: 2 },
       { id: 'bog-tortoise', weight: 1 },
     ] satisfies readonly EnemyRosterEntry[],
