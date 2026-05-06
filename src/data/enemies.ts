@@ -306,7 +306,7 @@ export const ENEMIES = {
   'boss-lord-onyx': {
     id: 'boss-lord-onyx',
     textureKey: TextureKeys.BossLordOnyx,
-    displayName: 'Lord Onyx',
+    displayName: 'The Prismarch',
     hp: 90,
     contactDamage: 1,
     /** Rooted at the seal — moves=false in the LordOnyx class. */

@@ -41,7 +41,6 @@ export interface PixieQueenHost {
  */
 export class PixieQueen extends BossEnemy {
   override readonly displayName = 'Pixie Queen';
-  override readonly maxHp = ENEMIES['boss-pixie-queen'].hp;
   protected override readonly phases: readonly BossPhaseDefinition[] = [
     { hpThresholdFraction: 0.5, phaseIndex: 2 },
   ];
@@ -126,33 +125,58 @@ export class PixieQueen extends BossEnemy {
   }
 
   /**
-   * Pick a tree position at random, avoiding the current one. Falls back to a
-   * random in-bounds spot at least `FALLBACK_MIN_DISTANCE` from the player
-   * when no trees exist (e.g. open boss room).
+   * Pick a tree position at random, avoiding the current one AND any tree
+   * that's too close to the player (the prior version skipped that check
+   * for the tree path, so if the player happened to be parked next to a
+   * tree the queen could materialize directly on top of him for free
+   * contact damage). Falls back to the FARTHEST tree from the player when
+   * no safe candidate exists, then to a random in-bounds spot if there are
+   * no trees at all (open arena).
    */
   private pickTeleportTarget(): { x: number; y: number } {
     const trees = this.host.getTreePositions();
+    const player = this.host.getPlayer();
+    const minDistSq =
+      PIXIE_QUEEN_FALLBACK_MIN_DISTANCE * PIXIE_QUEEN_FALLBACK_MIN_DISTANCE;
+
     if (trees.length > 0) {
-      // Prefer a tree that isn't where we currently stand.
-      const candidates = trees.filter(
-        (t) => Math.hypot(t.x - this.x, t.y - this.y) > 16,
-      );
-      const pool = candidates.length > 0 ? candidates : trees;
-      const pick = pool[Math.floor(Math.random() * pool.length)] ?? pool[0]!;
-      return { x: pick.x, y: pick.y };
+      // Reject trees the queen is already at (she'd appear to not move) and
+      // trees within the safe distance of the player.
+      const safe = trees.filter((t) => {
+        if (Math.hypot(t.x - this.x, t.y - this.y) <= 16) return false;
+        const dx = t.x - player.x;
+        const dy = t.y - player.y;
+        return dx * dx + dy * dy >= minDistSq;
+      });
+      if (safe.length > 0) {
+        const pick = safe[Math.floor(Math.random() * safe.length)]!;
+        return { x: pick.x, y: pick.y };
+      }
+      // No safe tree available (player is parked in the middle of a
+      // tree-dense room). Pick the FARTHEST tree as best-effort instead of
+      // re-using the random tree pool — keeps the queen out of the player's
+      // immediate hitbox at the cost of a less random teleport.
+      let farthest = trees[0]!;
+      let farthestSq = -1;
+      for (const t of trees) {
+        const dx = t.x - player.x;
+        const dy = t.y - player.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > farthestSq) {
+          farthestSq = distSq;
+          farthest = t;
+        }
+      }
+      return { x: farthest.x, y: farthest.y };
     }
     // Fallback: random in-bounds, away from the player.
     const bounds = this.host.getRoomBounds();
-    const player = this.host.getPlayer();
     for (let attempt = 0; attempt < 12; attempt++) {
       const x = bounds.minX + Math.random() * (bounds.maxX - bounds.minX);
       const y = bounds.minY + Math.random() * (bounds.maxY - bounds.minY);
       const dx = x - player.x;
       const dy = y - player.y;
-      if (
-        dx * dx + dy * dy >=
-        PIXIE_QUEEN_FALLBACK_MIN_DISTANCE * PIXIE_QUEEN_FALLBACK_MIN_DISTANCE
-      ) {
+      if (dx * dx + dy * dy >= minDistSq) {
         return { x, y };
       }
     }

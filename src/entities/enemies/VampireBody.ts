@@ -13,6 +13,15 @@ export interface VampireFightCoordinator {
   onBodyDamaged(body: VampireBody): void;
   /** Called from `die()` BEFORE the death tween runs. */
   onBodyDied(body: VampireBody): void;
+  /**
+   * Phase 1 attack-overlap gating. `self` asks whether the OTHER live body
+   * is currently in a high-pressure state (e.g. Crimson Lord's dash
+   * telegraph / dash). Used by Sapphire Marquis to defer his fan + teleport
+   * so the player isn't hit with "Lord telegraph + Marquis fan" simultaneously,
+   * which the user flagged as pure-RNG dodging in Phase 1. Returns false
+   * when the partner is dead (solo mode), so it has no effect post Phase 1.
+   */
+  isPartnerInDangerZone(self: VampireBody): boolean;
 }
 
 /**
@@ -33,9 +42,13 @@ export abstract class VampireBody extends BaseEnemy {
   /** Display name shown in error logs / debugging only — combined fight uses
    * "Vampire Twins" via the coordinator. */
   abstract readonly displayName: string;
-  /** Anchor for berserker-trigger fraction. Sourced from data definition by
-   * the subclass so balancing lives in `data/enemies.ts`. */
-  abstract readonly maxHp: number;
+  /**
+   * Anchor for berserker-trigger fraction + the combined HP bar in
+   * VampireFight. Set in the constructor from `definition.hp × bossHpScale`
+   * (same DPS-ratio scaling BossEnemy uses) so the dual-body fight obeys the
+   * same "always feels like base" contract as solo bosses.
+   */
+  readonly maxHp: number;
 
   protected coordinator: VampireFightCoordinator | null = null;
   protected berserkerEntered = false;
@@ -43,6 +56,14 @@ export abstract class VampireBody extends BaseEnemy {
 
   constructor(scene: Phaser.Scene, x: number, y: number, definition: EnemyDefinition) {
     super(scene, x, y, definition);
+    // Override BaseEnemy's mob-multiplier-applied hp with DPS-ratio scaling
+    // (registry value set by GameScene before the boss spawn). See BossEnemy
+    // for the rationale.
+    const raw = scene.registry.get('bossHpScale') as number | undefined;
+    const scale =
+      raw === undefined || !Number.isFinite(raw) || raw < 1 ? 1.0 : raw;
+    this.maxHp = Math.max(1, Math.round(definition.hp * scale));
+    this.hp = this.maxHp;
   }
 
   attachCoordinator(coordinator: VampireFightCoordinator): void {
@@ -100,4 +121,13 @@ export abstract class VampireBody extends BaseEnemy {
   protected abstract onEnterSoloMode(): void;
   /** Subclass hook for Phase 3 (own HP fell below berserker threshold). */
   protected abstract enterBerserker(): void;
+  /**
+   * Subclass hook for the cross-body danger-zone check. Returns true when
+   * THIS body is in a state where the partner should defer their own
+   * attacks to avoid unfair simultaneous threats. Crimson Lord returns
+   * true during dash telegraph + dash itself; Marquis returns false (his
+   * fan / curtain don't have a discrete "incoming" window the partner
+   * needs to defer for).
+   */
+  abstract isInDangerZone(): boolean;
 }

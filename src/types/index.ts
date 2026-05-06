@@ -78,6 +78,13 @@ export interface FloorTheme {
    * Concrete data files use the stricter `EnemyRosterEntry` from `data/enemies.ts`.
    */
   enemyRoster: ReadonlyArray<{ id: string; weight: number; minPerRoom?: number }>;
+  /**
+   * Per-floor HP multiplier applied to all NON-boss enemies on this floor.
+   * 1.0 = baseline, 1.5 = +50 %, etc. Bosses ignore this — they get their
+   * own DPS-ratio scaling at spawn time so they always feel like a base-stats
+   * fight regardless of player damage build. Defaults to 1.0 if unset.
+   */
+  enemyHpMultiplier?: number;
 }
 
 export const RoomKind = {
@@ -176,7 +183,6 @@ export interface PlayerStats {
   damage: number;        // base 1
   fireRate: number;      // base 1.0 (multiplier — höher = schneller)
   missileSpeed: number;  // base = MISSILE_SPEED
-  range: number;         // base 1.0 (multiplier auf MISSILE_LIFETIME_MS)
   moveSpeed: number;     // base = PLAYER_SPEED
   missileScale: number;  // base 1.0 — visual scale (additiv via Items)
 }

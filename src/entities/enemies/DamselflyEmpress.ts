@@ -39,7 +39,6 @@ type DashState = 'idle' | 'telegraph' | 'dash' | 'recovery';
  */
 export class DamselflyEmpress extends BossEnemy {
   override readonly displayName = 'Damselfly Empress';
-  override readonly maxHp = ENEMIES['boss-damselfly-empress'].hp;
   protected override readonly phases: readonly BossPhaseDefinition[] = [
     { hpThresholdFraction: 0.5, phaseIndex: 2 },
   ];

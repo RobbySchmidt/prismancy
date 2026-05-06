@@ -37,6 +37,7 @@ export const FLOORS = {
       { id: 'pixie-dancer', weight: 2 },
       { id: 'vine-sprout', weight: 2 },
     ] satisfies readonly EnemyRosterEntry[],
+    enemyHpMultiplier: 1.0,
   },
   'sapphire-swamp': {
     id: 'sapphire-swamp',
@@ -63,6 +64,7 @@ export const FLOORS = {
       { id: 'damselfly', weight: 2 },
       { id: 'bog-tortoise', weight: 1 },
     ] satisfies readonly EnemyRosterEntry[],
+    enemyHpMultiplier: 1.5,
   },
   'onyx-mansion': {
     id: 'onyx-mansion',
@@ -95,6 +97,7 @@ export const FLOORS = {
       // so its homing-shot pressure consistently mixes with the wraith chase.
       { id: 'cursed-mirror', weight: 2, minPerRoom: 1 },
     ] satisfies readonly EnemyRosterEntry[],
+    enemyHpMultiplier: 2.0,
   },
 } as const satisfies Record<string, FloorTheme>;
 

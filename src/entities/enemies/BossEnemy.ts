@@ -5,6 +5,20 @@ import { EventBus } from '../../utils/EventBus';
 import { BaseEnemy } from './BaseEnemy';
 
 /**
+ * Read the per-spawn boss HP scale factor from the scene registry. GameScene
+ * computes this from the player's current effective DPS (damage × fireRate)
+ * before each boss spawn, so the fight always has the same time-to-kill
+ * regardless of which damage / fire-rate items the player picked up.
+ * Floors with weak / no items → 1.0 (= base feel). Heavily stacked builds
+ * scale up linearly. Floor mob multiplier does NOT apply to bosses.
+ */
+function readBossHpScale(scene: Phaser.Scene): number {
+  const raw = scene.registry.get('bossHpScale') as number | undefined;
+  if (raw === undefined || !Number.isFinite(raw) || raw < 1) return 1.0;
+  return raw;
+}
+
+/**
  * One phase transition trigger for a boss. The boss starts in phase 1
  * implicitly; phases listed here flip in order as the boss takes damage.
  */
@@ -37,8 +51,12 @@ export interface BossPhaseDefinition {
 export abstract class BossEnemy extends BaseEnemy {
   /** Human-readable name for the boss-bar title + the kill event payload. */
   abstract readonly displayName: string;
-  /** Anchor for HP-fraction calculations (e.g. UI ratio = current / maxHp). */
-  abstract readonly maxHp: number;
+  /**
+   * Anchor for HP-fraction calculations (UI ratio = current / maxHp). Set in
+   * the constructor from `definition.hp × bossHpScale` so subclasses don't
+   * need their own initializer (and can't drift from the data file).
+   */
+  readonly maxHp: number;
   /**
    * Sorted ascending by `phaseIndex`. Only phases 2+ should be listed;
    * phase 1 is implicit from spawn. Subclasses are responsible for the sort.
@@ -49,6 +67,11 @@ export abstract class BossEnemy extends BaseEnemy {
 
   constructor(scene: Phaser.Scene, x: number, y: number, definition: EnemyDefinition) {
     super(scene, x, y, definition);
+    // Override BaseEnemy's mob-multiplier-applied hp with DPS-ratio scaling so
+    // bosses always feel like a base-stats fight regardless of player build.
+    const scale = readBossHpScale(scene);
+    this.maxHp = Math.max(1, Math.round(definition.hp * scale));
+    this.hp = this.maxHp;
   }
 
   /**

@@ -61,7 +61,6 @@ interface OrbitingThorn {
  */
 export class BogColossus extends BossEnemy {
   override readonly displayName = 'Bog Colossus';
-  override readonly maxHp = ENEMIES['boss-bog-colossus'].hp;
   protected override readonly phases: readonly BossPhaseDefinition[] = [
     { hpThresholdFraction: 0.5, phaseIndex: 2 },
   ];

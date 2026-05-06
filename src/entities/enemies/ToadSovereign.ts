@@ -43,7 +43,6 @@ type Phase2State = 'comboHop' | 'comboLand' | 'comboGap';
  */
 export class ToadSovereign extends BossEnemy {
   override readonly displayName = 'Toad Sovereign';
-  override readonly maxHp = ENEMIES['boss-toad-sovereign'].hp;
   protected override readonly phases: readonly BossPhaseDefinition[] = [
     { hpThresholdFraction: 0.5, phaseIndex: 2 },
   ];

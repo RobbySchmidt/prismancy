@@ -26,7 +26,12 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
 
     this.definition = definition;
-    this.hp = definition.hp;
+    // Per-floor mob HP scaling — Sapphire ×1.5, Onyx ×2.0 (see floors.ts).
+    // BossEnemy and VampireBody overwrite this with their own DPS-ratio
+    // scaling in their constructor bodies, so this only really hits mobs.
+    const mobHpMult =
+      (scene.registry.get('enemyHpMultiplier') as number | undefined) ?? 1.0;
+    this.hp = Math.max(1, Math.round(definition.hp * mobHpMult));
 
     this.setDepth(DepthLayers.Enemy);
     this.setScale(WORLD_SPRITE_SCALE);

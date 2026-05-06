@@ -28,6 +28,12 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     | null = null;
   private homingTurnRate = 0;
 
+  /** When true, this projectile passes through walls + door barriers
+   * (the wall colliders' processCallback returns false). Used by The
+   * Prismarch's Crimson Web waves so the bolts aren't despawned the
+   * moment a wave thorn reaches the room edge. Reset on each `fire()`. */
+  passThroughWalls = false;
+
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, TextureKeys.Thorn);
     scene.add.existing(this);
@@ -54,6 +60,7 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     this.lifetimeMs = ENEMY_PROJECTILE_LIFETIME_MS;
     this.homingTarget = null;
     this.homingTurnRate = 0;
+    this.passThroughWalls = false;
   }
 
   /**

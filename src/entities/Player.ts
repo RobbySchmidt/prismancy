@@ -109,7 +109,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const body = this.body as Phaser.Physics.Arcade.Body;
     this.missilePool.fire(body.center.x, body.center.y, dir, {
       speed: this.stats.getEffective('missileSpeed'),
-      lifetime: MISSILE_LIFETIME_MS * this.stats.getEffective('range'),
+      lifetime: MISSILE_LIFETIME_MS,
       damage: this.stats.getEffective('damage'),
       scale: this.stats.getEffective('missileScale'),
       tint: this.stats.getMissileTint(),

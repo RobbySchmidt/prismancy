@@ -38,7 +38,6 @@ export interface MossyBehemothHost {
  */
 export class MossyBehemoth extends BossEnemy {
   override readonly displayName = 'Mossy Behemoth';
-  override readonly maxHp = ENEMIES['boss-mossy-behemoth'].hp;
   protected override readonly phases: readonly BossPhaseDefinition[] = [
     { hpThresholdFraction: 0.5, phaseIndex: 2 },
   ];

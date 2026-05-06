@@ -51,7 +51,6 @@ export interface SapphireMarquisHost {
  */
 export class SapphireMarquis extends VampireBody {
   override readonly displayName = 'Sapphire Marquis';
-  override readonly maxHp = ENEMIES['boss-sapphire-marquis'].hp;
 
   private readonly host: SapphireMarquisHost;
 
@@ -93,14 +92,24 @@ export class SapphireMarquis extends VampireBody {
 
     this.kiteToward(player);
 
+    // Phase 1 cross-body gating: defer fan + teleport while Crimson Lord is
+    // mid-telegraph / mid-dash so the player isn't reading two simultaneous
+    // threats. Solo mode (partner dead) bypasses the check, since
+    // `isPartnerInDangerZone` returns false there anyway. Timers don't get
+    // reset on a deferral — when the Lord exits the danger window, the
+    // overdue fan / teleport fires immediately the next frame.
+    const partnerDanger =
+      !this.soloMode &&
+      this.coordinator?.isPartnerInDangerZone(this) === true;
+
     // Fan (Phase 1 + 2 share this path; count + spread differ).
-    if (time >= this.nextFanAt) {
+    if (time >= this.nextFanAt && !partnerDanger) {
       this.fireFan(player);
       this.nextFanAt = time + SAPPHIRE_MARQUIS_PHASE1_FAN_INTERVAL_MS;
     }
 
     // Teleport (Phase 1 + 2).
-    if (time >= this.nextTeleportAt) {
+    if (time >= this.nextTeleportAt && !partnerDanger) {
       this.beginTeleport(time);
       this.nextTeleportAt = time + SAPPHIRE_MARQUIS_TELEPORT_INTERVAL_MS;
     }
@@ -109,6 +118,17 @@ export class SapphireMarquis extends VampireBody {
     if (this.soloMode) {
       this.tickCurtain(time);
     }
+  }
+
+  // --- Coordinator danger-zone hook ----------------------------------------
+
+  /**
+   * Marquis has no discrete "incoming" window the Lord needs to defer for —
+   * his fan + curtain are continuous-pressure attacks the partner can
+   * dodge alongside their own moves. Always false.
+   */
+  override isInDangerZone(): boolean {
+    return false;
   }
 
   // --- Movement / kiting ---------------------------------------------------

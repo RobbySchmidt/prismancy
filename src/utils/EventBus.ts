@@ -44,6 +44,12 @@ export interface GameEvents {
   /** Lord Onyx is dead — full-victory win-screen hooks here, AND the
    * Prismancy red/gold cosmetic skin gets persisted to localStorage. */
   'run:onyxFullVictory': void;
+  /** Per-phase Prism Special trigger fired. Phase-1/2/3 fires once per
+   * phase. Payload includes the boss's prism position so the gem seal can
+   * fly the matching gem (Phase 1=Emerald, 2=Sapphire, 3=Onyx) from the
+   * altar socket into the prism during the charge window. After the gem
+   * lands, the seal clears the socket. */
+  'lordOnyx:specialFired': { phase: 1 | 2 | 3; x: number; y: number };
 }
 
 class TypedEventBus {

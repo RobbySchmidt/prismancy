@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  BASE_PLAYER_STATS,
   CAMERA_ZOOM,
   ENEMY_PROJECTILE_DAMAGE,
   GAME_HEIGHT,
@@ -285,6 +286,11 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('currentFloorId', this.currentFloorId);
     this.registry.set('dungeonSeed', this.dungeonSeed);
     this.registry.set('floorIndex', this.floorIndex);
+    // Mob HP multiplier read by BaseEnemy.constructor — Sapphire ×1.5, Onyx
+    // ×2.0 keeps mob threat in line with player damage growth across floors.
+    // Defaults to 1.0 if the floor doesn't declare one.
+    const theme = FLOORS[this.currentFloorId];
+    this.registry.set('enemyHpMultiplier', theme.enemyHpMultiplier ?? 1.0);
   }
 
   create(): void {
@@ -1061,6 +1067,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Compute the current boss-HP scale factor (player effective DPS / base
+   * DPS) and stash it on the registry so BossEnemy + VampireBody pick it up
+   * during construction. Call this RIGHT BEFORE every boss instantiation —
+   * the value reflects whichever items the player has picked up so far,
+   * making the upcoming boss take roughly the same time to kill as a
+   * base-stats fight regardless of build. Scale is clamped to ≥ 1.0 so a
+   * weaker-than-base build doesn't shrink boss HP below the data value.
+   */
+  private updateBossHpScale(): void {
+    const dmg = this.stats.getEffective('damage');
+    const fr = this.stats.getEffective('fireRate');
+    const baseDps = BASE_PLAYER_STATS.damage * BASE_PLAYER_STATS.fireRate;
+    const ratio = baseDps > 0 ? (dmg * fr) / baseDps : 1.0;
+    const scale = Math.max(1.0, ratio);
+    this.registry.set('bossHpScale', scale);
+  }
+
+  /**
    * Resolve the floor's boss roster, instantiate the matching boss class at
    * the room center, and arm the no-hit tracker. Currently only Vine Lord
    * exists; future bosses get added to the switch as they're authored.
@@ -1073,6 +1097,7 @@ export class GameScene extends Phaser.Scene {
     );
     if (!bossId) return; // floor has no authored boss yet
     const center = this.currentRoom.getCenter();
+    this.updateBossHpScale();
 
     // Vampire Twins is a virtual boss id — dispatched to a coordinator that
     // spawns + manages two bodies as one fight. Coordinator emits
@@ -1114,6 +1139,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.enemies.clear(true, true);
     const center = this.currentRoom.getCenter();
+    this.updateBossHpScale();
 
     // Vampire Twins virtual id — same dispatch as the natural boss spawn.
     if (bossId === 'boss-vampire-twins') {
@@ -1218,29 +1244,20 @@ export class GameScene extends Phaser.Scene {
   private handleBossKilled(payload: { x: number; y: number; name: string; noHit: boolean }): void {
     this.markCurrentRoomCleared();
 
-    // Lord Onyx is the run finale — no reward pedestal, no exit stairs,
+    // The Prismarch is the run finale — no reward pedestal, no exit stairs,
     // no further boss-rooms. Persist the cosmetic unlock and emit the
     // full-victory event so the win screen (Phase 5 Chunk 4 #5) can hook
     // in. Bypass the normal reward flow entirely.
-    if (payload.name === 'Lord Onyx') {
+    if (payload.name === 'The Prismarch') {
       this.handleLordOnyxKilled(payload);
       return;
     }
 
     const center = this.currentRoom?.getCenter();
     if (center) {
-      // Reward pedestal: boss-pool item.
-      this.spawnBossPoolItem(center.x, center.y);
-      // Two hearts flanking the pedestal.
-      const heartOffset = TILE_SIZE * 1.5;
-      const leftHeart = this.spawnPickup(PickupKind.Heart, center.x - heartOffset, center.y);
-      leftHeart?.setSpawnProtection(700);
-      const rightHeart = this.spawnPickup(PickupKind.Heart, center.x + heartOffset, center.y);
-      rightHeart?.setSpawnProtection(700);
-
-      // No-hit gem — gated by BOTH the boolean flag AND the damage counter
-      // as a paranoia check (mismatch = bug; logged in dev). Player must
-      // also not already own this floor's gem.
+      // No-hit gem gating + (Onyx) gem-count check both want the noHit flag
+      // computed up-front. Boolean + damage counter both have to agree; a
+      // mismatch indicates a tracking bug and is logged in dev.
       const noHit = this.bossNoHitInProgress && this.bossDamageCount === 0;
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
@@ -1248,6 +1265,33 @@ export class GameScene extends Phaser.Scene {
           `[boss:killed] flag=${this.bossNoHitInProgress} damageCount=${this.bossDamageCount} → noHit=${noHit}, hasGem(${this.currentFloorId})=${this.inventory.hasGem(this.currentFloorId)}`,
         );
       }
+
+      // Reward pedestal: boss-pool item. On Onyx Mansion the only path that
+      // makes the item useful is the Prismarch route — taking the exit
+      // stairs ends the run without consuming items, so a freshly-picked
+      // Onyx-pool item gets wasted. Only drop it if the player will have
+      // all 3 gems for the seal (counting the gem this fight may award via
+      // the no-hit reward). Other floors keep the unconditional drop.
+      let shouldSpawnItem = true;
+      if (this.currentFloorId === 'onyx-mansion') {
+        const currentGems = this.inventory.getGems().size;
+        const willGainOnyxGem = noHit && !this.inventory.hasGem('onyx-mansion');
+        shouldSpawnItem = currentGems + (willGainOnyxGem ? 1 : 0) >= 3;
+      }
+      if (shouldSpawnItem) {
+        this.spawnBossPoolItem(center.x, center.y);
+      }
+
+      // Two hearts flanking the pedestal — drop unconditionally on every
+      // boss kill including the no-item Onyx case (player may need HP for
+      // the run-end stairs anyway, or for the impending Prismarch fight).
+      const heartOffset = TILE_SIZE * 1.5;
+      const leftHeart = this.spawnPickup(PickupKind.Heart, center.x - heartOffset, center.y);
+      leftHeart?.setSpawnProtection(700);
+      const rightHeart = this.spawnPickup(PickupKind.Heart, center.x + heartOffset, center.y);
+      rightHeart?.setSpawnProtection(700);
+
+      // No-hit gem — Player must not already own this floor's gem.
       if (noHit && !this.inventory.hasGem(this.currentFloorId)) {
         const gem = new GemPickup(this, center.x, center.y - heartOffset, this.currentFloorId);
         gem.setSpawnProtection(700);
@@ -1469,7 +1513,7 @@ export class GameScene extends Phaser.Scene {
     this.stairsSprite = null;
 
     const banner = this.add
-      .text(payload.x, payload.y - 56, 'Lord Onyx stirs...', {
+      .text(payload.x, payload.y - 56, 'The Prismarch stirs...', {
         fontFamily: 'monospace',
         fontSize: '18px',
         color: '#ff80ff',
@@ -1506,6 +1550,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const center = this.currentRoom.getCenter();
+    this.updateBossHpScale();
     const boss = new LordOnyx(this, center.x, center.y, this.bossHost());
     this.enemies.add(boss);
     this.activeBoss = boss;
@@ -1544,6 +1589,15 @@ export class GameScene extends Phaser.Scene {
       };
       missile.deactivate?.();
     };
+    /** processCallback for enemy-projectile wall/barrier/blocker colliders:
+     * if a projectile sets `passThroughWalls = true` (used by The Prismarch's
+     * Crimson Web waves so the wave-bolts aren't kills the moment a thorn
+     * touches a wall), the collider returns false → no separation, no
+     * deactivate callback. Player overlaps still trigger normally. */
+    const enemyProjectileProcess = (proj: unknown): boolean => {
+      const p = proj as { passThroughWalls?: boolean };
+      return !p.passThroughWalls;
+    };
 
     this.playerWallCollider = this.physics.add.collider(this.player, this.currentRoom.walls);
     this.enemyWallCollider = this.physics.add.collider(this.enemies, this.currentRoom.walls);
@@ -1553,11 +1607,13 @@ export class GameScene extends Phaser.Scene {
       deactivateMissile,
     );
 
-    // Enemy projectiles share the same wall kill behaviour.
+    // Enemy projectiles share the same wall kill behaviour. Crimson-Web
+    // wave thorns opt out via `passThroughWalls` (see processCallback).
     this.enemyProjectileWallCollider = this.physics.add.collider(
       this.enemyProjectilePool.getGroup(),
       this.currentRoom.walls,
       deactivateMissile,
+      enemyProjectileProcess,
     );
 
     // Enemy-only door blockers: keep enemies + their projectiles inside the
@@ -1571,6 +1627,7 @@ export class GameScene extends Phaser.Scene {
       this.enemyProjectilePool.getGroup(),
       this.currentRoom.enemyBlockers,
       deactivateMissile,
+      enemyProjectileProcess,
     );
 
     // Door barriers: each closed door has its own barrier image with a static
@@ -1587,6 +1644,7 @@ export class GameScene extends Phaser.Scene {
           this.enemyProjectilePool.getGroup(),
           barrier,
           deactivateMissile,
+          enemyProjectileProcess,
         ),
       );
     }
@@ -1736,6 +1794,13 @@ export class GameScene extends Phaser.Scene {
       const c = this.physics.add.overlap(this.player, door.trigger, () => {
         if (this.inTransition) return;
         if (door.isLocked()) {
+          // Block unlock attempts during combat — locked treasure / shop
+          // doors should obey the same "no exits while uncleared" rule as
+          // every other door. Without this gate a player with a key could
+          // bail mid-fight into the safe room, which the user flagged as
+          // a bug ("walking through a locked door during the fight").
+          const desc = this.layout.rooms.get(this.currentRoomId);
+          if (!desc?.cleared) return;
           if (!this.inventory.spendKey()) return;
           if (!door.tryUnlock()) return;
           this.markDoorUnlockedInLayout(door.direction);
@@ -1932,6 +1997,10 @@ export class GameScene extends Phaser.Scene {
       };
       missile.deactivate?.();
     };
+    const enemyProjectileProcess = (proj: unknown): boolean => {
+      const p = proj as { passThroughWalls?: boolean };
+      return !p.passThroughWalls;
+    };
     for (const door of this.currentRoom.doors) {
       const barrier = door.getBarrier();
       if (!barrier) continue;
@@ -1944,6 +2013,7 @@ export class GameScene extends Phaser.Scene {
           this.enemyProjectilePool.getGroup(),
           barrier,
           deactivateMissile,
+          enemyProjectileProcess,
         ),
       );
     }
@@ -1997,6 +2067,10 @@ export class GameScene extends Phaser.Scene {
       };
       missile.deactivate?.();
     };
+    const enemyProjectileProcess = (proj: unknown): boolean => {
+      const p = proj as { passThroughWalls?: boolean };
+      return !p.passThroughWalls;
+    };
     for (const door of this.currentRoom.doors) {
       const barrier = door.getBarrier();
       if (!barrier) continue;
@@ -2009,6 +2083,7 @@ export class GameScene extends Phaser.Scene {
           this.enemyProjectilePool.getGroup(),
           barrier,
           deactivateMissile,
+          enemyProjectileProcess,
         ),
       );
     }

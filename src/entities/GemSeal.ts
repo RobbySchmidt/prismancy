@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { TILE_SIZE, gemTextureKey } from '../config/GameConfig';
 import { DepthLayers } from '../config/DepthLayers';
 import { FLOORS, type FloorId } from '../data/floors';
-import { EventBus } from '../utils/EventBus';
+import { EventBus, type GameEvents } from '../utils/EventBus';
 
 /** Floor gems that count toward sealing the Onyx fight, in display order. */
 const REQUIRED_GEM_FLOORS: readonly FloorId[] = [
@@ -16,6 +16,19 @@ const SEAL_HEIGHT = 60;
 /** Cooldown between hint-text reshows so a player parked on the trigger
  * doesn't spam the toast. */
 const HINT_COOLDOWN_MS = 1500;
+/** Duration for the gem to fly from its altar socket into the boss's
+ * prism when a Prism Special charges. Lands ~400ms before the charge
+ * window ends, so the prism visibly absorbs the gem before the pattern
+ * fires. */
+const SPECIAL_GEM_FLY_DURATION_MS = 800;
+/** Map a phase index (1/2/3) to the floor whose gem the special consumes.
+ * Mirrors the floor-progression order so Phase 1 = Emerald (Floor 1)
+ * etc — narratively, each gem powers the special tied to its origin. */
+const PHASE_TO_FLOOR: Record<1 | 2 | 3, FloorId> = {
+  1: 'emerald-forest',
+  2: 'sapphire-swamp',
+  3: 'onyx-mansion',
+};
 
 /**
  * Stone altar that sits in the back of the Onyx Vampire room after the
@@ -49,6 +62,12 @@ export class GemSeal {
     string,
     { plate: Phaser.GameObjects.Image; halo: Phaser.GameObjects.Arc | null }
   >();
+  /** Sockets whose gem has already been consumed by a Prism Special.
+   * Sticky so a stale `addGem` can't re-fill the slot. */
+  private readonly consumedSockets = new Set<string>();
+  private readonly specialFiredHandler: (
+    payload: GameEvents['lordOnyx:specialFired'],
+  ) => void;
 
   constructor(scene: Phaser.Scene, x: number, y: number, ownedGems: ReadonlySet<string>) {
     this.scene = scene;
@@ -91,6 +110,15 @@ export class GemSeal {
     // to tap pixel-perfect. ~1.5 tiles in front of the seal.
     this.trigger = scene.add.zone(x, y + TILE_SIZE * 0.4, SEAL_WIDTH + 16, TILE_SIZE * 1.5);
     scene.physics.add.existing(this.trigger, true);
+
+    // The Prismarch fires a Prism Special once per phase — the matching
+    // gem flies from its socket into the boss's prism, then the socket
+    // clears. We listen here so the seal stays the source of truth for
+    // gem visuals.
+    this.specialFiredHandler = ({ phase, x: bx, y: by }) => {
+      this.consumeGemForPhase(phase, bx, by);
+    };
+    EventBus.on('lordOnyx:specialFired', this.specialFiredHandler);
   }
 
   /**
@@ -103,6 +131,9 @@ export class GemSeal {
   addGem(floorId: string, fromX: number, fromY: number): void {
     if (!REQUIRED_GEM_FLOORS.includes(floorId as FloorId)) return;
     if (this.ownedGems.has(floorId)) return;
+    // Once a gem has been consumed by a Prism Special the socket stays
+    // empty for the rest of the fight — don't accept a late re-fill.
+    if (this.consumedSockets.has(floorId)) return;
     const socket = this.socketSprites.get(floorId);
     if (!socket) return;
     this.ownedGems.add(floorId);
@@ -230,11 +261,118 @@ export class GemSeal {
   }
 
   destroy(): void {
+    EventBus.off('lordOnyx:specialFired', this.specialFiredHandler);
     this.trigger.destroy();
     this.visuals.destroy();
     if (this.hintLabel) {
       this.hintLabel.destroy();
       this.hintLabel = null;
+    }
+  }
+
+  /**
+   * Prism Special fired — fly the matching gem from its altar socket into
+   * the boss's prism position, then clear the socket. No-op if the player
+   * never placed that floor's gem (player can summon Lord Onyx without
+   * the consume animation if `consumedSockets` already covers — but this
+   * is enforced by the seal only activating with 3/3, so all sockets are
+   * filled on entry to the fight).
+   */
+  private consumeGemForPhase(
+    phase: 1 | 2 | 3,
+    targetX: number,
+    targetY: number,
+  ): void {
+    const floorId = PHASE_TO_FLOOR[phase];
+    if (!this.ownedGems.has(floorId)) return;
+    const socket = this.socketSprites.get(floorId);
+    if (!socket) return;
+
+    // Mark consumed immediately — sticky against any addGem race + lets
+    // a duplicate special-fire (defensive) become a no-op.
+    this.ownedGems.delete(floorId);
+    this.consumedSockets.add(floorId);
+
+    const fromX = this.visuals.x + socket.plate.x;
+    const fromY = this.visuals.y + socket.plate.y;
+    const haloColor = FLOORS[floorId]?.palette.glow ?? 0xffffff;
+
+    // Flying gem copy — sibling sprite in world coords.
+    const flyer = this.scene.add
+      .image(fromX, fromY, gemTextureKey(floorId))
+      .setScale(1.6)
+      .setDepth(DepthLayers.HUD - 2);
+    const flyerHalo = this.scene.add
+      .circle(fromX, fromY, 14, haloColor, 0.5)
+      .setDepth(DepthLayers.HUD - 3);
+
+    // Quadratic Bézier with the mid-point lifted upward so the gem arcs
+    // into the prism instead of dragging across the floor.
+    const midX = (fromX + targetX) / 2;
+    const midY = Math.min(fromY, targetY) - 80;
+
+    this.scene.tweens.add({
+      targets: { t: 0 },
+      t: 1,
+      duration: SPECIAL_GEM_FLY_DURATION_MS,
+      ease: 'Sine.InOut',
+      onUpdate: (tween) => {
+        const t = tween.getValue() ?? 0;
+        const u = 1 - t;
+        const x = u * u * fromX + 2 * u * t * midX + t * t * targetX;
+        const y = u * u * fromY + 2 * u * t * midY + t * t * targetY;
+        flyer.setPosition(x, y);
+        flyerHalo.setPosition(x, y);
+        // Scale grows toward the target so the gem reads as "feeding"
+        // into the prism rather than landing.
+        const s = 1.6 + t * 0.6;
+        flyer.setScale(s);
+        flyerHalo.setScale(s);
+      },
+      onComplete: () => {
+        flyer.destroy();
+        flyerHalo.destroy();
+        this.clearSocket(floorId);
+      },
+    });
+  }
+
+  /**
+   * Empty a socket after its gem has been consumed by a Prism Special.
+   * Plate dims back to the empty-state look + halo destroyed + a small
+   * burst at the socket so the consume reads visually.
+   */
+  private clearSocket(floorId: string): void {
+    const socket = this.socketSprites.get(floorId);
+    if (!socket) return;
+    const haloColor = FLOORS[floorId as FloorId]?.palette.glow ?? 0xffffff;
+
+    // Burst at the socket spot so the moment of consume reads.
+    const burst = this.scene.add
+      .circle(
+        this.visuals.x + socket.plate.x,
+        this.visuals.y + socket.plate.y,
+        4,
+        haloColor,
+        1,
+      )
+      .setDepth(DepthLayers.HUD - 2);
+    this.scene.tweens.add({
+      targets: burst,
+      scale: 8,
+      alpha: 0,
+      duration: 360,
+      ease: 'Sine.Out',
+      onComplete: () => burst.destroy(),
+    });
+
+    // Plate returns to empty state.
+    socket.plate.setAlpha(0.18);
+    socket.plate.setTintFill(0x1a0c20);
+    if (socket.halo) {
+      this.scene.tweens.killTweensOf(socket.halo);
+      socket.halo.destroy();
+      socket.halo = null;
     }
   }
 

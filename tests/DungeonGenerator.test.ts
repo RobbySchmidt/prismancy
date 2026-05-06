@@ -234,6 +234,28 @@ describe('DungeonGenerator', () => {
     expect(treasures).toHaveLength(1);
     expect(shops).toHaveLength(1);
   });
+
+  // Regression: prior to the dead-end-only refactor, the generator's fallback
+  // path could place a Treasure / Shop on a 2-door pass-through normal room
+  // sitting between Start and Boss. On locked floors that turned the boss
+  // unreachable without a key. Verify across many seeds that specials are
+  // always leaves.
+  it('treasure + shop rooms are always dead-ends (door-degree 1)', () => {
+    for (let i = 0; i < 50; i++) {
+      const layout = DungeonGenerator.generate({
+        seed: `dead-end-invariant-${i}`,
+        floorIndex: 1,
+      });
+      for (const room of layout.rooms.values()) {
+        if (room.kind !== RoomKind.Treasure && room.kind !== RoomKind.Shop) continue;
+        const doorCount = Object.values(room.doors).filter((d) => d.exists).length;
+        expect(
+          doorCount,
+          `seed ${i} room ${room.id} (${room.kind}) has ${doorCount} doors`,
+        ).toBe(1);
+      }
+    }
+  });
 });
 
 function isAdjacentTo(

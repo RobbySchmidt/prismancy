@@ -84,6 +84,23 @@ export class VampireFight {
     });
   }
 
+  /**
+   * Phase 1 cross-body danger-zone gate. The querying body wants to know
+   * whether the OTHER live body is in a high-pressure state right now
+   * (Crimson Lord telegraph / dash). Used by Sapphire Marquis to defer his
+   * fan + teleport so "Lord telegraph + Marquis fan" doesn't overlap, which
+   * was the unfair-RNG bug the user flagged. Returns false once the partner
+   * has died — solo mode has nothing to defer for.
+   */
+  isPartnerInDangerZone(self: VampireBody): boolean {
+    for (const partner of this.bodies) {
+      if (partner === self) continue;
+      if (!partner.active) continue;
+      return partner.isInDangerZone();
+    }
+    return false;
+  }
+
   onBodyDied(body: VampireBody): void {
     this.lastDeathX = body.x;
     this.lastDeathY = body.y;

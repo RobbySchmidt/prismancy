@@ -19,8 +19,11 @@ import { RNG } from '../utils/RNG';
  * Hard cap on how many extra rooms the generator may add beyond
  * `targetRoomCount` while trying to find leaf candidates for treasure / shop.
  * Keeps pathologically small floors from ballooning if leafs are scarce.
+ * Bumped 10 → 16 alongside the dead-end-only special placement: since we no
+ * longer fall back to a pass-through normal room when leaves are scarce, the
+ * generator needs more headroom to grow the dungeon until enough leaves exist.
  */
-const MAX_RETRY_ROOMS = 10;
+const MAX_RETRY_ROOMS = 16;
 
 const DIRECTIONS: readonly Direction[] = ['up', 'down', 'left', 'right'] as const;
 
@@ -226,16 +229,14 @@ export class DungeonGenerator {
       for (const r of shuffledLeafs) {
         if (!used.has(r.id)) return r;
       }
-      // Fallback: any non-start, non-boss, non-already-special normal room.
-      const fallbacks = Array.from(rooms.values()).filter(
-        (r) =>
-          r.kind === RoomKind.Normal &&
-          r.id !== startId &&
-          r.id !== bossId &&
-          !used.has(r.id),
-      );
-      if (fallbacks.length === 0) return null;
-      return rng.pick(fallbacks);
+      // No leaf available — skip this special. The previous fallback to a
+      // non-leaf normal room produced "pass-through" Treasure/Shop rooms that
+      // sat on the path between Start and Boss, which on locked floors made
+      // the Boss reachable only with a key. We'd rather have a missing
+      // special than a path-blocking one. The retry loop above already tries
+      // to grow the dungeon until enough leaves exist; in the rare case that
+      // still doesn't yield two, this floor just gets one (or zero) specials.
+      return null;
     };
 
     const specialUsed = new Set<string>();

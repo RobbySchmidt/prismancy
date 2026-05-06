@@ -41,7 +41,6 @@ type DashState = 'idle' | 'telegraph' | 'dashing' | 'recovering';
  */
 export class CrimsonLord extends VampireBody {
   override readonly displayName = 'Crimson Lord';
-  override readonly maxHp = ENEMIES['boss-crimson-lord'].hp;
 
   private readonly host: CrimsonLordHost;
   private dashState: DashState = 'idle';
@@ -205,6 +204,34 @@ export class CrimsonLord extends VampireBody {
     if (this.berserkerEntered) gap = CRIMSON_LORD_DASH_GAP_PHASE3_MS;
     else if (this.soloMode) gap = CRIMSON_LORD_DASH_GAP_PHASE2_MS;
     this.stateEndsAt = time + gap;
+  }
+
+  // --- Coordinator danger-zone hook ----------------------------------------
+
+  /**
+   * Phase 1 only: Lord is "dangerous" while telegraphing (700 ms warning)
+   * or actually mid-dash (250 ms), AND in the last `LATE_IDLE_BUFFER_MS`
+   * of the idle/chase phase. The late-idle buffer matters because Marquis
+   * fan thorns live 1500 ms — a fan fired 800 ms before the telegraph is
+   * still in the air during the telegraph window, recreating exactly the
+   * "two threats at once" overlap the gating was supposed to prevent.
+   * Buffering pre-telegraph means the projectiles have time to clear by
+   * the time the player is reading the dash line.
+   *
+   * Marquis reads this through the coordinator. After Marquis dies
+   * (solo / berserker), nothing reads this hook anyway.
+   */
+  override isInDangerZone(): boolean {
+    if (this.dashState === 'telegraph' || this.dashState === 'dashing') {
+      return true;
+    }
+    if (this.dashState === 'idle' && !this.berserkerEntered) {
+      // stateEndsAt during idle = the time the telegraph will start.
+      // Within the buffer window we count as "imminent" and gate Marquis.
+      const LATE_IDLE_BUFFER_MS = 800;
+      return this.stateEndsAt - this.scene.time.now <= LATE_IDLE_BUFFER_MS;
+    }
+    return false;
   }
 
   // --- Phase hooks ---------------------------------------------------------

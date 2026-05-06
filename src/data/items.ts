@@ -43,11 +43,11 @@ export const ITEMS = {
   telescopicWand: {
     id: 'telescopicWand',
     displayName: 'Telescopic Wand',
-    description: '+40% Range, +15% Missile Speed.',
+    description: '+1 Damage, +15% Missile Speed.',
     textureKey: TextureKeys.ItemTelescopicWand,
     pools: [ItemPool.Treasure],
     effects: [
-      { stat: 'range', mult: 1.4 },
+      { stat: 'damage', add: 1 },
       { stat: 'missileSpeed', mult: 1.15 },
     ],
   },
@@ -66,11 +66,11 @@ export const ITEMS = {
   caffeinePill: {
     id: 'caffeinePill',
     displayName: 'Caffeine Pill',
-    description: '+10% Fire Rate, +10 Move Speed.',
+    description: '+0.5 Damage, +10 Move Speed.',
     textureKey: TextureKeys.ItemCaffeinePill,
     pools: [ItemPool.Shop],
     effects: [
-      { stat: 'fireRate', add: 0.1 },
+      { stat: 'damage', add: 0.5 },
       { stat: 'moveSpeed', add: 10 },
     ],
     shopPrice: 8,
@@ -78,14 +78,13 @@ export const ITEMS = {
   pixieDust: {
     id: 'pixieDust',
     displayName: 'Pixie Dust',
-    description: '+0.5 Damage, faster missiles, magic pink color.',
+    description: '+1 max HP, faster missiles, magic pink color.',
     textureKey: TextureKeys.ItemPixieDust,
     pools: [ItemPool.Treasure],
-    effects: [
-      { stat: 'damage', add: 0.5 },
-      { stat: 'missileSpeed', add: 60 },
-    ],
+    effects: [{ stat: 'missileSpeed', add: 60 }],
     missileTint: 0xff44aa, // magenta
+    /** 2 HP = one full heart (HP_PER_HEART). Pixie magic restores vitality. */
+    maxHealthBonus: 2,
   },
   heartContainer: {
     id: 'heartContainer',
@@ -136,13 +135,13 @@ export const ITEMS = {
   spyglass: {
     id: 'spyglass',
     displayName: 'Spyglass',
-    description: '+40% Range, +10% Missile Speed.',
+    description: '+1 max HP, +10% Missile Speed.',
     textureKey: TextureKeys.ItemSpyglass,
     pools: [ItemPool.Treasure, ItemPool.Shop],
-    effects: [
-      { stat: 'range', mult: 1.4 },
-      { stat: 'missileSpeed', mult: 1.1 },
-    ],
+    effects: [{ stat: 'missileSpeed', mult: 1.1 }],
+    /** 2 HP = one full heart (HP_PER_HEART). The spyglass spots danger
+     * before it lands — translates to a vitality bump. */
+    maxHealthBonus: 2,
     shopPrice: 14,
   },
   lilyDiadem: {
@@ -159,12 +158,12 @@ export const ITEMS = {
   mirePearl: {
     id: 'mirePearl',
     displayName: 'Mire Pearl',
-    description: '+50% Range, +1 Damage. Pearl-blue missile.',
+    description: '+1 Damage, +20% Missile Speed. Pearl-blue missile.',
     textureKey: TextureKeys.ItemMirePearl,
     pools: [ItemPool.Boss],
     effects: [
-      { stat: 'range', mult: 1.5 },
       { stat: 'damage', add: 1 },
+      { stat: 'missileSpeed', mult: 1.2 },
     ],
     missileTint: 0xb0e8ff,
     floor: 'sapphire-swamp',
@@ -209,13 +208,11 @@ export const ITEMS = {
   obsidianHeart: {
     id: 'obsidianHeart',
     displayName: 'Obsidian Heart',
-    description: '+1 Damage, +40% Range. Amethyst missile.',
+    description: '+1 Damage, +1 Max HP. Amethyst missile.',
     textureKey: TextureKeys.ItemObsidianHeart,
     pools: [ItemPool.Boss],
-    effects: [
-      { stat: 'damage', add: 1 },
-      { stat: 'range', mult: 1.4 },
-    ],
+    effects: [{ stat: 'damage', add: 1 }],
+    maxHealthBonus: 2,
     missileTint: 0x8a4ad8,
     floor: 'onyx-mansion',
   },

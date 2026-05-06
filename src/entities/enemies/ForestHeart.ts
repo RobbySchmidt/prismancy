@@ -40,7 +40,6 @@ export interface ForestHeartHost {
  */
 export class ForestHeart extends BossEnemy {
   override readonly displayName = 'Forest Heart';
-  override readonly maxHp = ENEMIES['boss-forest-heart'].hp;
   protected override readonly phases: readonly BossPhaseDefinition[] = [
     { hpThresholdFraction: 0.5, phaseIndex: 2 },
   ];

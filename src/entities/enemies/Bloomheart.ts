@@ -4,9 +4,7 @@ import {
   BLOOMHEART_INITIAL_DELAY_MS,
   BLOOMHEART_PHASE1_FAN_INTERVAL_MS,
   BLOOMHEART_PHASE1_TELEGRAPH_MS,
-  BLOOMHEART_PHASE2_ADD_INTERVAL_MS,
   BLOOMHEART_PHASE2_FAN_INTERVAL_MS,
-  BLOOMHEART_PHASE2_MAX_ADDS,
   BLOOMHEART_PHASE2_SPORE_INTERVAL_MS,
   BLOOMHEART_PHASE_FLASH_MS,
   BLOOMHEART_SPORE_BURST_COUNT,
@@ -16,15 +14,13 @@ import {
   ENEMY_PROJECTILE_SPEED,
 } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
-import { ENEMIES, type EnemyId } from '../../data/enemies';
+import { ENEMIES } from '../../data/enemies';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
-import { type BaseEnemy } from './BaseEnemy';
 import { BossEnemy, type BossPhaseDefinition } from './BossEnemy';
 
 export interface BloomheartHost {
   enemyProjectilePool: EnemyProjectilePool;
-  spawnEnemyAt(id: EnemyId, x: number, y: number): BaseEnemy | null;
   getPlayer(): Player;
   getRoomBounds(): { minX: number; maxX: number; minY: number; maxY: number };
 }
@@ -33,16 +29,20 @@ export interface BloomheartHost {
  * Bloomheart — Sapphire Swamp boss based on Snapper Bloom. Rooted carnivore
  * plant. Phase 1: a slow 5-thorn wide fan (±30°) every 1.6 s with a brief
  * mouth-open telegraph. Phase 2 (≤ 50 % HP): faster fan + a "spore" projectile
- * that drifts toward the player and bursts into 6 mini-thorns after a delay,
- * plus up to 2 Snapper Bloom adds.
+ * that drifts toward the player and bursts into 6 mini-thorns after a delay.
  *
  * The spore is a custom non-pooled visual sprite that the boss tracks; on
  * lifetime expiry it fires real EnemyProjectiles radially from the burst
  * position (so they damage on contact like any other enemy thorn).
+ *
+ * Phase-2 trash-mob adds (Snapper Bloom spawns) were removed in the
+ * Floor-HP-Scaling pass — under the new mob multiplier the adds were
+ * piling up while the player tried to dodge fan + spore, and the user
+ * flagged it as "must go". The faster fan + spore alone is enough to
+ * differentiate Phase 2.
  */
 export class Bloomheart extends BossEnemy {
   override readonly displayName = 'Bloomheart';
-  override readonly maxHp = ENEMIES['boss-bloomheart'].hp;
   protected override readonly phases: readonly BossPhaseDefinition[] = [
     { hpThresholdFraction: 0.5, phaseIndex: 2 },
   ];
@@ -51,8 +51,6 @@ export class Bloomheart extends BossEnemy {
   private nextFanAt: number;
   private telegraphScheduled = false;
   private nextSporeAt = 0;
-  private nextAddAt = 0;
-  private adds: BaseEnemy[] = [];
 
   constructor(scene: Phaser.Scene, x: number, y: number, host: BloomheartHost) {
     super(scene, x, y, ENEMIES['boss-bloomheart']);
@@ -69,7 +67,6 @@ export class Bloomheart extends BossEnemy {
     this.tickFan(time);
     if (this.currentPhase >= 2) {
       this.tickSpore(time);
-      this.tickAdds(time);
     }
   }
 
@@ -197,26 +194,6 @@ export class Bloomheart extends BossEnemy {
     });
   }
 
-  private tickAdds(time: number): void {
-    if (time < this.nextAddAt) return;
-    this.adds = this.adds.filter((a) => a.active);
-    if (this.adds.length < BLOOMHEART_PHASE2_MAX_ADDS) {
-      const bounds = this.host.getRoomBounds();
-      const margin = 0.18;
-      const x =
-        Math.random() < 0.5
-          ? bounds.minX + (bounds.maxX - bounds.minX) * margin * Math.random()
-          : bounds.maxX - (bounds.maxX - bounds.minX) * margin * Math.random();
-      const y =
-        Math.random() < 0.5
-          ? bounds.minY + (bounds.maxY - bounds.minY) * margin * Math.random()
-          : bounds.maxY - (bounds.maxY - bounds.minY) * margin * Math.random();
-      const add = this.host.spawnEnemyAt('snapper-bloom', x, y);
-      if (add) this.adds.push(add);
-    }
-    this.nextAddAt = time + BLOOMHEART_PHASE2_ADD_INTERVAL_MS;
-  }
-
   protected onPhaseChanged(newPhase: number): void {
     if (newPhase !== 2) return;
     this.scene.tweens.killTweensOf(this);
@@ -228,6 +205,5 @@ export class Bloomheart extends BossEnemy {
     this.scene.cameras.main.shake(180, 0.005);
     const now = this.scene.time.now;
     this.nextSporeAt = now + 600;
-    this.nextAddAt = now + 1400;
   }
 }

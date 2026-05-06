@@ -40,8 +40,6 @@ export interface VineLordHost {
  */
 export class VineLord extends BossEnemy {
   override readonly displayName = 'Vine Lord';
-  // Sourced from the data definition so HP balancing lives in `data/enemies.ts`.
-  override readonly maxHp = ENEMIES['boss-vine-lord'].hp;
   protected override readonly phases: readonly BossPhaseDefinition[] = [
     { hpThresholdFraction: 0.5, phaseIndex: 2 },
   ];

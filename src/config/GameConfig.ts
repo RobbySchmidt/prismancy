@@ -104,7 +104,7 @@ export const ENEMY_PROJECTILE_SPEED = 240;
 export const ENEMY_PROJECTILE_LIFETIME_MS = 1500;
 export const ENEMY_PROJECTILE_DAMAGE = 1;
 export const ENEMY_PROJECTILE_RADIUS = 8;
-export const ENEMY_PROJECTILE_POOL_SIZE = 32;
+export const ENEMY_PROJECTILE_POOL_SIZE = 96;
 
 // --- Mossy Slime -------------------------------------------------------------
 
@@ -176,8 +176,14 @@ export const MOSSY_BEHEMOTH_PHASE_FLASH_MS = 200;
 
 /** Phase 1: cooldown (ms) between teleports. */
 export const PIXIE_QUEEN_PHASE1_TELEPORT_INTERVAL_MS = 2000;
-/** Phase 2: shorter teleport cooldown. */
-export const PIXIE_QUEEN_PHASE2_TELEPORT_INTERVAL_MS = 1400;
+/**
+ * Phase 2: cooldown (ms) between teleports. Bumped 1400 → 2400 — Phase 2
+ * adds Pixie Dancer adds for extra pressure, so the teleport pace doesn't
+ * also need to accelerate. At 1400 the queen barely sat still long enough
+ * for the player to land hits while juggling adds; at 2400 she's vulnerable
+ * for ~2.2 s per cycle, which lets damage actually land.
+ */
+export const PIXIE_QUEEN_PHASE2_TELEPORT_INTERVAL_MS = 2400;
 /** Sparkle / fade-out window before teleporting (ms). */
 export const PIXIE_QUEEN_TELEPORT_FADE_MS = 200;
 /** Phase 2: cooldown (ms) between Pixie Dancer add spawns. */
@@ -288,7 +294,7 @@ export const TOAD_SOVEREIGN_PHASE2_MAX_ADDS = 2;
 
 // --- Bloomheart (boss, Floor 2) ----------------------------------------------
 
-export const BLOOMHEART_VISUAL_SCALE = 2.4 * WORLD_SPRITE_SCALE;
+export const BLOOMHEART_VISUAL_SCALE = 1.8 * WORLD_SPRITE_SCALE;
 export const BLOOMHEART_PHASE_FLASH_MS = 200;
 export const BLOOMHEART_INITIAL_DELAY_MS = 900;
 /** Phase 1: 5-thorn wide fan (±30°) on a slow cadence. */
@@ -303,8 +309,6 @@ export const BLOOMHEART_SPORE_SPEED = 140;
 export const BLOOMHEART_SPORE_LIFETIME_MS = 700;
 /** Number of mini-thorns the spore bursts into when it pops. */
 export const BLOOMHEART_SPORE_BURST_COUNT = 6;
-export const BLOOMHEART_PHASE2_ADD_INTERVAL_MS = 4000;
-export const BLOOMHEART_PHASE2_MAX_ADDS = 2;
 
 // --- Damselfly Empress (boss, Floor 2) ---------------------------------------
 
@@ -526,39 +530,154 @@ export const SAPPHIRE_MARQUIS_BERSERKER_SKIPPED_ARMS = 1;
 export const VAMPIRE_PHASE_FLASH_MS = 220;
 
 // --- Lord Onyx (secret endboss, Onyx Mansion) -------------------------------
-// Rooted endgame boss. Three phases: aimed homing missile + radial wave →
-// adds + faster cadence → continuous gap-spinning stream. Earned by
-// activating the gem seal with all 3 floor trophies.
+// Rooted endgame boss. Three phases of snappy bullet-hell base patterns,
+// each with a per-phase timer that triggers a Prism Special — the special
+// consumes one of the 3 floor gems from the altar (Chunk 2 hooks). Earned
+// by activating the gem seal with all 3 floor trophies.
 
 export const LORD_ONYX_HP = 90;
-/** Visual scale — chunky boss-tier silhouette so the silhouette dominates
- * the room. */
+/** Visual scale — chunky boss-tier silhouette so he dominates the room. */
 export const LORD_ONYX_VISUAL_SCALE = 1.7 * WORLD_SPRITE_SCALE;
 
-// Phase 1: aimed homing + radial wave.
-export const LORD_ONYX_P1_MISSILE_INTERVAL_MS = 1800;
-export const LORD_ONYX_P1_MISSILE_INITIAL_DELAY_MS = 1000;
-export const LORD_ONYX_P1_RADIAL_INTERVAL_MS = 4000;
-export const LORD_ONYX_P1_RADIAL_THORN_COUNT = 8;
 /** Slower turn rate than Cursed Mirror (110°/s) so even an end-game player
  * with stat-pumped move speed can sharp-cut around it. */
 export const LORD_ONYX_HOMING_TURN_RATE_DEG = 60;
 export const LORD_ONYX_PROJECTILE_LIFETIME_MS = 2400;
 
-// Phase 2: faster cadence + Wraith adds + spinning cross.
-export const LORD_ONYX_P2_MISSILE_INTERVAL_MS = 1300;
-export const LORD_ONYX_P2_RADIAL_INTERVAL_MS = 3000;
-export const LORD_ONYX_P2_CROSS_INTERVAL_MS = 2000;
+// Phase 1: aimed 5-thorn fan + slowly-rotating 4-thorn cross.
+// Two overlapping rhythms — fan tracks the player, cross is boss-relative.
+export const LORD_ONYX_P1_FAN_INTERVAL_MS = 1600;
+export const LORD_ONYX_P1_FAN_INITIAL_DELAY_MS = 800;
+export const LORD_ONYX_P1_FAN_THORN_COUNT = 5;
+export const LORD_ONYX_P1_FAN_SPREAD_DEG = 32;
+export const LORD_ONYX_P1_CROSS_INTERVAL_MS = 2400;
+export const LORD_ONYX_P1_CROSS_INITIAL_DELAY_MS = 1800;
+export const LORD_ONYX_P1_CROSS_DRIFT_DEG_PER_S = 22;
+
+// Phase 2: 8-arm spinning ring with 90° gap (2 of 8 arms skipped) +
+// telegraphed walk-snipe through the gap (every 2 s). Wraith adds spawn
+// once on phase entry.
+export const LORD_ONYX_P2_RING_ARM_COUNT = 8;
+/** 2 arms skipped of 8 = 90° rotating gap. */
+export const LORD_ONYX_P2_RING_GAP_ARMS = 2;
+export const LORD_ONYX_P2_RING_SPIN_DEG_PER_S = 56;
+export const LORD_ONYX_P2_RING_FIRE_INTERVAL_MS = 220;
+export const LORD_ONYX_P2_SNIPE_INTERVAL_MS = 2000;
+export const LORD_ONYX_P2_SNIPE_TELEGRAPH_MS = 380;
 export const LORD_ONYX_P2_ADD_COUNT = 2;
 
-// Phase 3: continuous spinning stream with permanent gap (Marquis-style).
-export const LORD_ONYX_P3_SPIN_RATE_DEG_PER_SEC = 60;
-export const LORD_ONYX_P3_FIRE_INTERVAL_MS = 180;
-export const LORD_ONYX_P3_ARM_COUNT = 8;
-export const LORD_ONYX_P3_SKIPPED_ARMS = 1;
-/** Aimed homing on top of the spin, so standing in the gap forever isn't
- * enough — player has to keep moving with the gap AND dodge a heat-seeker. */
-export const LORD_ONYX_P3_MISSILE_INTERVAL_MS = 2400;
+// Phase 3: enrolling radial waves — 12 thorns spawn at the room perimeter
+// and converge inward toward Lord Onyx. Forces the player into a mid-range
+// orbit donut (too close = bullet gaps converge too tight; too far = you're
+// where they spawn). Aimed homing on top so you can't just camp the donut.
+export const LORD_ONYX_P3_WAVE_INTERVAL_MS = 2800;
+export const LORD_ONYX_P3_WAVE_THORN_COUNT = 12;
+/** Spawn radius for inward-converging thorns (relative to Lord Onyx). */
+export const LORD_ONYX_P3_WAVE_SPAWN_RADIUS = 320;
+export const LORD_ONYX_P3_WAVE_SPEED = 110;
+export const LORD_ONYX_P3_WAVE_LIFETIME_MS = 4000;
+/** Passive warning-marker window before each inward thorn becomes a real
+ * (hitbox-having) projectile. Without this the perimeter spawns can land
+ * directly on the player, which the user flagged as unfair. */
+export const LORD_ONYX_P3_WAVE_TELEGRAPH_MS = 500;
+export const LORD_ONYX_P3_HOMING_INTERVAL_MS = 1400;
+
+// Per-phase Prism Special trigger — counts from phase entry. The matching
+// gem flies from the altar into the boss's prism during the charge, then
+// the gem-themed pattern fires and the altar socket clears.
+export const LORD_ONYX_SPECIAL_DELAY_P1_MS = 6000;
+export const LORD_ONYX_SPECIAL_DELAY_P2_MS = 5000;
+export const LORD_ONYX_SPECIAL_DELAY_P3_MS = 4000;
+
+// Special state machine (model B — boss invulnerable during centering →
+// charge → fire → recovering, vulnerable again on idle).
+/** Pre-charge centering teleport — every Prism Special starts with a
+ * brief blink to the room center so the radial patterns stay
+ * symmetrical and the player has a fixed reference point. Skipped if
+ * the boss is already within ~half a tile of center. */
+export const LORD_ONYX_SPECIAL_CENTER_TELEPORT_MS = 400;
+/** Charge window: prism glow builds, boss is rooted + invulnerable, gem
+ * flies in from the altar. Patterns fire at charge-end. */
+export const LORD_ONYX_SPECIAL_CHARGE_MS = 1200;
+/** Brief invulnerable cooldown after the pattern finishes. Prevents the
+ * player from punishing the recovery frame. */
+export const LORD_ONYX_SPECIAL_RECOVER_MS = 400;
+/** Glow colors keyed to the 3 floor gems (matching floor palette glow). */
+export const LORD_ONYX_SPECIAL_COLOR_P1 = 0x4afa80; // emerald
+export const LORD_ONYX_SPECIAL_COLOR_P2 = 0x4a80fa; // sapphire
+export const LORD_ONYX_SPECIAL_COLOR_P3 = 0xc864ff; // amethyst / onyx
+
+// Phase 1 special — Forest Wrath: boss "ignites" 10 emerald-tinted thorns
+// from his prism that fan out radially, then home onto the player for a
+// few seconds before despawning. Boss stays passive throughout — no other
+// attacks fire during this window.
+export const LORD_ONYX_FOREST_WRATH_THORN_COUNT = 10;
+/** Initial radial spread speed before homing kicks in. */
+export const LORD_ONYX_FOREST_WRATH_INITIAL_SPEED = 160;
+/** Homing turn rate. Slightly looser than Cursed Mirror so the player
+ * has room to handle the boss's normal Phase 1 base patterns (fan +
+ * cross) firing on top of the homing swarm. */
+export const LORD_ONYX_FOREST_WRATH_HOMING_TURN_DEG = 100;
+/** How long each homing thorn lives before despawning. */
+export const LORD_ONYX_FOREST_WRATH_LIFETIME_MS = 10000;
+/** Total special window — slightly longer than thorn lifetime so the
+ * recovery doesn't bleed into the despawn frame. */
+export const LORD_ONYX_FOREST_WRATH_PATTERN_MS = 10300;
+
+// Phase 2 special — Tide Mandala: 2 sapphire orbiting rings around the
+// boss + aimed thorns through the gaps. Bog-Colossus-style.
+export const LORD_ONYX_TIDE_OUTER_THORNS = 6;
+export const LORD_ONYX_TIDE_OUTER_RADIUS = 150;
+export const LORD_ONYX_TIDE_OUTER_SPEED_DEG_PER_S = 90;
+export const LORD_ONYX_TIDE_INNER_THORNS = 5;
+export const LORD_ONYX_TIDE_INNER_RADIUS = 80;
+export const LORD_ONYX_TIDE_INNER_SPEED_DEG_PER_S = -130;
+export const LORD_ONYX_TIDE_ORBIT_DURATION_MS = 2600;
+export const LORD_ONYX_TIDE_AIMED_INTERVAL_MS = 650;
+export const LORD_ONYX_TIDE_RELEASE_SPEED = 220;
+export const LORD_ONYX_TIDE_PATTERN_MS = 3300;
+
+// Phase 3 special — Crimson Web: pulsing radial waves expanding outward
+// from the boss. Each wave is N thorns at evenly-spaced slots (= rotation
+// positions); one slot is the wave's gap. Adjacent thorns in the same
+// wave are connected by jagged crimson lightning bolts that track their
+// projectiles each frame. Successive waves drift their gap by 1 slot so
+// the player has to "snake" through the wave-front.
+export const LORD_ONYX_WEB_WAVE_COUNT = 14;
+export const LORD_ONYX_WEB_WAVE_INTERVAL_MS = 700;
+/** Slots in a wave's ring. 12 slots = 30° apart; with 1 skipped that's
+ * a 30°-wide gap. With drift = 1 slot per wave, the gap moves only 30°
+ * per 700 ms — base-speed player can keep tangential pace at the
+ * radius the wave-front is at (~150 px/s required at R=200). */
+export const LORD_ONYX_WEB_THORNS_PER_WAVE = 12;
+/** Each successive wave drifts its gap slot by this many positions in
+ * the same direction — gives the "drift to thread" feel. */
+export const LORD_ONYX_WEB_GAP_DRIFT_SLOTS = 1;
+/** Outward radial speed for every wave thorn. Slow enough that the
+ * player has time to read each wave + thread its gap. */
+export const LORD_ONYX_WEB_WAVE_SPEED = 110;
+/** Lifetime per wave thorn (covers the room edge + a bit). */
+export const LORD_ONYX_WEB_WAVE_LIFETIME_MS = 3500;
+/** Total special window — sustained pulsing pressure across the full
+ * window, gap rotates around the boss as the player snakes through. */
+export const LORD_ONYX_WEB_PATTERN_MS = 10000;
+/** Crimson tint for every web projectile + lightning bolt. */
+export const LORD_ONYX_WEB_COLOR = 0xc8284a;
+
+// Teleport movement — keeps the rooted boss visually interesting.
+// Telegraph: boss fades to 0.35 alpha + a tinted-black shadow of his sprite
+// appears at the target location, pulsing. After the telegraph he snaps to
+// the target and the shadow fades. Attacks continue from his current
+// position during the telegraph so the player has to read both the
+// patterns and the imminent reposition.
+export const LORD_ONYX_TELEPORT_INTERVAL_MS = 4500;
+export const LORD_ONYX_TELEPORT_TELEGRAPH_MS = 700;
+export const LORD_ONYX_TELEPORT_INITIAL_DELAY_MS = 3500;
+/** Min distance from the player at the chosen teleport target. */
+export const LORD_ONYX_TELEPORT_MIN_PLAYER_DIST = 220;
+/** Wall margin so he never teleports into a corner where Phase 3 waves
+ * would spawn far outside the room. */
+export const LORD_ONYX_TELEPORT_WALL_MARGIN = 96;
 
 /** Phase transition flash + camera shake durations. */
 export const LORD_ONYX_PHASE_FLASH_MS = 260;
@@ -757,7 +876,6 @@ export const BASE_PLAYER_STATS: PlayerStats = {
   damage: MISSILE_DAMAGE,
   fireRate: 1.0,
   missileSpeed: MISSILE_SPEED,
-  range: 1.0,
   moveSpeed: PLAYER_SPEED,
   missileScale: 1.0,
 };
