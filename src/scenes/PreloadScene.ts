@@ -271,13 +271,18 @@ export class PreloadScene extends Phaser.Scene {
     const size = TILE_SIZE;
     g.clear();
 
-    // Mockup grid is ~24 cols × 26 rows. PX = 2 → 48 × 52, fits inside 64².
-    const PX = 2;
-    const GRID_W = 24;
-    const GRID_H = 26;
-    const offX = Math.floor((size - GRID_W * PX) / 2);
-    const offY = Math.floor((size - GRID_H * PX) / 2);
-
+    // Painted version (Variant C "Compact Wizard" from StyleMockupScene Page 7).
+    // Same vocabulary as the bosses — fillPoints silhouette + fillEllipse/
+    // fillTriangle multi-tone shading + soft outline — instead of the old PX-2
+    // pixel-block grid. Slightly smaller than the previous pixel-art so the
+    // wizard reads as a hero rather than dominating the room.
+    //
+    // Palette mapping (mockup → palette field):
+    //   ROBE_DARK → ROBE_SHADOW
+    //   TIP_HALO  → TIP_SPARKLE
+    // SHADOW + BOOT_HI + HAT (mid-tone) are kept in the palette interface
+    // even though they're consumed sparingly here, so the existing two
+    // skin palettes (default purple, prismancy crimson) keep working.
     const {
       OUT,
       HAT,
@@ -293,140 +298,172 @@ export class PreloadScene extends Phaser.Scene {
       BUCKLE,
       WAND,
       TIP,
-      SHADOW,
       BOOT,
-      BOOT_HI,
       EYE,
       TIP_SPARKLE,
     } = palette;
+    void HAT;
+    void palette.SHADOW;
+    void palette.BOOT_HI;
 
-    const block = (x: number, y: number, w: number, h: number, color: number): void =>
-      this.pxBlock(g, x, y, w, h, color, PX, offX, offY);
-    const dot = (x: number, y: number, color: number): void =>
-      this.px(g, x, y, color, PX, offX, offY);
+    const cx = size / 2;        // 32
+    const top = 10;             // figure top y (hat tip) — shifted down vs.
+                                 // the previous painterly pass so the figure
+                                 // shrinks ~85 % without changing the world-
+                                 // space hitbox (PLAYER_HITBOX_OFFSET_Y +
+                                 // PLAYER_HITBOX_RADIUS in GameConfig stay
+                                 // unchanged). User-flagged 2026-05-07.
+    const figBot = 53;          // boots bottom y
 
-    // Hat tip (gold orb at top)
-    block(11, 5, 2, 1, TIP);
-    block(11, 4, 1, 1, OUT);
-    block(12, 4, 1, 1, OUT);
+    // 1) ROBE — bell silhouette, rounded shoulders, slight hem flare.
+    const robe: Array<{ x: number; y: number }> = [
+      { x: cx - 5, y: top + 20 },     // L shoulder
+      { x: cx + 5, y: top + 20 },     // R shoulder
+      { x: cx + 8, y: top + 28 },     // R side mid
+      { x: cx + 11, y: top + 36 },    // R hem corner
+      { x: cx + 9, y: top + 39 },     // R hem inner
+      { x: cx, y: top + 40 },         // hem center
+      { x: cx - 9, y: top + 39 },     // L hem inner
+      { x: cx - 11, y: top + 36 },    // L hem corner
+      { x: cx - 8, y: top + 28 },     // L side mid
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(robe, true);
+    g.fillStyle(ROBE_SHADOW, 1);
+    g.fillPoints(
+      robe.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    // Mid-tone fills.
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(cx, top + 28, 14, 16);
+    g.fillEllipse(cx, top + 35, 19, 7);
+    // Left-edge highlight rim.
+    g.fillStyle(ROBE_HI, 0.65);
+    g.fillEllipse(cx - 3, top + 27, 2.5, 9);
 
-    // Hat — narrowing cone with outline + dark side + highlight
-    // Row y=6
-    block(10, 6, 1, 1, OUT);
-    block(11, 6, 2, 1, HAT_DARK);
-    block(13, 6, 1, 1, OUT);
-    // Row y=7
-    block(10, 7, 1, 1, OUT);
-    block(11, 7, 2, 1, HAT_HI);
-    block(13, 7, 1, 1, HAT_DARK);
-    block(14, 7, 1, 1, OUT);
-    // Row y=8
-    block(9, 8, 1, 1, OUT);
-    block(10, 8, 1, 1, HAT_HI);
-    block(11, 8, 1, 1, HAT_HI);
-    block(12, 8, 2, 1, HAT);
-    block(14, 8, 1, 1, HAT_DARK);
-    block(15, 8, 1, 1, OUT);
-    // Row y=9
-    block(9, 9, 1, 1, OUT);
-    block(10, 9, 1, 1, HAT_HI);
-    block(11, 9, 3, 1, HAT);
-    block(14, 9, 1, 1, HAT_DARK);
-    block(15, 9, 1, 1, OUT);
-    // Hat brim
-    block(7, 10, 1, 1, OUT);
-    block(8, 10, 8, 1, HAT_DARK);
-    block(16, 10, 1, 1, OUT);
-    // Shadow under brim
-    block(8, 11, 8, 1, SHADOW);
+    // 2) BELT with buckle — cinches the bell silhouette.
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 8, top + 30, 16, 3);
+    g.fillStyle(BOOT, 1);
+    g.fillRect(cx - 7, top + 31, 14, 1);
+    g.fillStyle(BUCKLE, 1);
+    g.fillRect(cx - 2, top + 31, 4, 2);
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 1, top + 32, 2, 1);
 
-    // Face row y=11 outlines
-    block(8, 11, 1, 1, OUT);
-    block(15, 11, 1, 1, OUT);
-    // Face row y=12: skin
-    block(8, 12, 1, 1, OUT);
-    block(15, 12, 1, 1, OUT);
-    block(9, 12, 6, 1, SKIN);
-    dot(10, 12, EYE);
-    dot(13, 12, EYE);
-    // Face row y=13
-    block(8, 13, 1, 1, OUT);
-    block(15, 13, 1, 1, OUT);
-    block(9, 13, 6, 1, SKIN);
-    dot(11, 13, SKIN_SHADOW);
-    dot(12, 13, SKIN_SHADOW);
+    // 3) GOLD HEM TRIM — slim accent above the hem corner.
+    g.fillStyle(BUCKLE, 0.85);
+    g.fillRect(cx - 10, top + 38, 20, 1);
 
-    // Beard — three rows tapering, with subtle shadow detail pixels
-    block(8, 14, 1, 1, OUT);
-    block(15, 14, 1, 1, OUT);
-    block(9, 14, 6, 1, BEARD);
-    dot(10, 14, BEARD_SHADOW);
-    dot(13, 14, BEARD_SHADOW);
-    block(8, 15, 1, 1, OUT);
-    block(15, 15, 1, 1, OUT);
-    block(9, 15, 6, 1, BEARD);
-    dot(11, 15, BEARD_SHADOW);
-    dot(12, 15, BEARD_SHADOW);
-    block(9, 16, 1, 1, OUT);
-    block(14, 16, 1, 1, OUT);
-    block(10, 16, 4, 1, BEARD);
+    // 4) BOOTS peeking out at the hem.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx - 3, top + 42, 5, 3);
+    g.fillEllipse(cx + 3, top + 42, 5, 3);
+    g.fillStyle(BOOT, 1);
+    g.fillEllipse(cx - 3, top + 42, 3.5, 2);
+    g.fillEllipse(cx + 3, top + 42, 3.5, 2);
 
-    // Robe — shoulders down to hem, highlight on the left, shadow on the right
-    block(8, 17, 1, 1, OUT);
-    block(15, 17, 1, 1, OUT);
-    block(9, 17, 6, 1, ROBE);
-    dot(9, 17, ROBE_HI);
-    dot(14, 17, ROBE_SHADOW);
-    block(7, 18, 1, 1, OUT);
-    block(16, 18, 1, 1, OUT);
-    block(8, 18, 8, 1, ROBE);
-    dot(8, 18, ROBE_HI);
-    block(14, 18, 2, 1, ROBE_SHADOW);
-    block(7, 19, 1, 1, OUT);
-    block(16, 19, 1, 1, OUT);
-    block(8, 19, 8, 1, ROBE);
-    dot(8, 19, ROBE_HI);
-    block(14, 19, 2, 1, ROBE_SHADOW);
-    // Belt
-    block(7, 20, 1, 1, OUT);
-    block(16, 20, 1, 1, OUT);
-    block(8, 20, 8, 1, BOOT);
-    dot(11, 20, BUCKLE);
-    dot(12, 20, BUCKLE);
-    // Robe lower
-    block(7, 21, 1, 1, OUT);
-    block(16, 21, 1, 1, OUT);
-    block(8, 21, 8, 1, ROBE);
-    dot(8, 21, ROBE_HI);
-    block(14, 21, 2, 1, ROBE_SHADOW);
-    block(6, 22, 1, 1, OUT);
-    block(17, 22, 1, 1, OUT);
-    block(7, 22, 10, 1, ROBE);
-    dot(7, 22, ROBE_HI);
-    block(14, 22, 3, 1, ROBE_SHADOW);
-    block(6, 23, 1, 1, OUT);
-    block(17, 23, 1, 1, OUT);
-    block(7, 23, 10, 1, ROBE_SHADOW);
+    // 5) BEARD — soft rounded tuft below the face.
+    const beard: Array<{ x: number; y: number }> = [
+      { x: cx - 3, y: top + 14 },
+      { x: cx + 3, y: top + 14 },
+      { x: cx + 5, y: top + 18 },
+      { x: cx + 2, y: top + 21 },
+      { x: cx, y: top + 22 },
+      { x: cx - 2, y: top + 21 },
+      { x: cx - 5, y: top + 18 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(beard, true);
+    g.fillStyle(BEARD, 1);
+    g.fillPoints(
+      beard.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(BEARD_SHADOW, 0.55);
+    g.fillEllipse(cx + 2, top + 19, 2, 3);
 
-    // Wand peeking out on right side (rises behind shoulder)
-    dot(17, 17, WAND);
-    dot(18, 16, WAND);
-    block(19, 14, 1, 1, OUT);
-    block(19, 15, 1, 1, OUT);
-    dot(19, 14, TIP);
-    dot(19, 15, TIP);
-    dot(18, 13, TIP_SPARKLE);
+    // 6) FACE strip above the beard.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx, top + 12, 8, 5);
+    g.fillStyle(SKIN, 1);
+    g.fillEllipse(cx, top + 12, 6.5, 3.7);
+    g.fillStyle(SKIN_SHADOW, 0.7);
+    g.fillRect(cx - 3, top + 14, 5, 1);
+    // Eyes.
+    g.fillStyle(EYE, 1);
+    g.fillRect(cx - 2, top + 11, 1, 2);
+    g.fillRect(cx + 2, top + 11, 1, 2);
 
-    // Feet
-    block(9, 24, 2, 1, BOOT);
-    block(13, 24, 2, 1, BOOT);
-    dot(9, 24, BOOT_HI);
-    dot(13, 24, BOOT_HI);
+    // 7) HAT — pointed cone with soft brim.
+    const hat: Array<{ x: number; y: number }> = [
+      { x: cx, y: top + 0 },          // tip
+      { x: cx + 1, y: top + 3 },
+      { x: cx + 3, y: top + 7 },
+      { x: cx + 5, y: top + 10 },
+      { x: cx + 8, y: top + 12 },     // brim corner R
+      { x: cx + 5, y: top + 13 },     // under R
+      { x: cx, y: top + 12 },         // under center
+      { x: cx - 5, y: top + 13 },     // under L
+      { x: cx - 8, y: top + 12 },     // brim corner L
+      { x: cx - 5, y: top + 10 },
+      { x: cx - 3, y: top + 7 },
+      { x: cx - 1, y: top + 3 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(hat, true);
+    g.fillStyle(HAT_DARK, 1);
+    g.fillPoints(
+      hat.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(HAT, 1);
+    g.fillTriangle(
+      cx - 0.5, top + 2,
+      cx + 3, top + 9,
+      cx - 4, top + 11,
+    );
+    g.fillStyle(HAT_HI, 0.7);
+    g.fillTriangle(
+      cx - 1, top + 3,
+      cx + 0.5, top + 3,
+      cx - 3, top + 9,
+    );
+    // Gold tip orb above the hat point.
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx, top - 2, 1.7);
+    g.fillStyle(BUCKLE, 1);
+    g.fillCircle(cx, top - 2, 1.2);
+    // Brim shadow under hat.
+    g.fillStyle(OUT, 0.55);
+    g.fillEllipse(cx, top + 14, 12, 1.3);
 
-    // Ground shadow under boots (semi-transparent ellipse)
-    const groundCx = offX + 12 * PX;
-    const groundCy = offY + 25.4 * PX;
-    this.groundShadow(g, groundCx, groundCy, 4 * PX, 1.2 * PX, 0.4);
+    // 8) WAND held forward in front of the body, less-extreme tilt — tip
+    // points up-right above the shoulder. Hand grips at chest level.
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx + 2, top + 30, cx + 11, top + 16, cx + 12, top + 19);
+    g.fillStyle(WAND, 1);
+    g.fillTriangle(cx + 2, top + 31, cx + 10, top + 17, cx + 11, top + 19);
+
+    // 9) HAND on the wand — no full sleeve, the arm is implied (D's idiom).
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx + 6, top + 26, 1.7);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(cx + 6, top + 26, 1.3);
+
+    // 10) WAND TIP — gold orb + soft halo + catchlight pixel.
+    g.fillStyle(TIP_SPARKLE, 0.5);
+    g.fillCircle(cx + 11, top + 17, 4);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx + 11, top + 17, 1.9);
+    g.fillStyle(TIP, 1);
+    g.fillCircle(cx + 11, top + 17, 1.4);
+    g.fillStyle(TIP_SPARKLE, 1);
+    g.fillRect(cx + 10, top + 16, 1, 1);
+
+    // 11) Ground shadow under the boots.
+    this.groundShadow(g, cx, figBot + 2, 9, 1.4, 0.45);
 
     g.generateTexture(textureKey, size, size);
   }

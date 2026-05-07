@@ -14,8 +14,8 @@ import {
 import { FLOORS } from '../data/floors';
 import { RNG } from '../utils/RNG';
 
-type MockupPage = 0 | 1 | 2 | 3 | 4 | 5;
-const PAGE_COUNT = 6;
+type MockupPage = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+const PAGE_COUNT = 7;
 
 /**
  * Visual mockup with four pages, switched via TAB:
@@ -114,6 +114,14 @@ export class StyleMockupScene extends Phaser.Scene {
           `Page 6/${PAGE_COUNT} Â· Old V2 vs. variants  (A = implemented)`,
         );
         this.paintShowcaseMarquisVariants();
+        break;
+      case 6:
+        this.paintHeader(
+          cx,
+          'WIZARD SPRITE VARIANT MOCKUP',
+          `Page 7/${PAGE_COUNT} Â· Current pixel-art vs. 4 painterly redesigns`,
+        );
+        this.paintShowcaseWizardVariants();
         break;
     }
     this.paintFooter(cx);
@@ -3861,6 +3869,817 @@ export class StyleMockupScene extends Phaser.Scene {
       );
       g.fillStyle(SILVER_HI, 1);
       g.fillRect(ox - 1, oy - 1, 1, 1);
+    }
+  }
+
+  // ===========================================================================
+  // Page 7: Wizard sprite painterly redesigns
+  //
+  // Goal: bring the player sprite up to the same painted-silhouette quality
+  // as the bosses + the room atmospheres. The current sprite is hard pixel-
+  // art (PX-2 grid blocks, flat shading, hard outlines), which clashes with
+  // the rest of the visual style now that levels + bosses have moved to
+  // soft fillPoints silhouettes + multi-tone shading.
+  //
+  //   CURRENT  — live `tex-player` rendered at 4×, pixel-art reference
+  //   A — SMOOTH PAINTER  : same wizard concept (witch hat, beard, robe),
+  //                          painted with fillPoints + ellipses + 4-tone
+  //                          shading. Same height as current.
+  //   B — HOODED SAGE     : concept change — deep hood replaces witch hat,
+  //                          face partially in shadow, mansion-floor mood.
+  //   C — COMPACT WIZARD  : same painterly redesign as A but ~85 % scale,
+  //                          tighter belt cinch, more heroic stance.
+  //   D — APPRENTICE      : ~70 % scale, rounder proportions, wand actively
+  //                          casting in front, "young mage" reading.
+  // ===========================================================================
+
+  private paintShowcaseWizardVariants(): void {
+    const slots: Array<{
+      title: string;
+      lines: readonly string[];
+      paint: (cx: number, cy: number) => void;
+    }> = [
+      {
+        title: 'CURRENT  (PIXEL-ART)',
+        lines: ['Hard PX-2 block grid,', 'flat shading + outlines,', 'clashes with painted bosses.'],
+        paint: (cx, cy) => this.paintWizardCurrent(cx, cy),
+      },
+      {
+        title: 'A — SMOOTH PAINTER',
+        lines: [
+          'Same concept, painterly.',
+          'fillPoints silhouette,',
+          '4-tone robe shading.',
+        ],
+        paint: (cx, cy) => this.drawWizardVariantSmooth(this.add.graphics(), cx, cy),
+      },
+      {
+        title: 'B — HOODED SAGE',
+        lines: [
+          'Deep hood, face in shadow,',
+          'mansion-floor mood.',
+          'Beard tip + glowing eyes.',
+        ],
+        paint: (cx, cy) => this.drawWizardVariantHooded(this.add.graphics(), cx, cy),
+      },
+      {
+        title: 'C — COMPACT WIZARD',
+        lines: [
+          '~85 % size, tighter cinch,',
+          'heroic stance, painted.',
+          'Most familiar redesign.',
+        ],
+        paint: (cx, cy) => this.drawWizardVariantCompact(this.add.graphics(), cx, cy),
+      },
+      {
+        title: 'D — APPRENTICE',
+        lines: [
+          '~70 % size, rounder shape,',
+          'wand casting forward,',
+          '"young mage" reading.',
+        ],
+        paint: (cx, cy) => this.drawWizardVariantApprentice(this.add.graphics(), cx, cy),
+      },
+    ];
+
+    const centers = [96, 288, 480, 672, 864];
+    const slotHalfW = 86;
+    const slotTopY = 110;
+    const slotH = 350;
+    const titleY = slotTopY + 14;
+    const wizardY = slotTopY + 210;
+    const descTopY = slotTopY + 280;
+
+    for (let i = 0; i < slots.length; i++) {
+      const sx = centers[i];
+      const slot = slots[i];
+
+      // Frame box — purple border to match wizard palette.
+      const frame = this.add.graphics();
+      frame.fillStyle(0x0a0418, 0.65);
+      frame.fillRect(sx - slotHalfW, slotTopY, slotHalfW * 2, slotH);
+      frame.lineStyle(1, 0x9a4cd8, 0.45);
+      frame.strokeRect(sx - slotHalfW, slotTopY, slotHalfW * 2, slotH);
+
+      // Floor shadow + warm pad.
+      const pad = this.add.graphics();
+      pad.fillStyle(0x000000, 0.55);
+      pad.fillEllipse(sx, wizardY + 70, 78, 13);
+      pad.fillStyle(0x9a4cd8, 0.16);
+      pad.fillEllipse(sx, wizardY + 70, 56, 9);
+      pad.fillStyle(0xffd84a, 0.20);
+      pad.fillEllipse(sx, wizardY + 70, 26, 5);
+
+      this.add
+        .text(sx, titleY, slot.title, {
+          fontSize: '15px',
+          fontStyle: 'bold',
+          color: '#e9d5ff',
+          stroke: '#1a0828',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5, 0);
+
+      slot.paint(sx, wizardY);
+
+      for (let li = 0; li < slot.lines.length; li++) {
+        this.add
+          .text(sx, descTopY + li * 16, slot.lines[li], {
+            fontSize: '11px',
+            color: '#aab8c0',
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5, 0)
+          .setAlpha(0.9);
+      }
+    }
+  }
+
+  /**
+   * Renders the live ingame Player texture at 4× scale so the comparison
+   * against the painted variants is honest. Halo behind the sprite for
+   * parity with the painted variants (which all bake their own glow).
+   */
+  private paintWizardCurrent(cx: number, cy: number): void {
+    const halo = this.add.graphics();
+    halo.fillStyle(0x9a4cd8, 0.10);
+    halo.fillCircle(cx, cy, 80);
+    halo.fillStyle(0x5a1f9a, 0.16);
+    halo.fillCircle(cx, cy, 50);
+    const img = this.add.image(cx, cy, TextureKeys.Player);
+    img.setScale(4);
+    halo.setDepth(img.depth - 1);
+  }
+
+  /**
+   * VARIANT A — Smooth Painter.
+   * Same wizard concept (pointed witch hat + white beard + purple robe +
+   * gold belt + wand) but rendered with fillPoints silhouette + 4-tone
+   * shading instead of the PX-2 pixel-block grid. Reads as the same
+   * character, just painted in the same vocabulary as the bosses + walls.
+   */
+  private drawWizardVariantSmooth(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const OUT = 0x1a0828;
+    const HAT_DARK = 0x3a0f70;
+    const HAT = 0x5a1f9a;
+    const HAT_HI = 0x8a4fce;
+    const ROBE_DARK = 0x3a0c68;
+    const ROBE = 0x7a2cb8;
+    const ROBE_HI = 0xa672e0;
+    const SKIN = 0xf0c89a;
+    const SKIN_SHADOW = 0xc89a6c;
+    const BEARD = 0xf0f0f0;
+    const BEARD_HI = 0xffffff;
+    const BEARD_SHADOW = 0xb0b0b8;
+    const BUCKLE = 0xffd84a;
+    const WAND = 0xc89758;
+    const TIP = 0xffd84a;
+    const TIP_HALO = 0xfff8c0;
+    const EYE = 0x222222;
+    const BOOT = 0x2a1a0d;
+
+    const bx = cx;
+    const top = cy - 80;
+
+    // 1) ROBE — bell silhouette, rounded shoulders, slight hem flare.
+    const robeOuter = [
+      { x: bx - 14, y: top + 64 },     // left shoulder
+      { x: bx + 14, y: top + 64 },     // right shoulder
+      { x: bx + 22, y: top + 100 },    // mid-side
+      { x: bx + 32, y: top + 134 },    // hem-corner
+      { x: bx + 26, y: top + 148 },    // hem inner
+      { x: bx + 12, y: top + 152 },    // hem center-right
+      { x: bx, y: top + 150 },         // hem center
+      { x: bx - 12, y: top + 152 },    // hem center-left
+      { x: bx - 26, y: top + 148 },    // hem inner left
+      { x: bx - 32, y: top + 134 },
+      { x: bx - 22, y: top + 100 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(robeOuter, true);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      robeOuter.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(bx, top + 110, 38, 60);
+    g.fillEllipse(bx, top + 140, 50, 22);
+    g.fillStyle(ROBE_HI, 0.7);
+    g.fillEllipse(bx - 8, top + 100, 8, 36);
+
+    // Belt with buckle — cinches the bell silhouette.
+    g.fillStyle(OUT, 1);
+    g.fillRect(bx - 24, top + 116, 48, 7);
+    g.fillStyle(BOOT, 1);
+    g.fillRect(bx - 22, top + 117, 44, 5);
+    g.fillStyle(BUCKLE, 1);
+    g.fillRect(bx - 5, top + 117, 10, 6);
+    g.fillStyle(OUT, 1);
+    g.fillRect(bx - 3, top + 119, 6, 2);
+
+    // Hem outline accent (gold trim).
+    g.fillStyle(BUCKLE, 0.85);
+    g.fillRect(bx - 30, top + 144, 60, 2);
+
+    // 2) BOOTS peeking out at the hem.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(bx - 9, top + 156, 12, 7);
+    g.fillEllipse(bx + 9, top + 156, 12, 7);
+    g.fillStyle(BOOT, 1);
+    g.fillEllipse(bx - 9, top + 156, 10, 5);
+    g.fillEllipse(bx + 9, top + 156, 10, 5);
+
+    // 3) BEARD — soft rounded shape, multi-tone.
+    const beardPts = [
+      { x: bx - 10, y: top + 50 },
+      { x: bx + 10, y: top + 50 },
+      { x: bx + 14, y: top + 60 },
+      { x: bx + 8, y: top + 72 },
+      { x: bx, y: top + 76 },
+      { x: bx - 8, y: top + 72 },
+      { x: bx - 14, y: top + 60 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(beardPts, true);
+    g.fillStyle(BEARD, 1);
+    g.fillPoints(
+      beardPts.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(BEARD_HI, 0.7);
+    g.fillEllipse(bx - 4, top + 56, 4, 6);
+    g.fillStyle(BEARD_SHADOW, 0.6);
+    g.fillEllipse(bx + 5, top + 66, 5, 8);
+
+    // 4) FACE strip above the beard.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(bx, top + 46, 18, 10);
+    g.fillStyle(SKIN, 1);
+    g.fillEllipse(bx, top + 46, 16, 8);
+    g.fillStyle(SKIN_SHADOW, 0.8);
+    g.fillRect(bx - 6, top + 49, 12, 1);
+    // Eyes.
+    g.fillStyle(EYE, 1);
+    g.fillRect(bx - 5, top + 44, 2, 2);
+    g.fillRect(bx + 3, top + 44, 2, 2);
+
+    // 5) HAT — pointed cone with rounded brim, gold tip orb.
+    const hat = [
+      { x: bx, y: top + 0 },           // tip
+      { x: bx + 4, y: top + 14 },
+      { x: bx + 10, y: top + 28 },
+      { x: bx + 16, y: top + 38 },     // brim corner right
+      { x: bx + 22, y: top + 44 },     // brim outer right
+      { x: bx + 14, y: top + 46 },     // brim under right
+      { x: bx, y: top + 45 },          // brim under center
+      { x: bx - 14, y: top + 46 },
+      { x: bx - 22, y: top + 44 },
+      { x: bx - 16, y: top + 38 },
+      { x: bx - 10, y: top + 28 },
+      { x: bx - 4, y: top + 14 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(hat, true);
+    g.fillStyle(HAT_DARK, 1);
+    g.fillPoints(
+      hat.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(HAT, 1);
+    g.fillTriangle(
+      bx - 1, top + 4,
+      bx + 8, top + 36,
+      bx - 14, top + 38,
+    );
+    g.fillStyle(HAT_HI, 0.7);
+    g.fillTriangle(
+      bx - 2, top + 8,
+      bx + 2, top + 8,
+      bx - 8, top + 32,
+    );
+    // Gold tip orb at apex.
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx, top - 3, 4);
+    g.fillStyle(BUCKLE, 1);
+    g.fillCircle(bx, top - 3, 3);
+    g.fillStyle(TIP_HALO, 1);
+    g.fillRect(bx - 1, top - 5, 1, 1);
+    // Brim shadow under hat.
+    g.fillStyle(OUT, 0.6);
+    g.fillEllipse(bx, top + 47, 32, 3);
+
+    // 6) WAND peeking from behind the right shoulder.
+    g.fillStyle(OUT, 1);
+    g.fillRect(bx + 22, top + 32, 4, 38);
+    g.fillStyle(WAND, 1);
+    g.fillRect(bx + 23, top + 32, 2, 36);
+    // Wand tip with halo.
+    g.fillStyle(TIP_HALO, 0.45);
+    g.fillCircle(bx + 24, top + 26, 9);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx + 24, top + 28, 5);
+    g.fillStyle(TIP, 1);
+    g.fillCircle(bx + 24, top + 28, 3.5);
+    g.fillStyle(TIP_HALO, 1);
+    g.fillRect(bx + 23, top + 27, 1, 1);
+  }
+
+  /**
+   * VARIANT B — Hooded Sage.
+   * Same robe/body but the pointed hat is replaced with a deep hood. Face
+   * sits in shadow with only the beard tip and a pair of glowing eyes
+   * visible. Reads as a more cryptic / sinister mage — fits the mansion
+   * floor mood, but might be too "boss-aligned" for a player avatar.
+   */
+  private drawWizardVariantHooded(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const OUT = 0x1a0828;
+    const ROBE_DARK = 0x3a0c68;
+    const ROBE = 0x7a2cb8;
+    const ROBE_HI = 0xa672e0;
+    const ROBE_HOOD = 0x2a0844;
+    const SKIN = 0xf0c89a;
+    const BEARD = 0xf0f0f0;
+    const BEARD_SHADOW = 0xb0b0b8;
+    const BUCKLE = 0xffd84a;
+    const WAND = 0xc89758;
+    const TIP = 0xffd84a;
+    const TIP_HALO = 0xfff8c0;
+    const EYE_GLOW = 0xa0d8ff;
+    const BOOT = 0x2a1a0d;
+
+    const bx = cx;
+    const top = cy - 76;
+
+    // 1) ROBE bell silhouette (same shape as A, slightly slimmer).
+    const robeOuter = [
+      { x: bx - 16, y: top + 56 },
+      { x: bx + 16, y: top + 56 },
+      { x: bx + 22, y: top + 92 },
+      { x: bx + 30, y: top + 124 },
+      { x: bx + 24, y: top + 142 },
+      { x: bx, y: top + 146 },
+      { x: bx - 24, y: top + 142 },
+      { x: bx - 30, y: top + 124 },
+      { x: bx - 22, y: top + 92 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(robeOuter, true);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      robeOuter.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(bx, top + 100, 38, 56);
+    g.fillStyle(ROBE_HI, 0.6);
+    g.fillEllipse(bx - 8, top + 92, 8, 32);
+
+    // Hem trim.
+    g.fillStyle(BUCKLE, 0.8);
+    g.fillRect(bx - 28, top + 138, 56, 2);
+
+    // Belt + buckle.
+    g.fillStyle(OUT, 1);
+    g.fillRect(bx - 22, top + 110, 44, 6);
+    g.fillStyle(BOOT, 1);
+    g.fillRect(bx - 21, top + 111, 42, 4);
+    g.fillStyle(BUCKLE, 1);
+    g.fillRect(bx - 4, top + 111, 8, 4);
+
+    // Boots.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(bx - 8, top + 150, 11, 6);
+    g.fillEllipse(bx + 8, top + 150, 11, 6);
+    g.fillStyle(BOOT, 1);
+    g.fillEllipse(bx - 8, top + 150, 9, 4);
+    g.fillEllipse(bx + 8, top + 150, 9, 4);
+
+    // 2) HOOD + COWL — pulled deep over the head.
+    const hood = [
+      { x: bx - 6, y: top + 0 },       // hood crown peak
+      { x: bx + 6, y: top + 0 },
+      { x: bx + 14, y: top + 8 },
+      { x: bx + 20, y: top + 24 },
+      { x: bx + 22, y: top + 42 },     // shoulder-cowl right
+      { x: bx + 16, y: top + 56 },     // hood meets robe
+      { x: bx + 8, y: top + 50 },      // hood mouth right
+      { x: bx, y: top + 48 },
+      { x: bx - 8, y: top + 50 },
+      { x: bx - 16, y: top + 56 },
+      { x: bx - 22, y: top + 42 },
+      { x: bx - 20, y: top + 24 },
+      { x: bx - 14, y: top + 8 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(hood, true);
+    g.fillStyle(ROBE_HOOD, 1);
+    g.fillPoints(
+      hood.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(bx, top + 26, 22, 36);
+    g.fillStyle(ROBE_HI, 0.5);
+    g.fillTriangle(bx - 12, top + 16, bx - 6, top + 16, bx - 14, top + 38);
+
+    // Hood opening — pure-black void where the face sits.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(bx, top + 32, 18, 22);
+
+    // Glowing eyes inside the void.
+    g.fillStyle(EYE_GLOW, 1);
+    g.fillRect(bx - 4, top + 30, 2, 3);
+    g.fillRect(bx + 2, top + 30, 2, 3);
+
+    // Beard tip peeking out the bottom of the hood.
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(bx - 5, top + 42, bx + 5, top + 42, bx, top + 54);
+    g.fillStyle(BEARD, 1);
+    g.fillTriangle(bx - 4, top + 42, bx + 4, top + 42, bx, top + 52);
+    g.fillStyle(BEARD_SHADOW, 0.7);
+    g.fillRect(bx - 1, top + 46, 2, 5);
+    void SKIN;
+
+    // Wand peeking from right shoulder.
+    g.fillStyle(OUT, 1);
+    g.fillRect(bx + 22, top + 30, 4, 36);
+    g.fillStyle(WAND, 1);
+    g.fillRect(bx + 23, top + 30, 2, 34);
+    g.fillStyle(TIP_HALO, 0.45);
+    g.fillCircle(bx + 24, top + 24, 9);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx + 24, top + 26, 5);
+    g.fillStyle(TIP, 1);
+    g.fillCircle(bx + 24, top + 26, 3.5);
+  }
+
+  /**
+   * VARIANT C — Compact Wizard.
+   * Same painterly redesign as A but ~85 % scale, with a tighter belt
+   * cinch and a slightly more heroic stance (legs visible, hat brim
+   * pulled down). Best blend of "still recognisably the wizard" + "less
+   * dominant on screen".
+   */
+  private drawWizardVariantCompact(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const OUT = 0x1a0828;
+    const HAT_DARK = 0x3a0f70;
+    const HAT = 0x5a1f9a;
+    const HAT_HI = 0x8a4fce;
+    const ROBE_DARK = 0x3a0c68;
+    const ROBE = 0x7a2cb8;
+    const ROBE_HI = 0xa672e0;
+    const SKIN = 0xf0c89a;
+    const SKIN_SHADOW = 0xc89a6c;
+    const BEARD = 0xf0f0f0;
+    const BEARD_SHADOW = 0xb0b0b8;
+    const BUCKLE = 0xffd84a;
+    const WAND = 0xc89758;
+    const TIP = 0xffd84a;
+    const TIP_HALO = 0xfff8c0;
+    const EYE = 0x222222;
+    const BOOT = 0x2a1a0d;
+
+    const bx = cx;
+    const top = cy - 68;
+
+    // ROBE — slightly shorter + tighter than A.
+    const robeOuter = [
+      { x: bx - 12, y: top + 54 },
+      { x: bx + 12, y: top + 54 },
+      { x: bx + 19, y: top + 84 },
+      { x: bx + 28, y: top + 116 },
+      { x: bx + 22, y: top + 130 },
+      { x: bx, y: top + 132 },
+      { x: bx - 22, y: top + 130 },
+      { x: bx - 28, y: top + 116 },
+      { x: bx - 19, y: top + 84 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(robeOuter, true);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      robeOuter.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(bx, top + 92, 32, 50);
+    g.fillStyle(ROBE_HI, 0.65);
+    g.fillEllipse(bx - 6, top + 86, 7, 28);
+
+    // Tighter belt cinch.
+    g.fillStyle(OUT, 1);
+    g.fillRect(bx - 18, top + 100, 36, 7);
+    g.fillStyle(BOOT, 1);
+    g.fillRect(bx - 17, top + 101, 34, 5);
+    g.fillStyle(BUCKLE, 1);
+    g.fillRect(bx - 4, top + 102, 8, 5);
+    g.fillStyle(OUT, 1);
+    g.fillRect(bx - 2, top + 104, 4, 1);
+
+    // Gold hem trim.
+    g.fillStyle(BUCKLE, 0.85);
+    g.fillRect(bx - 26, top + 124, 52, 2);
+
+    // Boots — slightly more visible (heroic stance).
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(bx - 8, top + 136, 11, 7);
+    g.fillEllipse(bx + 8, top + 136, 11, 7);
+    g.fillStyle(BOOT, 1);
+    g.fillEllipse(bx - 8, top + 136, 9, 5);
+    g.fillEllipse(bx + 8, top + 136, 9, 5);
+
+    // BEARD — slightly shorter.
+    const beardPts = [
+      { x: bx - 8, y: top + 42 },
+      { x: bx + 8, y: top + 42 },
+      { x: bx + 12, y: top + 50 },
+      { x: bx + 6, y: top + 60 },
+      { x: bx, y: top + 62 },
+      { x: bx - 6, y: top + 60 },
+      { x: bx - 12, y: top + 50 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(beardPts, true);
+    g.fillStyle(BEARD, 1);
+    g.fillPoints(
+      beardPts.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(BEARD_SHADOW, 0.55);
+    g.fillEllipse(bx + 4, top + 54, 4, 6);
+
+    // FACE.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(bx, top + 38, 16, 9);
+    g.fillStyle(SKIN, 1);
+    g.fillEllipse(bx, top + 38, 14, 7);
+    g.fillStyle(SKIN_SHADOW, 0.8);
+    g.fillRect(bx - 5, top + 41, 10, 1);
+    g.fillStyle(EYE, 1);
+    g.fillRect(bx - 4, top + 36, 2, 2);
+    g.fillRect(bx + 2, top + 36, 2, 2);
+
+    // HAT — slightly smaller cone.
+    const hat = [
+      { x: bx, y: top + 0 },
+      { x: bx + 3, y: top + 12 },
+      { x: bx + 8, y: top + 22 },
+      { x: bx + 14, y: top + 30 },
+      { x: bx + 20, y: top + 36 },
+      { x: bx + 12, y: top + 38 },
+      { x: bx, y: top + 37 },
+      { x: bx - 12, y: top + 38 },
+      { x: bx - 20, y: top + 36 },
+      { x: bx - 14, y: top + 30 },
+      { x: bx - 8, y: top + 22 },
+      { x: bx - 3, y: top + 12 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(hat, true);
+    g.fillStyle(HAT_DARK, 1);
+    g.fillPoints(
+      hat.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(HAT, 1);
+    g.fillTriangle(
+      bx - 1, top + 3,
+      bx + 6, top + 28,
+      bx - 12, top + 30,
+    );
+    g.fillStyle(HAT_HI, 0.7);
+    g.fillTriangle(
+      bx - 2, top + 6,
+      bx + 1, top + 6,
+      bx - 6, top + 26,
+    );
+    // Gold tip orb.
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx, top - 3, 3.5);
+    g.fillStyle(BUCKLE, 1);
+    g.fillCircle(bx, top - 3, 2.5);
+    // Brim shadow.
+    g.fillStyle(OUT, 0.6);
+    g.fillEllipse(bx, top + 39, 28, 2);
+
+    // WAND held FORWARD in front of the body, hand at chest level — same
+    // pose-idiom as D but with a less extreme tilt: tip points up-right
+    // toward the upper edge of the figure instead of nearly horizontal.
+    // Tapered triangle: narrow held-end (lower-left), wider at the tip
+    // (upper-right) so the gold orb reads as a natural cap on the wand.
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(bx + 6, top + 86, bx + 28, top + 50, bx + 30, top + 56);
+    g.fillStyle(WAND, 1);
+    g.fillTriangle(bx + 6, top + 87, bx + 27, top + 51, bx + 28, top + 55);
+
+    // HAND on the wand at chest level — no full arm/sleeve, the arm is
+    // implied to come from the body to the wand grip (D's idiom).
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx + 14, top + 74, 4);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(bx + 14, top + 74, 3);
+    g.fillStyle(SKIN_SHADOW, 0.7);
+    g.fillRect(bx + 13, top + 75, 3, 1);
+
+    // WAND TIP — gold orb + halo + sparkle ring. Sits OVER the wand wide
+    // end so the magical glow reads as "tip lit up".
+    g.fillStyle(TIP_HALO, 0.55);
+    g.fillCircle(bx + 29, top + 53, 11);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx + 29, top + 53, 5);
+    g.fillStyle(TIP, 1);
+    g.fillCircle(bx + 29, top + 53, 3.5);
+    g.fillStyle(TIP_HALO, 1);
+    g.fillRect(bx + 28, top + 52, 1, 1);
+    // Sparkle ring around the tip.
+    for (const [dx, dy] of [
+      [-8, -3],
+      [9, -2],
+      [3, -10],
+      [-2, 9],
+      [10, 6],
+    ] as const) {
+      g.fillStyle(TIP_HALO, 0.85);
+      g.fillRect(bx + 29 + dx, top + 53 + dy, 1, 1);
+    }
+  }
+
+  /**
+   * VARIANT D — Apprentice.
+   * Significantly smaller (~70 %), rounder proportions, wand actively
+   * casting forward (one hand visible holding the wand mid-air with a
+   * bright tip burst). Reads "young mage" / hero-pose. Most distinct
+   * from the bosses' tall bell silhouettes.
+   */
+  private drawWizardVariantApprentice(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const OUT = 0x1a0828;
+    const HAT_DARK = 0x3a0f70;
+    const HAT = 0x5a1f9a;
+    const HAT_HI = 0x8a4fce;
+    const ROBE_DARK = 0x3a0c68;
+    const ROBE = 0x7a2cb8;
+    const ROBE_HI = 0xa672e0;
+    const SKIN = 0xf0c89a;
+    const SKIN_SHADOW = 0xc89a6c;
+    const BEARD = 0xf0f0f0;
+    const BUCKLE = 0xffd84a;
+    const WAND = 0xc89758;
+    const TIP = 0xffd84a;
+    const TIP_HALO = 0xfff8c0;
+    const EYE = 0x222222;
+    const BOOT = 0x2a1a0d;
+
+    const bx = cx;
+    const top = cy - 56;
+
+    // SHORT ROBE — egg-shaped, no exaggerated hem.
+    const robeOuter = [
+      { x: bx - 10, y: top + 44 },
+      { x: bx + 10, y: top + 44 },
+      { x: bx + 17, y: top + 70 },
+      { x: bx + 22, y: top + 96 },
+      { x: bx + 14, y: top + 108 },
+      { x: bx, y: top + 110 },
+      { x: bx - 14, y: top + 108 },
+      { x: bx - 22, y: top + 96 },
+      { x: bx - 17, y: top + 70 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(robeOuter, true);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      robeOuter.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(bx, top + 78, 28, 38);
+    g.fillStyle(ROBE_HI, 0.7);
+    g.fillEllipse(bx - 5, top + 72, 6, 22);
+
+    // Belt with buckle.
+    g.fillStyle(OUT, 1);
+    g.fillRect(bx - 15, top + 84, 30, 5);
+    g.fillStyle(BOOT, 1);
+    g.fillRect(bx - 14, top + 85, 28, 3);
+    g.fillStyle(BUCKLE, 1);
+    g.fillRect(bx - 3, top + 85, 6, 3);
+
+    // Boots.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(bx - 7, top + 113, 9, 5);
+    g.fillEllipse(bx + 7, top + 113, 9, 5);
+    g.fillStyle(BOOT, 1);
+    g.fillEllipse(bx - 7, top + 113, 7, 3);
+    g.fillEllipse(bx + 7, top + 113, 7, 3);
+
+    // Smaller beard — short tuft.
+    const beardPts = [
+      { x: bx - 5, y: top + 36 },
+      { x: bx + 5, y: top + 36 },
+      { x: bx + 7, y: top + 42 },
+      { x: bx, y: top + 50 },
+      { x: bx - 7, y: top + 42 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(beardPts, true);
+    g.fillStyle(BEARD, 1);
+    g.fillPoints(
+      beardPts.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+
+    // ROUND face.
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx, top + 32, 8);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(bx, top + 32, 7);
+    g.fillStyle(SKIN_SHADOW, 0.7);
+    g.fillRect(bx - 4, top + 35, 8, 1);
+    g.fillStyle(EYE, 1);
+    g.fillRect(bx - 3, top + 30, 2, 2);
+    g.fillRect(bx + 1, top + 30, 2, 2);
+
+    // SHORTER HAT.
+    const hat = [
+      { x: bx, y: top + 0 },
+      { x: bx + 2, y: top + 8 },
+      { x: bx + 7, y: top + 18 },
+      { x: bx + 14, y: top + 26 },
+      { x: bx + 8, y: top + 28 },
+      { x: bx, y: top + 27 },
+      { x: bx - 8, y: top + 28 },
+      { x: bx - 14, y: top + 26 },
+      { x: bx - 7, y: top + 18 },
+      { x: bx - 2, y: top + 8 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(hat, true);
+    g.fillStyle(HAT_DARK, 1);
+    g.fillPoints(
+      hat.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(HAT, 1);
+    g.fillTriangle(bx - 1, top + 2, bx + 5, top + 22, bx - 8, top + 24);
+    g.fillStyle(HAT_HI, 0.7);
+    g.fillTriangle(bx - 2, top + 4, bx + 0, top + 4, bx - 5, top + 20);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx, top - 2, 3);
+    g.fillStyle(BUCKLE, 1);
+    g.fillCircle(bx, top - 2, 2);
+    // Brim shadow.
+    g.fillStyle(OUT, 0.5);
+    g.fillEllipse(bx, top + 29, 22, 2);
+
+    // 6) WAND held forward + hand visible. Wand crosses the body diagonally
+    // at chest height — clearer "casting" hero-read than the over-shoulder
+    // peek of A/C.
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(bx + 4, top + 60, bx + 32, top + 50, bx + 30, top + 56);
+    g.fillStyle(WAND, 1);
+    g.fillTriangle(bx + 4, top + 61, bx + 30, top + 51, bx + 28, top + 55);
+    // Hand wrapping wand mid-shaft.
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx + 14, top + 56, 4.5);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(bx + 14, top + 56, 3.5);
+    // Wand tip burst.
+    g.fillStyle(TIP_HALO, 0.55);
+    g.fillCircle(bx + 32, top + 50, 11);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx + 32, top + 50, 5);
+    g.fillStyle(TIP, 1);
+    g.fillCircle(bx + 32, top + 50, 3.5);
+    g.fillStyle(TIP_HALO, 1);
+    g.fillRect(bx + 31, top + 49, 1, 1);
+    // Sparkle ring.
+    for (const [dx, dy] of [
+      [-8, -4],
+      [9, -3],
+      [4, -10],
+      [-3, 9],
+      [10, 6],
+    ] as const) {
+      g.fillStyle(TIP_HALO, 0.85);
+      g.fillRect(bx + 32 + dx, top + 50 + dy, 1, 1);
     }
   }
 }
