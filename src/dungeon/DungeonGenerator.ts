@@ -179,6 +179,51 @@ export class DungeonGenerator {
     // to non-leaf normal rooms. We only expand when the user actually asked
     // for a non-trivial dungeon (>= 4 rooms = start + boss + 2 specials);
     // tiny tests / debug calls deserve to keep the room count they asked for.
+    /**
+     * Smart-retry placement: pick an empty cell with EXACTLY 1 placed
+     * neighbor (so the new room is born as a leaf), preferring leafs that
+     * are not adjacent to the current boss and that don't sit farther from
+     * start than the boss (which would re-elect the boss). Pure random
+     * placement (`tryPlaceOne`) frequently lands on cells with 2+ neighbors
+     * and just thickens the cluster, which is why ~3 % of seeds used to end
+     * up with zero eligible leafs even after `MAX_RETRY_ROOMS` retries.
+     */
+    const tryPlaceLeaf = (currentBoss: { gx: number; gy: number }): boolean => {
+      const bossKey = cellKey(currentBoss.gx, currentBoss.gy);
+      const bossDist =
+        Math.abs(currentBoss.gx - center) + Math.abs(currentBoss.gy - center);
+      type Cand = { gx: number; gy: number; bossAdjacent: boolean; reElectsBoss: boolean };
+      const all: Cand[] = [];
+      for (let gx = 0; gx < gridSize; gx++) {
+        for (let gy = 0; gy < gridSize; gy++) {
+          if (placed.has(cellKey(gx, gy))) continue;
+          let neighborCount = 0;
+          let bossAdj = false;
+          for (const dir of DIRECTIONS) {
+            const d = DELTA[dir];
+            const nx = gx + d.dx;
+            const ny = gy + d.dy;
+            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
+            const k = cellKey(nx, ny);
+            if (placed.has(k)) {
+              neighborCount++;
+              if (k === bossKey) bossAdj = true;
+            }
+          }
+          if (neighborCount !== 1) continue;
+          const reElects = Math.abs(gx - center) + Math.abs(gy - center) >= bossDist;
+          all.push({ gx, gy, bossAdjacent: bossAdj, reElectsBoss: reElects });
+        }
+      }
+      let pool = all.filter((c) => !c.bossAdjacent && !c.reElectsBoss);
+      if (pool.length === 0) pool = all.filter((c) => !c.bossAdjacent);
+      if (pool.length === 0) pool = all;
+      if (pool.length === 0) return false;
+      const pick = rng.pick(pool);
+      placed.set(cellKey(pick.gx, pick.gy), { gx: pick.gx, gy: pick.gy });
+      return true;
+    };
+
     let extras = 0;
     while (
       targetCount >= 4 &&
@@ -187,10 +232,19 @@ export class DungeonGenerator {
       placed.size < gridSize * gridSize
     ) {
       const before = placed.size;
-      let attempt = 0;
-      while (placed.size === before && attempt < DUNGEON_GENERATOR_MAX_ITERATIONS) {
-        attempt++;
-        if (tryPlaceOne()) break;
+      const currentBoss = rooms.get(bossId);
+      const placedLeaf =
+        currentBoss !== undefined &&
+        tryPlaceLeaf({ gx: currentBoss.gx, gy: currentBoss.gy });
+      if (!placedLeaf) {
+        // Smart placement found no leaf candidates — fall back to the old
+        // random-walk placement so the loop can still grow the dungeon
+        // toward a state where leafs become possible again.
+        let attempt = 0;
+        while (placed.size === before && attempt < DUNGEON_GENERATOR_MAX_ITERATIONS) {
+          attempt++;
+          if (tryPlaceOne()) break;
+        }
       }
       if (placed.size === before) break; // grid full / unable to place more
       extras++;
@@ -225,17 +279,23 @@ export class DungeonGenerator {
     const eligibleLeafs = DungeonGenerator.findEligibleLeafs(rooms, startId, bossId);
     const shuffledLeafs = rng.shuffle(eligibleLeafs);
 
+    // Safety net for the rare seeds (~0.04 %) where smart-retry can't grow
+    // enough eligible leafs: pick non-leaf rooms that are NOT on the critical
+    // path between start and boss (BFS-without-them still reaches the boss)
+    // and not adjacent to the boss (so their doors don't tag-collide with
+    // boss doors). Locking these doors stays safe because the player can
+    // still reach the boss via an alternate path without spending a key.
+    const safeNonLeafs = DungeonGenerator.findSafeNonLeafs(rooms, startId, bossId);
+    const shuffledNonLeafs = rng.shuffle(safeNonLeafs);
+
     const pickSpecial = (used: Set<string>): RoomDescriptor | null => {
       for (const r of shuffledLeafs) {
         if (!used.has(r.id)) return r;
       }
-      // No leaf available — skip this special. The previous fallback to a
-      // non-leaf normal room produced "pass-through" Treasure/Shop rooms that
-      // sat on the path between Start and Boss, which on locked floors made
-      // the Boss reachable only with a key. We'd rather have a missing
-      // special than a path-blocking one. The retry loop above already tries
-      // to grow the dungeon until enough leaves exist; in the rare case that
-      // still doesn't yield two, this floor just gets one (or zero) specials.
+      // Fall back to non-critical-path non-leaf rooms.
+      for (const r of shuffledNonLeafs) {
+        if (!used.has(r.id)) return r;
+      }
       return null;
     };
 
@@ -288,6 +348,70 @@ export class DungeonGenerator {
       out.push(r);
     }
     return out;
+  }
+
+  /**
+   * Non-leaf rooms (door-degree ≥ 2) that are SAFE to use as a special-room
+   * fallback when leafs run out: not start, not boss, not adjacent to the
+   * boss (door-tag collision), AND removing the room from the dungeon graph
+   * still leaves the boss reachable from start. The BFS check guarantees the
+   * boss can always be reached without spending a key, even when the
+   * candidate's doors get locked on Floor ≥ `LOCK_FLOOR_THRESHOLD`. This is
+   * a last-resort path; the smart-retry leaf-creation loop above means it
+   * fires on roughly 1 seed in a few thousand.
+   */
+  private static findSafeNonLeafs(
+    rooms: Map<string, RoomDescriptor>,
+    startId: string,
+    bossId: string,
+  ): RoomDescriptor[] {
+    const out: RoomDescriptor[] = [];
+    const bossRoom = rooms.get(bossId);
+    for (const r of rooms.values()) {
+      if (r.id === startId || r.id === bossId) continue;
+      const doorCount = DIRECTIONS.filter((dir) => r.doors[dir].exists).length;
+      if (doorCount < 2) continue; // leafs are handled by the primary path
+      if (
+        bossRoom &&
+        Math.abs(r.gx - bossRoom.gx) + Math.abs(r.gy - bossRoom.gy) === 1
+      ) {
+        continue;
+      }
+      if (!DungeonGenerator.bossReachableWithout(rooms, startId, bossId, r.id)) continue;
+      out.push(r);
+    }
+    return out;
+  }
+
+  /**
+   * BFS from `startId` to `bossId` over the door graph, pretending
+   * `excludedId` doesn't exist. Returns true if the boss is still reachable.
+   */
+  private static bossReachableWithout(
+    rooms: Map<string, RoomDescriptor>,
+    startId: string,
+    bossId: string,
+    excludedId: string,
+  ): boolean {
+    if (startId === excludedId) return false;
+    const visited = new Set<string>();
+    const queue: string[] = [startId];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      if (id === bossId) return true;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      const room = rooms.get(id);
+      if (!room) continue;
+      for (const dir of DIRECTIONS) {
+        if (!room.doors[dir].exists) continue;
+        const d = DELTA[dir];
+        const nid = roomId(room.gx + d.dx, room.gy + d.dy);
+        if (nid === excludedId) continue;
+        if (!visited.has(nid)) queue.push(nid);
+      }
+    }
+    return false;
   }
 
   /**

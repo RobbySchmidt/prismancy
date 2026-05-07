@@ -130,8 +130,11 @@ export class PixieQueen extends BossEnemy {
    * for the tree path, so if the player happened to be parked next to a
    * tree the queen could materialize directly on top of him for free
    * contact damage). Falls back to the FARTHEST tree from the player when
-   * no safe candidate exists, then to a random in-bounds spot if there are
-   * no trees at all (open arena).
+   * no safe candidate exists, then to a perimeter-anchor grid when there
+   * are no trees at all (boss rooms skip `scatterDecorations`, so the queen
+   * has no real trees to teleport between — the anchor grid keeps her
+   * teleport spots varied instead of bouncing between two random points
+   * the bounds-fallback happened to land on).
    */
   private pickTeleportTarget(): { x: number; y: number } {
     const trees = this.host.getTreePositions();
@@ -169,21 +172,47 @@ export class PixieQueen extends BossEnemy {
       }
       return { x: farthest.x, y: farthest.y };
     }
-    // Fallback: random in-bounds, away from the player.
+
+    // No trees in this room (every boss room skips decoration scatter).
+    // Use a fixed 8-anchor perimeter grid: TL, TM, TR, ML, MR, BL, BM, BR
+    // around the playable bounds. Reject anchors the queen is already on
+    // and anchors within the safe distance of the player. Pick farthest as
+    // the last-resort tier — same shape as the tree path above.
     const bounds = this.host.getRoomBounds();
-    for (let attempt = 0; attempt < 12; attempt++) {
-      const x = bounds.minX + Math.random() * (bounds.maxX - bounds.minX);
-      const y = bounds.minY + Math.random() * (bounds.maxY - bounds.minY);
-      const dx = x - player.x;
-      const dy = y - player.y;
-      if (dx * dx + dy * dy >= minDistSq) {
-        return { x, y };
+    const ax = (t: number): number => bounds.minX + (bounds.maxX - bounds.minX) * t;
+    const ay = (t: number): number => bounds.minY + (bounds.maxY - bounds.minY) * t;
+    const anchors: { x: number; y: number }[] = [
+      { x: ax(0.15), y: ay(0.2) },
+      { x: ax(0.5), y: ay(0.2) },
+      { x: ax(0.85), y: ay(0.2) },
+      { x: ax(0.15), y: ay(0.5) },
+      { x: ax(0.85), y: ay(0.5) },
+      { x: ax(0.15), y: ay(0.8) },
+      { x: ax(0.5), y: ay(0.8) },
+      { x: ax(0.85), y: ay(0.8) },
+    ];
+    const safeAnchors = anchors.filter((a) => {
+      if (Math.hypot(a.x - this.x, a.y - this.y) <= 16) return false;
+      const dx = a.x - player.x;
+      const dy = a.y - player.y;
+      return dx * dx + dy * dy >= minDistSq;
+    });
+    if (safeAnchors.length > 0) {
+      return safeAnchors[Math.floor(Math.random() * safeAnchors.length)]!;
+    }
+    let farthest = anchors[0]!;
+    let farthestSq = -1;
+    for (const a of anchors) {
+      if (Math.hypot(a.x - this.x, a.y - this.y) <= 16) continue;
+      const dx = a.x - player.x;
+      const dy = a.y - player.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq > farthestSq) {
+        farthestSq = distSq;
+        farthest = a;
       }
     }
-    return {
-      x: (bounds.minX + bounds.maxX) / 2,
-      y: (bounds.minY + bounds.maxY) / 2,
-    };
+    return { x: farthest.x, y: farthest.y };
   }
 
   private spawnTeleportSparkles(cx: number, cy: number): void {

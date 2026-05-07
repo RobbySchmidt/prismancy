@@ -256,6 +256,70 @@ describe('DungeonGenerator', () => {
       }
     }
   });
+
+  // Regression: ~3 % of seeds used to produce no shop and/or no treasure room
+  // because the retry loop's pure-random placement frequently failed to grow
+  // any new leaves before exhausting `MAX_RETRY_ROOMS`. The smart-retry leaf-
+  // bias (with a non-articulation-point non-leaf safety net for the rare
+  // remainder) brings this rate to zero. Run a wide sweep so we catch any
+  // future regression that re-introduces the scarcity.
+  it('treasure + shop spawn for every seed across a wide sweep', () => {
+    let missing = 0;
+    for (let i = 0; i < 1000; i++) {
+      const layout = DungeonGenerator.generate({
+        seed: `prismancy-special-coverage-${i}`,
+        floorIndex: 3,
+      });
+      const has = (kind: typeof RoomKind.Treasure | typeof RoomKind.Shop): boolean =>
+        Array.from(layout.rooms.values()).some((r) => r.kind === kind);
+      if (!has(RoomKind.Treasure) || !has(RoomKind.Shop)) missing++;
+    }
+    expect(missing).toBe(0);
+  });
+
+  // Regression: when the smart-retry safety net kicks in (non-leaf room used
+  // as a special) the chosen room must still leave the boss reachable from
+  // start without spending a key. BFS the door graph while pretending the
+  // special room doesn't exist; the boss must remain reachable.
+  it('boss is always reachable from start without traversing specials', () => {
+    for (let i = 0; i < 200; i++) {
+      const layout = DungeonGenerator.generate({
+        seed: `prismancy-boss-reachability-${i}`,
+        floorIndex: 3,
+      });
+      const specials = Array.from(layout.rooms.values()).filter(
+        (r) => r.kind === RoomKind.Treasure || r.kind === RoomKind.Shop,
+      );
+      for (const special of specials) {
+        const visited = new Set<string>([special.id]);
+        const queue: string[] = [layout.startId];
+        let reached = false;
+        while (queue.length > 0) {
+          const id = queue.shift()!;
+          if (id === layout.bossId) {
+            reached = true;
+            break;
+          }
+          if (visited.has(id)) continue;
+          visited.add(id);
+          const room = layout.rooms.get(id);
+          if (!room) continue;
+          for (const [dir, info] of Object.entries(room.doors) as Array<
+            ['up' | 'down' | 'left' | 'right', (typeof room.doors)['up']]
+          >) {
+            if (!info.exists) continue;
+            const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+            const dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
+            queue.push(`r-${room.gx + dx}-${room.gy + dy}`);
+          }
+        }
+        expect(
+          reached,
+          `seed ${i} boss unreachable when ${special.kind} room ${special.id} is excluded`,
+        ).toBe(true);
+      }
+    }
+  });
 });
 
 function isAdjacentTo(
