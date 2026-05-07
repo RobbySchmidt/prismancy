@@ -34,7 +34,17 @@ export const WORLD_SPRITE_SCALE = 1.25;
 
 export const PLAYER_SPEED = 220;
 export const PLAYER_MAX_HEALTH = 6;
-export const PLAYER_HITBOX_RADIUS = 13;
+/** Player hitbox radius. Tuned 13 → 11 (2026-05-07) after user-flagged
+ * "tight dodges feel unfair" — the circle reached visually past the boots,
+ * so projectiles brushing the legs registered as hits. Combined with the
+ * +10 offset (was +12) below in `Player.ts` the bottom of the hitbox
+ * shrinks ~4 px while the top stays at roughly the robe shoulder, keeping
+ * the hat hitbox-free as before. */
+export const PLAYER_HITBOX_RADIUS = 11;
+/** Vertical offset of the hitbox circle CENTER below the sprite center.
+ * +10 keeps the hat clear (head silhouette ends ~2 px above this) while
+ * the radius-11 circle covers belt + thighs + upper calves. */
+export const PLAYER_HITBOX_OFFSET_Y = 10;
 export const PLAYER_INVINCIBILITY_MS = 800;
 
 export const MISSILE_SPEED = 420;
@@ -655,8 +665,9 @@ export const LORD_ONYX_P3_WAVE_SPEED = 110;
 export const LORD_ONYX_P3_WAVE_LIFETIME_MS = 4000;
 /** Passive warning-marker window before each inward thorn becomes a real
  * (hitbox-having) projectile. Without this the perimeter spawns can land
- * directly on the player, which the user flagged as unfair. */
-export const LORD_ONYX_P3_WAVE_TELEGRAPH_MS = 500;
+ * directly on the player, which the user flagged as unfair. Bumped 500 →
+ * 650 (2026-05-07) — players asked for a slightly longer no-damage tell. */
+export const LORD_ONYX_P3_WAVE_TELEGRAPH_MS = 650;
 export const LORD_ONYX_P3_HOMING_INTERVAL_MS = 1400;
 
 // Per-phase Prism Special trigger — counts from phase entry. The matching

@@ -55,6 +55,12 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     // get recycled across enemies, so without resetting, a previous Mirror
     // shard's purple texture would carry into the next thorn fire.
     this.setTexture(textureKey ?? TextureKeys.Thorn);
+    // Clear any leftover tint from the previous use of this pooled sprite.
+    // Without this, a BloodProjectile recycled from a Tide-Mandala sapphire-
+    // tinted shot keeps the blue tint — multiplied with the red texture it
+    // becomes near-black, hiding the Phase-2 walk-snipe shot. User-flagged
+    // 2026-05-07. Callers that want a tint must `setTint` AFTER `fire`.
+    this.clearTint();
     this.setRotation(Math.atan2(vy, vx));
     this.spawnedAt = this.scene.time.now;
     this.lifetimeMs = ENEMY_PROJECTILE_LIFETIME_MS;

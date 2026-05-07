@@ -5,6 +5,7 @@ import {
   KNOCKBACK_DURATION_MS,
   MISSILE_FIRE_INTERVAL_MS,
   MISSILE_LIFETIME_MS,
+  PLAYER_HITBOX_OFFSET_Y,
   PLAYER_HITBOX_RADIUS,
   PLAYER_INVINCIBILITY_MS,
   PLAYER_MAX_HEALTH,
@@ -78,7 +79,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setCircle(
       radius,
       halfW - radius,
-      halfH + 12 * invScale - radius,
+      halfH + PLAYER_HITBOX_OFFSET_Y * invScale - radius,
     );
     this.setCollideWorldBounds(true);
   }

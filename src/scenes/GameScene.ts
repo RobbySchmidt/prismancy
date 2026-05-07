@@ -351,6 +351,13 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('stats', this.stats);
     this.registry.set('inventory', this.inventory);
     this.registry.set('itemSystem', this.itemSystem);
+    // Expose player health so UIScene can seed its HealthDisplay with the
+    // ACTUAL current/max HP at construction time. Without this the floor-
+    // transition launches UIScene AFTER GameScene's `restore()` has emitted
+    // `player:healthChanged`, so the HUD shows base PLAYER_MAX_HEALTH until
+    // the next damage event re-fires the change. Bug user flagged on
+    // 2026-05-07.
+    this.registry.set('playerHealth', this.player.health);
 
     // Pickups live for the full run (one group, cleared on room teardown so
     // un-collected pickups don't leak into the next room).

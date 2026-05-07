@@ -18,7 +18,20 @@ export class HealthDisplay {
   private static readonly HEART_SIZE = 18;
   private static readonly HEART_GAP = 4;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, maxHealth: number) {
+  /**
+   * `currentHealth` defaults to `maxHealth` (full bar) which is correct for
+   * a fresh run. On a floor transition the caller should pass the real
+   * carry-over current HP — UIScene reads that off the registry-exposed
+   * PlayerHealth — otherwise the HUD shows base hearts until the next
+   * damage event resyncs.
+   */
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    maxHealth: number,
+    currentHealth: number = maxHealth,
+  ) {
     this.scene = scene;
     this.anchorX = x;
     this.anchorY = y;
@@ -30,7 +43,7 @@ export class HealthDisplay {
       EventBus.off('player:healthChanged', this.handler);
     });
 
-    this.refresh(maxHealth, maxHealth);
+    this.refresh(currentHealth, maxHealth);
   }
 
   /**

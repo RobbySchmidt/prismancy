@@ -64,7 +64,17 @@ export class UIScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(DepthLayers.HUD);
 
-    new HealthDisplay(this, 8, 32, PLAYER_MAX_HEALTH);
+    // Pull the live PlayerHealth off the registry so the HUD comes up with
+    // the ACTUAL current/max — a floor transition might launch this scene
+    // after the carry-over HP has already been restored, in which case
+    // `player:healthChanged` has already fired and the HUD would otherwise
+    // sit at base PLAYER_MAX_HEALTH until the next damage event.
+    const playerHealth = this.registry.get('playerHealth') as
+      | { getCurrent(): number; getMax(): number }
+      | undefined;
+    const initialMax = playerHealth?.getMax() ?? PLAYER_MAX_HEALTH;
+    const initialCurrent = playerHealth?.getCurrent() ?? PLAYER_MAX_HEALTH;
+    new HealthDisplay(this, 8, 32, initialMax, initialCurrent);
 
     // Coin / key counters sit just below the hearts so the left-edge HUD
     // reads top-to-bottom: floor name → hearts → coins → keys.
