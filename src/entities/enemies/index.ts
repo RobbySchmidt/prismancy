@@ -8,22 +8,20 @@ import { BogColossus } from './BogColossus';
 import { BogFrog } from './BogFrog';
 import { BogTortoise } from './BogTortoise';
 import { BossEnemy } from './BossEnemy';
-import { CrimsonLord } from './CrimsonLord';
 import { CursedMirror } from './CursedMirror';
 import { LordOnyx } from './LordOnyx';
 import { Damselfly } from './Damselfly';
 import { DamselflyEmpress } from './DamselflyEmpress';
 import { ForestHeart } from './ForestHeart';
 import { ForestSprite } from './ForestSprite';
+import { MarquisOfMirages } from './MarquisOfMirages';
 import { MossyBehemoth } from './MossyBehemoth';
 import { MossySlime } from './MossySlime';
 import { PixieDancer } from './PixieDancer';
 import { PixieQueen } from './PixieQueen';
 import { PossessedCandelabra } from './PossessedCandelabra';
-import { SapphireMarquis } from './SapphireMarquis';
 import { SnapperBloom } from './SnapperBloom';
 import { ToadSovereign } from './ToadSovereign';
-import { VampireFight } from './VampireFight';
 import { VineLord } from './VineLord';
 import { VineSprout } from './VineSprout';
 import { Wraith } from './Wraith';
@@ -86,8 +84,7 @@ export function createEnemy(
     case 'boss-bloomheart':
     case 'boss-damselfly-empress':
     case 'boss-bog-colossus':
-    case 'boss-crimson-lord':
-    case 'boss-sapphire-marquis':
+    case 'boss-marquis-of-mirages':
     case 'boss-lord-onyx':
       throw new Error(
         'createEnemy: boss enemies must be constructed directly (e.g. `new VineLord(scene, x, y, host)`).',
@@ -102,22 +99,20 @@ export {
   BogFrog,
   BogTortoise,
   BossEnemy,
-  CrimsonLord,
   CursedMirror,
   Damselfly,
   DamselflyEmpress,
   ForestHeart,
   ForestSprite,
   LordOnyx,
+  MarquisOfMirages,
   MossyBehemoth,
   MossySlime,
   PixieDancer,
   PixieQueen,
   PossessedCandelabra,
-  SapphireMarquis,
   SnapperBloom,
   ToadSovereign,
-  VampireFight,
   VineLord,
   VineSprout,
   Wraith,

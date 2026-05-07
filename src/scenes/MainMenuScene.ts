@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, SceneKeys, TextureKeys } from '../config/GameConfig';
+import { STARTING_FLOOR_ID } from '../data/floors';
 import { Cosmetics, type SkinId } from '../systems/Cosmetics';
 
 /**
@@ -62,7 +63,15 @@ export class MainMenuScene extends Phaser.Scene {
     this.setupSkinToggle(wizard);
 
     const startGame = (): void => {
-      this.scene.start(SceneKeys.Game);
+      // Explicit fresh-run payload. Without this Phaser's `scene.start(key)`
+      // keeps the previous run's `settings.data` — so finishing a run on Onyx
+      // and starting a new one from MainMenu would respawn on Onyx with the
+      // last carry-over still attached. Same fix already applied in
+      // `GameOverScene.handleRestart` for the Game-Over → R path.
+      this.scene.start(SceneKeys.Game, {
+        floorIndex: 1,
+        floorId: STARTING_FLOOR_ID,
+      });
       this.scene.launch(SceneKeys.UI);
     };
 

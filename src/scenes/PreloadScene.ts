@@ -101,10 +101,17 @@ export class PreloadScene extends Phaser.Scene {
     this.drawMansionMissileTexture(g);
     this.drawFlameMissileTexture(g);
     this.drawWaxPuddleTexture(g);
+    // BossCrimsonLord + BossSapphireMarquis: dead-code from the pre-Marquis-
+    // of-Mirages Vampire Twins design. Still drawn so the StyleMockupScene
+    // Page 6 "design history" panel can render the old sprites + so TS
+    // noUnusedLocals doesn't trip. Cleanup pass when the history page is no
+    // longer needed.
     this.drawBossCrimsonLordTexture(g);
     this.drawBossSapphireMarquisTexture(g);
+    this.drawBossMarquisOfMiragesTexture(g);
+    this.drawMirrorPortalEntryTexture(g);
+    this.drawMirrorPortalExitTexture(g);
     this.drawBloodProjectileTexture(g);
-    this.drawBloodTrailTexture(g);
     this.drawBossLordOnyxTexture(g);
     this.drawThornTexture(g);
     this.drawHeartTextures(g);
@@ -5109,10 +5116,10 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   /**
-   * Crimson Lord — vampire warrior in red robes with gold trim, pale fanged
-   * face, hooded silhouette. Asymmetric pose (slight lean) so the dash
-   * direction reads. Boss-tier 36×42 px so the silhouette stands clearly
-   * apart from a Wraith.
+   * Crimson Lord (DEAD CODE) — half of the pre-Marquis-of-Mirages Vampire
+   * Twins boss. Texture is still generated so the StyleMockupScene Page 6
+   * design-history panel keeps a visible reference to the old sprite. No
+   * runtime gameplay consumer.
    */
   private drawBossCrimsonLordTexture(g: Phaser.GameObjects.Graphics): void {
     const w = 36;
@@ -5417,6 +5424,325 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   /**
+   * Marquis of Mirages — single vampire-mage replacement for the Vampire
+   * Twins. Ports the StyleMockupScene Page 6 Variant A "Caped Conjurer"
+   * geometry (asymmetric cape billowing left + casting pose with raised
+   * oval hand-mirror) down to a 44×46 pixel-art canvas.
+   *
+   * Asymmetric on purpose: breaks the symmetric-bell silhouette the
+   * player flagged as chess-piece-like on the old V2 Marquis. Head sits
+   * slightly right of center (lean), cape sweeps to the left, raised
+   * arm + mirror push to the upper right.
+   */
+  private drawBossMarquisOfMiragesTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 44;
+    const h = 46;
+    const cx = w / 2;
+    g.clear();
+
+    const OUT = 0x000814;
+    const ROBE_DARK = 0x0c1830;
+    const ROBE = 0x1f3878;
+    const ROBE_HI = 0x4870c8;
+    const CAPE_DARK = 0x3a0810;
+    const CAPE = 0x84142c;
+    const CAPE_HI = 0xc8284a;
+    const TRIM = 0xffd84a;
+    const SKIN_OUT = 0x2a1828;
+    const SKIN = 0xd8c0d0;
+    const SKIN_HI = 0xf0d8e0;
+    const HAIR = 0x100614;
+    const EYE = 0xff2040;
+    const SCAR = 0x6a1818;
+    const SILVER = 0xd0d8e8;
+    const SILVER_HI = 0xffffff;
+    const SAPPHIRE = 0x4ad8ff;
+
+    // Ground shadow.
+    this.groundShadow(g, cx + 2, h - 3, 14, 4, 0.5);
+
+    // 1) CAPE — billows wide to the LEFT (asymmetric). Drawn first so the
+    // body sits on top.
+    const capeOuter: Array<{ x: number; y: number }> = [
+      { x: cx + 4, y: 14 },     // collar right
+      { x: cx + 1, y: 16 },     // collar mid
+      { x: cx - 3, y: 18 },     // shoulder left
+      { x: cx - 11, y: 22 },    // upper billow
+      { x: cx - 17, y: 28 },    // billow far edge
+      { x: cx - 19, y: 34 },    // bottom-left tip
+      { x: cx - 16, y: 39 },    // hem 1
+      { x: cx - 8, y: 43 },     // hem 2
+      { x: cx - 2, y: 42 },     // hem inner
+      { x: cx - 1, y: 30 },     // crease back inside
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(capeOuter, true);
+    // Inner cape fill — shifted slightly so the outline reads as a 1 px stroke.
+    g.fillStyle(CAPE_DARK, 1);
+    g.fillPoints(
+      capeOuter.map((p) => ({ x: p.x + 1, y: p.y })),
+      true,
+    );
+    // Mid-tone fold (carved triangle).
+    g.fillStyle(CAPE, 1);
+    g.fillTriangle(cx - 2, 19, cx - 14, 28, cx - 6, 40);
+    // Wind-edge highlight rim along the left tip.
+    g.fillStyle(CAPE_HI, 1);
+    g.fillTriangle(cx - 12, 22, cx - 16, 30, cx - 18, 36);
+
+    // 2) BODY — slim narrow torso, slight right-lean. No bell hem; cape
+    // covers the bottom-left, body's right side carries the visible hem.
+    const body: Array<{ x: number; y: number }> = [
+      { x: cx - 4, y: 17 },
+      { x: cx + 5, y: 17 },
+      { x: cx + 6, y: 26 },
+      { x: cx + 7, y: 35 },
+      { x: cx + 6, y: 41 },
+      { x: cx + 1, y: 43 },
+      { x: cx - 2, y: 43 },
+      { x: cx - 4, y: 35 },
+      { x: cx - 4, y: 26 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(body, true);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      body.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(cx + 1, 28, 7, 12);
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(cx + 1, 36, 9, 9);
+    // Right-side rim catch-light.
+    g.fillStyle(ROBE_HI, 1);
+    g.fillTriangle(cx + 4, 19, cx + 5, 19, cx + 6, 38);
+
+    // 3) GOLD V-trim down the chest + sapphire chest pin.
+    g.fillStyle(TRIM, 1);
+    g.fillRect(cx, 19, 1, 18);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx + 1, 25, 2);
+    g.fillStyle(TRIM, 1);
+    g.fillCircle(cx + 1, 25, 1.4);
+    g.fillStyle(SAPPHIRE, 1);
+    g.fillRect(cx + 1, 25, 1, 1);
+    // Hem trim line.
+    g.fillStyle(TRIM, 1);
+    g.fillRect(cx - 3, 41, 9, 1);
+
+    // 4) HEAD — slight right-of-center, leaning forward.
+    g.fillStyle(SKIN_OUT, 1);
+    g.fillCircle(cx + 1, 11, 5.2);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(cx + 1, 11, 4.2);
+    g.fillStyle(SKIN_HI, 1);
+    g.fillRect(cx, 9, 1, 1);
+    // Slicked-back hair.
+    g.fillStyle(HAIR, 1);
+    g.fillEllipse(cx + 1, 7, 11, 4);
+    g.fillTriangle(cx, 7, cx + 2, 7, cx + 1, 10);
+    // Single red eye + scarred left eye (vampire-mage signature).
+    g.fillStyle(0x080000, 1);
+    g.fillRect(cx - 2, 11, 2, 1);
+    g.fillRect(cx + 2, 11, 2, 1);
+    g.fillStyle(EYE, 1);
+    g.fillRect(cx + 2, 11, 2, 1);
+    g.fillStyle(SCAR, 1);
+    g.fillRect(cx - 3, 10, 1, 3);
+    // Thin lips.
+    g.fillStyle(0x080000, 1);
+    g.fillRect(cx, 13, 3, 1);
+
+    // 5) RIGHT ARM extended forward + slightly upward (presenting pose).
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx + 5, 17, cx + 14, 22, cx + 12, 27);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillTriangle(cx + 5, 18, cx + 13, 22, cx + 12, 26);
+    // Sleeve cuff (gold trim).
+    g.fillStyle(TRIM, 1);
+    g.fillRect(cx + 12, 23, 3, 1);
+
+    // 6) HAND-MIRROR — oval head + handle gripped DIRECTLY in the hand.
+    // Mirror raised toward the player (presenting pose). Center of oval
+    // sits up-and-right of the body's head. Handle runs DOWN through the
+    // gripping fingers; oval head sits above.
+    const mx = cx + 15;        // mirror oval center x
+    const my = 14;             // mirror oval center y
+    const rxOuter = 4;         // outer half-width
+    const ryOuter = 6;         // outer half-height (taller-than-wide)
+
+    // Soft silver halo around the oval (cosmetic glow).
+    g.fillStyle(SILVER, 0.28);
+    g.fillEllipse(mx, my, (rxOuter + 2) * 2, (ryOuter + 2) * 2);
+
+    // Frame: outline → gold rim → black inner → silver glass.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(mx, my, rxOuter * 2 + 2, ryOuter * 2 + 2);
+    g.fillStyle(TRIM, 1);
+    g.fillEllipse(mx, my, rxOuter * 2, ryOuter * 2);
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(mx, my, rxOuter * 2 - 2, ryOuter * 2 - 2);
+    g.fillStyle(SILVER, 1);
+    g.fillEllipse(mx, my - 1, rxOuter * 2 - 3, ryOuter * 2 - 3);
+    // Catch-light highlight on the glass.
+    g.fillStyle(SILVER_HI, 1);
+    g.fillRect(mx - 2, my - 4, 1, 2);
+    // Top crown gem on the frame.
+    g.fillStyle(OUT, 1);
+    g.fillRect(mx - 1, my - ryOuter - 2, 2, 1);
+    g.fillStyle(SAPPHIRE, 1);
+    g.fillRect(mx, my - ryOuter - 2, 1, 1);
+
+    // Mirror handle running DOWN through the gripping hand.
+    g.fillStyle(OUT, 1);
+    g.fillRect(mx - 1, my + ryOuter, 2, 9);
+    g.fillStyle(TRIM, 1);
+    g.fillRect(mx, my + ryOuter, 1, 9);
+    // Handle pommel.
+    g.fillStyle(OUT, 1);
+    g.fillRect(mx - 1, my + ryOuter + 9, 2, 2);
+    g.fillStyle(TRIM, 1);
+    g.fillRect(mx, my + ryOuter + 9, 1, 2);
+
+    // 7) HAND gripping the handle — drawn LAST so it sits over the handle.
+    g.fillStyle(SKIN_OUT, 1);
+    g.fillEllipse(mx, my + ryOuter + 5, 5, 4);
+    g.fillStyle(SKIN, 1);
+    g.fillEllipse(mx, my + ryOuter + 5, 3, 3);
+
+    g.generateTexture(TextureKeys.BossMarquisOfMirages, w, h);
+  }
+
+  /**
+   * Mirror Portal — entry variant. Tall oval (~28×40 px). Active glow:
+   * cyan rune-frame + bright sapphire glass + outer halo + 4 cardinal
+   * rune-marks around the frame. The "active" reading is the player's
+   * cue: this is the destructible portal whose destruction nullifies
+   * linked homing projectiles during the Mirror Special.
+   */
+  private drawMirrorPortalEntryTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 32;
+    const h = 44;
+    const cx = w / 2;
+    const cy = h / 2;
+    g.clear();
+
+    const OUT = 0x000814;
+    const TRIM = 0xffd84a;
+    const TRIM_DEEP = 0x8a5a18;
+    const RUNE = 0x4ad8ff;
+    const RUNE_HI = 0xa0f0ff;
+    const GLASS = 0x6090c8;
+    const GLASS_HI = 0xc0e0ff;
+    const SHADOW = 0x080820;
+
+    // Halo (outermost glow).
+    g.fillStyle(RUNE, 0.18);
+    g.fillEllipse(cx, cy, 30, 42);
+    g.fillStyle(RUNE_HI, 0.10);
+    g.fillEllipse(cx, cy, 24, 36);
+
+    // Frame — outer outline → gold trim → inner outline.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx, cy, 22, 36);
+    g.fillStyle(TRIM, 1);
+    g.fillEllipse(cx, cy, 20, 34);
+    g.fillStyle(TRIM_DEEP, 1);
+    g.fillEllipse(cx, cy, 18, 32);
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx, cy, 16, 30);
+
+    // Glass — sapphire-blue active surface with vertical highlight band.
+    g.fillStyle(GLASS, 1);
+    g.fillEllipse(cx, cy, 14, 28);
+    g.fillStyle(GLASS_HI, 0.55);
+    g.fillEllipse(cx - 2, cy - 4, 4, 16);
+    // Reflected runic spark in glass.
+    g.fillStyle(RUNE_HI, 0.85);
+    g.fillRect(cx - 1, cy - 6, 1, 1);
+    g.fillRect(cx + 2, cy + 2, 1, 1);
+
+    // 4 cardinal rune-marks on the gold trim (cyan studs).
+    for (const [rx, ry] of [
+      [cx, 4],          // top
+      [cx, h - 4],      // bottom
+      [3, cy],          // left
+      [w - 3, cy],      // right
+    ]) {
+      g.fillStyle(OUT, 1);
+      g.fillRect(rx - 1, ry - 1, 3, 3);
+      g.fillStyle(RUNE, 1);
+      g.fillRect(rx - 1, ry - 1, 2, 2);
+      g.fillStyle(RUNE_HI, 1);
+      g.fillRect(rx - 1, ry - 1, 1, 1);
+    }
+
+    // Shadow under the bottom edge for floor-grip.
+    g.fillStyle(SHADOW, 0.45);
+    g.fillEllipse(cx, h - 1, 16, 3);
+
+    g.generateTexture(TextureKeys.MirrorPortalEntry, w, h);
+  }
+
+  /**
+   * Mirror Portal — exit variant. Same silhouette as entry, but drained:
+   * dim trim, dark glass, no rune-glow. Visually communicates "this one
+   * is the safe one, ignore" so the player intuits the entry as the
+   * threat-source target.
+   */
+  private drawMirrorPortalExitTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 32;
+    const h = 44;
+    const cx = w / 2;
+    const cy = h / 2;
+    g.clear();
+
+    const OUT = 0x000814;
+    const TRIM_DIM = 0x6a4a18;
+    const TRIM_DEEPER = 0x402810;
+    const GLASS_DIM = 0x202a3a;
+    const GLASS_HI_DIM = 0x60708a;
+    const SHADOW = 0x080820;
+
+    // No outer halo (passive).
+
+    // Frame — dimmer trim.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx, cy, 22, 36);
+    g.fillStyle(TRIM_DIM, 1);
+    g.fillEllipse(cx, cy, 20, 34);
+    g.fillStyle(TRIM_DEEPER, 1);
+    g.fillEllipse(cx, cy, 18, 32);
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx, cy, 16, 30);
+
+    // Glass — dark, almost opaque (drained / unlit).
+    g.fillStyle(GLASS_DIM, 1);
+    g.fillEllipse(cx, cy, 14, 28);
+    g.fillStyle(GLASS_HI_DIM, 0.45);
+    g.fillEllipse(cx - 2, cy - 4, 3, 12);
+
+    // 4 cardinal rune-marks — drained: black-only, no cyan.
+    for (const [rx, ry] of [
+      [cx, 4],
+      [cx, h - 4],
+      [3, cy],
+      [w - 3, cy],
+    ]) {
+      g.fillStyle(OUT, 1);
+      g.fillRect(rx - 1, ry - 1, 3, 3);
+      g.fillStyle(TRIM_DEEPER, 1);
+      g.fillRect(rx - 1, ry - 1, 2, 2);
+    }
+
+    g.fillStyle(SHADOW, 0.45);
+    g.fillEllipse(cx, h - 1, 16, 3);
+
+    g.generateTexture(TextureKeys.MirrorPortalExit, w, h);
+  }
+
+  /**
    * Blood Projectile — crimson droplet/orb with dark outer ring + bright
    * core and a single white sparkle. Used by the Sapphire Marquis (his
    * blood-magic) and visually distinct from the amethyst Mansion Missile.
@@ -5442,36 +5768,6 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(c - 1, c - 1, 1, 1);
 
     g.generateTexture(TextureKeys.BloodProjectile, size, size);
-  }
-
-  /**
-   * Blood Trail — crimson splat/pool dropped along the Crimson Lord's dash
-   * path in Phase 2+. Mirrors the Wax Puddle structurally (same hazard
-   * group lives downstream) but recoloured for blood + a slightly smaller
-   * footprint so the player can thread between consecutive drops.
-   */
-  private drawBloodTrailTexture(g: Phaser.GameObjects.Graphics): void {
-    const size = 28;
-    g.clear();
-    const c = size / 2;
-
-    // Dark outer ring (clotted blood)
-    g.fillStyle(0x180408, 1);
-    g.fillEllipse(c, c, 22, 18);
-    // Mid crimson body
-    g.fillStyle(0x8a1424, 0.95);
-    g.fillEllipse(c, c, 17, 13);
-    // Bright red core
-    g.fillStyle(0xc8284a, 1);
-    g.fillEllipse(c, c, 11, 8);
-    // Hot pink center
-    g.fillStyle(0xff6080, 1);
-    g.fillEllipse(c - 1, c - 1, 5, 4);
-    // Sparkle
-    g.fillStyle(0xffd0d8, 1);
-    g.fillRect(c - 2, c - 2, 1, 1);
-
-    g.generateTexture(TextureKeys.BloodTrail, size, size);
   }
 
   /**

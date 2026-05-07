@@ -33,11 +33,15 @@ import { BogColossus, type BogColossusHost } from '../entities/enemies/BogColoss
 import { DamselflyEmpress, type DamselflyEmpressHost } from '../entities/enemies/DamselflyEmpress';
 import { ForestHeart, type ForestHeartHost } from '../entities/enemies/ForestHeart';
 import { LordOnyx, type LordOnyxHost } from '../entities/enemies/LordOnyx';
+import {
+  MarquisOfMirages,
+  type MarquisOfMiragesHost,
+} from '../entities/enemies/MarquisOfMirages';
 import { MossyBehemoth, type MossyBehemothHost } from '../entities/enemies/MossyBehemoth';
 import { PixieQueen, type PixieQueenHost } from '../entities/enemies/PixieQueen';
 import { ToadSovereign, type ToadSovereignHost } from '../entities/enemies/ToadSovereign';
-import { VampireFight, type VampireFightHost } from '../entities/enemies/VampireFight';
 import { VineLord, type VineLordHost } from '../entities/enemies/VineLord';
+import { MirrorPortal } from '../entities/MirrorPortal';
 import { createEnemy } from '../entities/enemies';
 import { BasePickup } from '../entities/pickups/BasePickup';
 import { BrownCratePickup, type CrateHost } from '../entities/pickups/BrownCratePickup';
@@ -48,8 +52,6 @@ import { HeartPickup } from '../entities/pickups/HeartPickup';
 import { ItemPickup } from '../entities/pickups/ItemPickup';
 import { KeyPickup } from '../entities/pickups/KeyPickup';
 import { EnemyProjectile } from '../entities/projectiles/EnemyProjectile';
-import { BloodTrail } from '../entities/hazards/BloodTrail';
-import { BloodTrailGroup } from '../entities/hazards/BloodTrailGroup';
 import { WaxPuddle } from '../entities/hazards/WaxPuddle';
 import { WaxPuddleGroup } from '../entities/hazards/WaxPuddleGroup';
 import { EnemyProjectilePool } from '../entities/projectiles/EnemyProjectilePool';
@@ -136,7 +138,11 @@ export class GameScene extends Phaser.Scene {
   private missilePool!: MagicMissilePool;
   private enemyProjectilePool!: EnemyProjectilePool;
   private waxPuddleGroup!: WaxPuddleGroup;
-  private bloodTrailGroup!: BloodTrailGroup;
+  /** Mirror Portals spawned by the Marquis of Mirages boss. Tracked here
+   * (not in `enemies`) so the missile↔portal overlap fires without the
+   * portals counting against `checkRoomClearedSoon`'s active-enemies
+   * test. Cleared on room teardown + boss-death. */
+  private mirrorPortals!: Phaser.Physics.Arcade.Group;
   private inputManager!: InputManager;
   private stats!: StatsSystem;
   private inventory!: Inventory;
@@ -173,7 +179,8 @@ export class GameScene extends Phaser.Scene {
   private enemyProjectileBarrierColliders: Phaser.Physics.Arcade.Collider[] = [];
   private enemyProjectilePlayerOverlap: Phaser.Physics.Arcade.Collider | null = null;
   private waxPuddlePlayerOverlap: Phaser.Physics.Arcade.Collider | null = null;
-  private bloodTrailPlayerOverlap: Phaser.Physics.Arcade.Collider | null = null;
+  private missileMirrorPortalOverlap: Phaser.Physics.Arcade.Collider | null = null;
+  private playerMirrorPortalCollider: Phaser.Physics.Arcade.Collider | null = null;
   private enemyBlockerCollider: Phaser.Physics.Arcade.Collider | null = null;
   private enemyProjectileBlockerCollider: Phaser.Physics.Arcade.Collider | null = null;
   private enemyWallCollider: Phaser.Physics.Arcade.Collider | null = null;
@@ -207,10 +214,10 @@ export class GameScene extends Phaser.Scene {
    * stuck-true flag can't silently award a no-hit gem. */
   private bossDamageCount = 0;
   /** The boss currently active in the room, or null if no boss fight is live.
-   * Widened to accept the `VampireFight` coordinator (which isn't a Phaser
-   * GameObject but has a manual `destroy()`); both share the same destroy +
-   * null-check lifecycle from GameScene's perspective. */
-  private activeBoss: BossEnemy | VampireFight | null = null;
+   * Onyx Mansion went from a coordinator-driven dual-body fight (Vampire
+   * Twins) to a single-body Marquis of Mirages, so this slot is back to
+   * the plain `BossEnemy | null` it was on every other floor. */
+  private activeBoss: BossEnemy | null = null;
 
   /** Gem seal placed in the Onyx vampire room after the Twins die. Holds
    * the activation state + tear-down handle. Null on every other floor. */
@@ -231,6 +238,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Phaser Key for the R restart-hold; created in create(). */
   private restartKey: Phaser.Input.Keyboard.Key | null = null;
+  /** Phaser Key for ESC pause-menu; polled in update(). */
+  private pauseKey: Phaser.Input.Keyboard.Key | null = null;
   /** Timestamp the player started holding R, or null if not currently held. */
   private restartHoldStartedAt: number | null = null;
   /** Background bar of the hold-R fill widget. */
@@ -314,7 +323,10 @@ export class GameScene extends Phaser.Scene {
     this.missilePool = new MagicMissilePool(this);
     this.enemyProjectilePool = new EnemyProjectilePool(this);
     this.waxPuddleGroup = new WaxPuddleGroup(this);
-    this.bloodTrailGroup = new BloodTrailGroup(this);
+    this.mirrorPortals = this.physics.add.group({
+      classType: MirrorPortal,
+      runChildUpdate: false,
+    });
     this.inputManager = new InputManager(this);
     this.player = new Player(this, 0, 0, this.inputManager, this.missilePool, this.stats);
 
@@ -357,6 +369,10 @@ export class GameScene extends Phaser.Scene {
     this.restartKey = this.input.keyboard?.addKey('R') ?? null;
     this.restartHoldStartedAt = null;
     this.buildRestartHoldWidget();
+
+    // ESC opens the pause overlay. Polled in update() via JustDown so we
+    // don't get repeat-firing while the key is held.
+    this.pauseKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC) ?? null;
 
     this.dropSystem = new DropSystem(
       {
@@ -412,6 +428,7 @@ export class GameScene extends Phaser.Scene {
       this.gemSealOverlap = null;
       this.restartHoldStartedAt = null;
       this.restartKey = null;
+      this.pauseKey = null;
       this.restartHoldBg = null;
       this.restartHoldFill = null;
       this.restartHoldLabel = null;
@@ -432,7 +449,8 @@ export class GameScene extends Phaser.Scene {
          * 25 % chance per run hasn't come up. Emerald: `'boss-vine-lord'`,
          * `'boss-mossy-behemoth'`, `'boss-pixie-queen'`, `'boss-forest-heart'`.
          * Sapphire: `'boss-toad-sovereign'`, `'boss-bloomheart'`,
-         * `'boss-damselfly-empress'`, `'boss-bog-colossus'`.
+         * `'boss-damselfly-empress'`, `'boss-bog-colossus'`. Onyx:
+         * `'boss-marquis-of-mirages'`, `'boss-lord-onyx'`.
          * Run `__wiz.spawnBoss('boss-bloomheart')` in the browser console.
          */
         spawnBoss: (bossId: string) => this.devSpawnBoss(bossId),
@@ -913,7 +931,10 @@ export class GameScene extends Phaser.Scene {
     this.enemyProjectileWallCollider?.destroy();
     this.enemyProjectilePlayerOverlap?.destroy();
     this.waxPuddlePlayerOverlap?.destroy();
-    this.bloodTrailPlayerOverlap?.destroy();
+    this.missileMirrorPortalOverlap?.destroy();
+    this.missileMirrorPortalOverlap = null;
+    this.playerMirrorPortalCollider?.destroy();
+    this.playerMirrorPortalCollider = null;
     this.enemyBlockerCollider?.destroy();
     this.enemyProjectileBlockerCollider?.destroy();
     this.enemyWallCollider?.destroy();
@@ -932,7 +953,8 @@ export class GameScene extends Phaser.Scene {
     this.missilePool.deactivateAll();
     this.enemyProjectilePool.deactivateAll();
     this.waxPuddleGroup.deactivateAll();
-    this.bloodTrailGroup.deactivateAll();
+    // Destroy any live mirror portals (Marquis-of-Mirages special leftovers).
+    this.mirrorPortals.clear(true, true);
 
     // Stairs sprite + overlap are room-scoped: reborn via the boss-room
     // re-entry path in `enterRoom` so we always destroy them on teardown.
@@ -1118,18 +1140,6 @@ export class GameScene extends Phaser.Scene {
     const center = this.currentRoom.getCenter();
     this.updateBossHpScale();
 
-    // Vampire Twins is a virtual boss id — dispatched to a coordinator that
-    // spawns + manages two bodies as one fight. Coordinator emits
-    // `boss:spawned` itself, so we don't double-emit here.
-    if (bossId === 'boss-vampire-twins') {
-      const fight = new VampireFight(this, center.x, center.y, this.bossHost());
-      for (const body of fight.getBodies()) this.enemies.add(body);
-      this.activeBoss = fight;
-      this.bossNoHitInProgress = true;
-      this.registry.set('bossNoHitInProgress', true);
-      return;
-    }
-
     const boss = this.constructBossById(bossId, center.x, center.y);
     if (!boss) return;
     this.enemies.add(boss);
@@ -1160,19 +1170,6 @@ export class GameScene extends Phaser.Scene {
     const center = this.currentRoom.getCenter();
     this.updateBossHpScale();
 
-    // Vampire Twins virtual id — same dispatch as the natural boss spawn.
-    if (bossId === 'boss-vampire-twins') {
-      const fight = new VampireFight(this, center.x, center.y, this.bossHost());
-      for (const body of fight.getBodies()) this.enemies.add(body);
-      this.activeBoss = fight;
-      this.bossNoHitInProgress = true;
-      this.registry.set('bossNoHitInProgress', true);
-      this.currentRoom.closeAllDoors();
-      // eslint-disable-next-line no-console
-      console.log(`[__wiz.spawnBoss] Spawned ${fight.displayName}.`);
-      return;
-    }
-
     const boss = this.constructBossById(bossId, center.x, center.y);
     if (!boss) return;
     this.enemies.add(boss);
@@ -1201,13 +1198,13 @@ export class GameScene extends Phaser.Scene {
     BloomheartHost &
     DamselflyEmpressHost &
     BogColossusHost &
-    VampireFightHost &
+    MarquisOfMiragesHost &
     LordOnyxHost {
     return {
       enemyProjectilePool: this.enemyProjectilePool,
       spawnEnemyAt: (id, sx, sy) => this.spawnEnemyAt(id, sx, sy),
       getPlayer: () => this.player,
-      bloodTrailGroup: this.bloodTrailGroup,
+      addMirrorPortal: (portal) => this.mirrorPortals.add(portal),
       getRoomBounds: () => ({
         minX: 2 * TILE_SIZE,
         maxX: (ROOM_WIDTH_TILES - 2) * TILE_SIZE,
@@ -1246,6 +1243,8 @@ export class GameScene extends Phaser.Scene {
         return new DamselflyEmpress(this, x, y, host);
       case 'boss-bog-colossus':
         return new BogColossus(this, x, y, host);
+      case 'boss-marquis-of-mirages':
+        return new MarquisOfMirages(this, x, y, host);
       case 'boss-lord-onyx':
         return new LordOnyx(this, x, y, host);
       default:
@@ -1807,30 +1806,36 @@ export class GameScene extends Phaser.Scene {
       },
     );
 
-    // Blood trail ↔ player: same hazard-tile pattern as the wax puddle, just
-    // a different sprite/lifetime. Dropped along the Crimson Lord's dash
-    // path in Phase 2+.
-    this.bloodTrailPlayerOverlap = this.physics.add.overlap(
-      this.player,
-      this.bloodTrailGroup.getGroup(),
+    // Mirror Portal ↔ player missile: lets the player damage the entry
+    // portal (HP 3) during the Marquis-of-Mirages Mirror Special. Exit
+    // portals also overlap but their `takeDamage` short-circuits to false
+    // → missile passes through visually but deactivates on hit (same idiom
+    // as enemy hits). This is fine because the exit's role is purely the
+    // boss-emerge anchor; the player has no incentive to shoot it.
+    this.missileMirrorPortalOverlap = this.physics.add.overlap(
+      this.missilePool.getGroup(),
+      this.mirrorPortals,
       (a, b) => {
         try {
-          const trail = (a instanceof BloodTrail ? a : b) as BloodTrail;
-          if (!trail.active) return;
-          if (!this.player.health.isVulnerable(this.time.now)) return;
-          const knockback = CombatSystem.knockbackVector(
-            { x: trail.x, y: trail.y },
-            { x: this.player.x, y: this.player.y },
-            KNOCKBACK_FORCE_PLAYER,
-          );
-          const landed = this.player.takeDamage(trail.damage, knockback, this.time.now);
-          if (landed) {
-            this.cameras.main.shake(SCREEN_SHAKE_DURATION_MS, SCREEN_SHAKE_INTENSITY);
-          }
+          const missile = (a instanceof MagicMissile ? a : b) as MagicMissile;
+          const portal = (a instanceof MirrorPortal ? a : b) as MirrorPortal;
+          if (!missile.active || !portal.active) return;
+          if (!portal.isEntry) return;
+          missile.deactivate();
+          portal.takeDamage(missile.damage);
         } catch (err) {
-          console.error('[bloodTrail↔player overlap] error:', err);
+          console.error('[missile↔mirrorPortal overlap] error:', err);
         }
       },
+    );
+
+    // Mirror Portal ↔ player: solid collider so the player can't walk
+    // through portals (positional choice — destroying the entry portal
+    // requires committing to a position). Exit portal also blocks; that's
+    // intentional, the exit is briefly in-room during the special.
+    this.playerMirrorPortalCollider = this.physics.add.collider(
+      this.player,
+      this.mirrorPortals,
     );
 
     // Door triggers: walking onto an OPEN door zone transitions to the
@@ -2147,6 +2152,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Open the pause overlay scene. Pauses Game (UIScene + the running
+   * tweens / physics step), then launches PauseScene on top. Resume is
+   * handled inside PauseScene which calls `scene.resume(Game)` and stops
+   * itself. Any in-flight restart-hold widget is reset so the bar doesn't
+   * sit visible behind the pause overlay.
+   */
+  private openPauseMenu(): void {
+    this.restartHoldStartedAt = null;
+    this.setRestartHoldWidgetVisible(false);
+    this.scene.pause();
+    this.scene.launch(SceneKeys.Pause);
+  }
+
+  /**
    * Hold-R-during-run polling. The widget fades in as the user holds R, the
    * fill bar tracks elapsed time, and on threshold we kick a fresh run.
    * Releasing R before the threshold cleanly resets the widget. Skipped
@@ -2155,6 +2174,18 @@ export class GameScene extends Phaser.Scene {
   override update(time: number, _delta: number): void {
     void _delta;
     if (this.inTransition) return;
+
+    // ESC → pause overlay. Skip if the map is already pausing the scene
+    // (TAB owns the map-mode pause flow, ESC shouldn't double-pause).
+    if (
+      this.pauseKey &&
+      Phaser.Input.Keyboard.JustDown(this.pauseKey) &&
+      !this.scene.isPaused()
+    ) {
+      this.openPauseMenu();
+      return;
+    }
+
     if (!this.restartKey) return;
 
     // Start tracking only on a fresh keydown — `JustDown` returns true only

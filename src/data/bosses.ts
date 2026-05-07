@@ -27,10 +27,15 @@ export const BOSSES: Record<string, BossRosterEntry> = {
     floor: 'sapphire-swamp',
   },
   'boss-bog-colossus': { id: 'boss-bog-colossus', weight: 1, floor: 'sapphire-swamp' },
-  // Virtual id — represents the Vampire Twins fight (Crimson Lord + Sapphire
-  // Marquis), dispatched in `constructBossById` to a `VampireFight` coordinator
-  // that spawns and manages both bodies as one logical boss.
-  'boss-vampire-twins': { id: 'boss-vampire-twins', weight: 1, floor: 'onyx-mansion' },
+  // Onyx Mansion standard boss (the gem-seal gates the secret Prismarch
+  // fight). Single vampire-mage body — replaced the old Vampire Twins
+  // coordinator setup with a simpler design built around a single Mirror-
+  // Portal special. See `entities/enemies/MarquisOfMirages.ts`.
+  'boss-marquis-of-mirages': {
+    id: 'boss-marquis-of-mirages',
+    weight: 1,
+    floor: 'onyx-mansion',
+  },
 };
 
 /**

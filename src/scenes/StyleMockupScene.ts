@@ -14,8 +14,8 @@ import {
 import { FLOORS } from '../data/floors';
 import { RNG } from '../utils/RNG';
 
-type MockupPage = 0 | 1 | 2 | 3 | 4;
-const PAGE_COUNT = 5;
+type MockupPage = 0 | 1 | 2 | 3 | 4 | 5;
+const PAGE_COUNT = 6;
 
 /**
  * Visual mockup with four pages, switched via TAB:
@@ -106,6 +106,14 @@ export class StyleMockupScene extends Phaser.Scene {
           `Page 5/${PAGE_COUNT} Â· Current vs. 3 design directions`,
         );
         this.paintShowcasePrismarchVariants();
+        break;
+      case 5:
+        this.paintHeader(
+          cx,
+          'MARQUIS OF MIRAGES â€” DESIGN HISTORY',
+          `Page 6/${PAGE_COUNT} Â· Old V2 vs. variants  (A = implemented)`,
+        );
+        this.paintShowcaseMarquisVariants();
         break;
     }
     this.paintFooter(cx);
@@ -3135,6 +3143,725 @@ export class StyleMockupScene extends Phaser.Scene {
     ];
 
     return { floorVariants, decorations };
+  }
+
+  // ===========================================================================
+  // Page 6: Vampire-Mage boss variants (chess-piece break)
+  //
+  // Goal: explore silhouettes that DON'T read as a chess piece. The current
+  // Sapphire Marquis is a symmetric vertical bell with a small head — the
+  // user's "Schachfigur" critique. Each variant aims at a distinct silhouette
+  // direction:
+  //   A — Caped Conjurer  → asymmetric cape + casting pose (in-action)
+  //   B — Hooded Specter  → slim tall rectangle, deep hood, hand-mirror prop
+  //   C — Mirage-Wing Lord → wide horizontal bat-cape (breaks vertical entirely)
+  //   D — Shard-Crowned   → tall narrow column + halo of mirror shards
+  // ===========================================================================
+
+  private paintShowcaseMarquisVariants(): void {
+    const slots: Array<{
+      title: string;
+      lines: readonly string[];
+      paint: (cx: number, cy: number) => void;
+    }> = [
+      {
+        title: 'OLD V2  (SAPPHIRE MARQUIS)',
+        lines: ['Twins-era bell silhouette.', 'Replaced by variant A.', 'Kept as design history.'],
+        paint: (cx, cy) => this.paintMarquisCurrent(cx, cy),
+      },
+      {
+        title: 'A — CAPED CONJURER  (LIVE)',
+        lines: [
+          'Asymmetric cape billow,',
+          'casting pose w/ oval mirror,',
+          'shipped on Onyx Mansion.',
+        ],
+        paint: (cx, cy) => this.drawMarquisVariantCaped(this.add.graphics(), cx, cy),
+      },
+      {
+        title: 'B — HOODED SPECTER',
+        lines: [
+          'Slim tall rectangle,',
+          'deep hood, faceless,',
+          'ornate hand-mirror prop.',
+        ],
+        paint: (cx, cy) => this.drawMarquisVariantHooded(this.add.graphics(), cx, cy),
+      },
+      {
+        title: 'C — MIRAGE-WING',
+        lines: [
+          'Wide horizontal bat-cape,',
+          'asymmetric wing spread,',
+          'breaks the vertical feel.',
+        ],
+        paint: (cx, cy) => this.drawMarquisVariantWinged(this.add.graphics(), cx, cy),
+      },
+      {
+        title: 'D — SHARD-CROWN',
+        lines: [
+          'Tall narrow column robe,',
+          'crown of mirror shards,',
+          '3 orbital fragments.',
+        ],
+        paint: (cx, cy) => this.drawMarquisVariantShardCrown(this.add.graphics(), cx, cy),
+      },
+    ];
+
+    const centers = [96, 288, 480, 672, 864];
+    const slotHalfW = 86;
+    const slotTopY = 110;
+    const slotH = 350;
+    const titleY = slotTopY + 14;
+    const bossY = slotTopY + 200;
+    const descTopY = slotTopY + 280;
+
+    for (let i = 0; i < slots.length; i++) {
+      const sx = centers[i];
+      const slot = slots[i];
+
+      // Frame box — sapphire/gold border instead of amethyst (vampire-mage palette).
+      const frame = this.add.graphics();
+      frame.fillStyle(0x040818, 0.65);
+      frame.fillRect(sx - slotHalfW, slotTopY, slotHalfW * 2, slotH);
+      frame.lineStyle(1, 0x4ad8ff, 0.45);
+      frame.strokeRect(sx - slotHalfW, slotTopY, slotHalfW * 2, slotH);
+
+      // Floor shadow + sapphire pad.
+      const pad = this.add.graphics();
+      pad.fillStyle(0x000000, 0.55);
+      pad.fillEllipse(sx, bossY + 86, 78, 13);
+      pad.fillStyle(0x4ad8ff, 0.16);
+      pad.fillEllipse(sx, bossY + 86, 56, 9);
+      pad.fillStyle(0xff80a0, 0.18);
+      pad.fillEllipse(sx, bossY + 86, 26, 5);
+
+      this.add
+        .text(sx, titleY, slot.title, {
+          fontSize: '15px',
+          fontStyle: 'bold',
+          color: '#cfe6ff',
+          stroke: '#040818',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5, 0);
+
+      slot.paint(sx, bossY);
+
+      for (let li = 0; li < slot.lines.length; li++) {
+        this.add
+          .text(sx, descTopY + li * 16, slot.lines[li], {
+            fontSize: '11px',
+            color: '#a8c0d8',
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5, 0)
+          .setAlpha(0.9);
+      }
+    }
+  }
+
+  /**
+   * Renders the live ingame Sapphire Marquis V2 texture as an Image, scaled
+   * to roughly match the painted variants. The bell-shape + small head is
+   * exactly what the user flagged as chess-piece-like.
+   */
+  private paintMarquisCurrent(cx: number, cy: number): void {
+    const halo = this.add.graphics();
+    halo.fillStyle(0x4ad8ff, 0.10);
+    halo.fillCircle(cx, cy, 90);
+    halo.fillStyle(0x1f3878, 0.18);
+    halo.fillCircle(cx, cy, 60);
+    const img = this.add.image(cx, cy, TextureKeys.BossSapphireMarquis);
+    img.setScale(4.4);
+    halo.setDepth(img.depth - 1);
+  }
+
+  /**
+   * VARIANT A — Caped Conjurer.
+   * Asymmetric: cape billows hard to the left, body leans into a forward
+   * casting pose with the right hand extended palm-out, a small hand-mirror
+   * floating just above it. Hem of the cape is wind-swept, not flared.
+   * Reads as in-action rather than statue-like.
+   */
+  private drawMarquisVariantCaped(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const OUT = 0x000814;
+    const ROBE_DARK = 0x0c1830;
+    const ROBE = 0x1f3878;
+    const ROBE_HI = 0x4870c8;
+    const CAPE_DARK = 0x3a0810;
+    const CAPE = 0x84142c;
+    const CAPE_HI = 0xc8284a;
+    const TRIM = 0xffd84a;
+    const SKIN = 0xd8c0d0;
+    const EYE = 0xff2040;
+    const SILVER = 0xd0d8e8;
+    const SILVER_HI = 0xffffff;
+
+    const bx = cx; // body center x
+    const top = cy - 78;
+
+    // 1) CAPE — billowing wide to the LEFT (asymmetric). Drawn before body.
+    const capeOuter = [
+      { x: bx + 14, y: top + 18 },     // collar right
+      { x: bx + 6, y: top + 22 },      // collar mid
+      { x: bx - 8, y: top + 26 },      // shoulder left
+      { x: bx - 36, y: top + 38 },     // billow peak
+      { x: bx - 58, y: top + 64 },     // billow far edge
+      { x: bx - 64, y: top + 92 },     // bottom-left tip
+      { x: bx - 50, y: top + 116 },    // hem 1
+      { x: bx - 28, y: top + 138 },    // hem 2
+      { x: bx - 10, y: top + 152 },    // hem 3 (tail)
+      { x: bx + 4, y: top + 142 },     // tucking back behind body
+      { x: bx - 4, y: top + 88 },      // inside crease
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(capeOuter, true);
+    g.fillStyle(CAPE_DARK, 1);
+    g.fillPoints(
+      capeOuter.map((p) => ({ x: p.x + 1, y: p.y + 1 })),
+      true,
+    );
+    // Cape mid-tone fold
+    g.fillStyle(CAPE, 1);
+    g.fillTriangle(bx - 6, top + 30, bx - 32, top + 70, bx - 22, top + 130);
+    // Cape highlight rim along the wind-edge
+    g.fillStyle(CAPE_HI, 0.85);
+    g.fillTriangle(bx - 30, top + 38, bx - 50, top + 70, bx - 56, top + 90);
+
+    // 2) BODY — narrow, leaning slightly right. Just a slim torso shape, no
+    // bell hem; the cape covers the bottom.
+    const bodyPts = [
+      { x: bx - 10, y: top + 28 },
+      { x: bx + 12, y: top + 28 },
+      { x: bx + 16, y: top + 78 },
+      { x: bx + 18, y: top + 130 },
+      { x: bx + 4, y: top + 144 },
+      { x: bx - 4, y: top + 130 },
+      { x: bx - 6, y: top + 78 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(bodyPts, true);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      bodyPts.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillEllipse(bx + 5, top + 80, 14, 50);
+    g.fillStyle(ROBE_HI, 1);
+    g.fillTriangle(bx + 8, top + 40, bx + 12, top + 40, bx + 14, top + 120);
+
+    // 3) GOLD V-trim down the chest
+    g.fillStyle(TRIM, 1);
+    g.fillRect(bx + 2, top + 32, 2, 48);
+    // Gold cabochon mid-chest
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx + 3, top + 46, 4);
+    g.fillStyle(TRIM, 1);
+    g.fillCircle(bx + 3, top + 46, 3);
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(bx + 3, top + 46, 1.6);
+
+    // 4) HEAD — slightly tilted forward (lean)
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx + 2, top + 16, 11);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(bx + 2, top + 16, 9);
+    // Slicked hair
+    g.fillStyle(0x100614, 1);
+    g.fillEllipse(bx + 2, top + 8, 20, 8);
+    // Single red eye
+    g.fillStyle(EYE, 1);
+    g.fillRect(bx + 4, top + 16, 3, 2);
+    // Closed eye (scar)
+    g.fillStyle(0x6a1818, 1);
+    g.fillRect(bx - 5, top + 15, 4, 1);
+
+    // 5) RIGHT ARM extended forward + UP (casting / presenting pose).
+    // Sleeve runs from shoulder out + slightly upward so the held mirror
+    // reads as raised toward the player.
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(bx + 14, top + 34, bx + 38, top + 50, bx + 32, top + 64);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillTriangle(bx + 14, top + 36, bx + 36, top + 50, bx + 32, top + 62);
+    // Sleeve cuff (gold trim)
+    g.fillStyle(TRIM, 1);
+    g.fillRect(bx + 32, top + 52, 6, 2);
+
+    // 6) HAND-MIRROR — oval head, handle gripped DIRECTLY in the hand.
+    // Mirror is raised toward the player. Handle runs vertically through
+    // the gripping fingers; oval head sits above.
+    const mx = bx + 38;       // mirror center x
+    const my = top + 36;      // mirror oval center y (above the hand)
+    const rx = 7;             // oval half-width
+    const ry = 11;            // oval half-height (taller than wide → hand-mirror)
+
+    // Soft silver halo around the oval
+    g.fillStyle(SILVER, 0.28);
+    g.fillEllipse(mx, my, rx * 2 + 8, ry * 2 + 8);
+
+    // Mirror frame (oval): outline → gold rim → glass
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(mx, my, rx * 2 + 2, ry * 2 + 2);
+    g.fillStyle(TRIM, 1);
+    g.fillEllipse(mx, my, rx * 2, ry * 2);
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(mx, my, rx * 2 - 3, ry * 2 - 3);
+    g.fillStyle(SILVER, 1);
+    g.fillEllipse(mx, my - 1, rx * 2 - 5, ry * 2 - 5);
+    // Catchlight on glass
+    g.fillStyle(SILVER_HI, 1);
+    g.fillRect(mx - 3, my - 6, 2, 4);
+    g.fillStyle(SILVER_HI, 0.7);
+    g.fillRect(mx - 4, my - 1, 1, 3);
+
+    // Top crown gem on the frame
+    g.fillStyle(OUT, 1);
+    g.fillCircle(mx, my - ry - 2, 2.5);
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(mx, my - ry - 2, 1.6);
+
+    // Mirror handle — runs DOWN from the oval base through the hand grip.
+    g.fillStyle(OUT, 1);
+    g.fillRect(mx - 1.5, my + ry, 3, 18);
+    g.fillStyle(TRIM, 1);
+    g.fillRect(mx - 1, my + ry, 2, 18);
+    // Handle pommel at bottom
+    g.fillStyle(OUT, 1);
+    g.fillCircle(mx, my + ry + 19, 2.5);
+    g.fillStyle(TRIM, 1);
+    g.fillCircle(mx, my + ry + 19, 1.8);
+
+    // 7) HAND gripping the handle — drawn LAST so it sits over the handle.
+    // Two skin-tone bumps suggest fingers wrapping around the metal.
+    const hx = mx;
+    const hy = my + ry + 9;
+    g.fillStyle(0x402028, 1);  // hand outline (dark skin shadow)
+    g.fillEllipse(hx, hy, 9, 6);
+    g.fillStyle(SKIN, 1);
+    g.fillEllipse(hx, hy, 7, 5);
+    // Knuckle line
+    g.fillStyle(0x402028, 0.6);
+    g.fillRect(hx - 3, hy - 1, 6, 1);
+  }
+
+  /**
+   * VARIANT B — Hooded Specter.
+   * Slim tall vertical silhouette (no bell flare). Deep hood pulled fully
+   * over the face, leaving a black void with two glowing pinpoints. Robe
+   * falls in straight vertical panels with subtle vertical creases. Holds
+   * an ornate hand-mirror at chest level — the "indirect-mirror" prop is
+   * the signature element. Reads as ominous / quiet rather than dramatic.
+   */
+  private drawMarquisVariantHooded(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const OUT = 0x000814;
+    const ROBE_DARK = 0x0a0420;
+    const ROBE = 0x281450;
+    const ROBE_HI = 0x583890;
+    const TRIM = 0xc0a050;
+    const SILVER = 0xd0d8e8;
+    const SILVER_HI = 0xffffff;
+    const EYE = 0xff4060;
+
+    const bx = cx;
+    const top = cy - 86;
+
+    // 1) HOOD + ROBE silhouette — narrow tall trapezoid, slight widening at
+    // shoulders, straight-falling hem. NO flared bell.
+    const outer = [
+      { x: bx, y: top + 0 },           // hood peak (slight)
+      { x: bx + 8, y: top + 8 },       // hood side
+      { x: bx + 14, y: top + 28 },     // shoulder
+      { x: bx + 20, y: top + 56 },     // arm-flare
+      { x: bx + 18, y: top + 100 },    // taper
+      { x: bx + 22, y: top + 158 },    // hem right
+      { x: bx + 14, y: top + 168 },    // hem corner
+      { x: bx, y: top + 166 },         // hem center
+      { x: bx - 14, y: top + 168 },    // hem corner
+      { x: bx - 22, y: top + 158 },    // hem left
+      { x: bx - 18, y: top + 100 },
+      { x: bx - 20, y: top + 56 },
+      { x: bx - 14, y: top + 28 },
+      { x: bx - 8, y: top + 8 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(outer, true);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      outer.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    // Mid robe tone vertical strip
+    g.fillStyle(ROBE, 1);
+    g.fillRect(bx - 12, top + 30, 24, 130);
+    g.fillStyle(ROBE_HI, 0.55);
+    g.fillRect(bx + 6, top + 30, 4, 120);
+
+    // 2) HOOD VOID — face is a pure-black ellipse with two glowing pinpoints.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(bx, top + 24, 22, 26);
+    // Trim on hood opening
+    g.lineStyle(2, TRIM, 1);
+    g.strokeEllipse(bx, top + 24, 22, 26);
+    // Eyes — two narrow vertical pinpoints
+    g.fillStyle(EYE, 1);
+    g.fillRect(bx - 5, top + 22, 2, 4);
+    g.fillRect(bx + 3, top + 22, 2, 4);
+
+    // 3) Vertical robe creases — silver thread, suggests panel construction.
+    g.fillStyle(TRIM, 0.6);
+    for (const dx of [-12, -4, 4, 12]) {
+      g.fillRect(bx + dx, top + 60, 1, 100);
+    }
+
+    // 4) GOLD chest sash + sapphire pin
+    g.fillStyle(TRIM, 1);
+    g.fillRect(bx - 14, top + 68, 28, 3);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx, top + 70, 3.5);
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(bx, top + 70, 2.2);
+
+    // 5) ORNATE HAND-MIRROR held at chest level — signature prop.
+    // Held in left hand peeking out from sleeve.
+    const mx = bx - 10;
+    const my = top + 100;
+    // Sleeve cuff
+    g.fillStyle(OUT, 1);
+    g.fillRect(bx - 16, top + 92, 8, 10);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillRect(bx - 15, top + 94, 7, 8);
+    // Hand
+    g.fillStyle(0xd8c0d0, 1);
+    g.fillCircle(bx - 12, top + 102, 3);
+    // Mirror handle
+    g.fillStyle(OUT, 1);
+    g.fillRect(mx - 1, my - 2, 2, 16);
+    g.fillStyle(TRIM, 1);
+    g.fillRect(mx, my - 2, 1, 16);
+    // Mirror oval head
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(mx, my - 8, 14, 18);
+    g.fillStyle(SILVER, 1);
+    g.fillEllipse(mx, my - 8, 11, 15);
+    g.fillStyle(SILVER_HI, 1);
+    g.fillRect(mx - 3, my - 12, 2, 3);
+    // Mirror frame trim
+    g.lineStyle(2, TRIM, 1);
+    g.strokeEllipse(mx, my - 8, 14, 18);
+    // Crowning gem on the frame
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(mx, my - 18, 1.8);
+  }
+
+  /**
+   * VARIANT C — Mirage-Wing Lord.
+   * Wide horizontal silhouette: bat-like cape spread asymmetrically wide
+   * (left wing higher, right lower). Body itself is a slim rod in the
+   * middle. Breaks the vertical-chess-piece feel ENTIRELY — the player
+   * reads "wide creature" the moment they see it.
+   */
+  private drawMarquisVariantWinged(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const OUT = 0x000814;
+    const ROBE_DARK = 0x0a1020;
+    const ROBE = 0x202c4c;
+    const CAPE_DARK = 0x180020;
+    const CAPE = 0x382850;
+    const CAPE_HI = 0x6a4ad0;
+    const TRIM = 0xc0a050;
+    const SKIN = 0xc8b0c0;
+    const EYE = 0xff4060;
+
+    const bx = cx;
+    const top = cy - 70;
+
+    // 1) BAT-WING CAPE — drawn first, wide horizontal spread.
+    // Left wing (higher, longer)
+    const leftWing = [
+      { x: bx - 4, y: top + 22 },
+      { x: bx - 28, y: top + 12 },     // tip 1 — finger 1
+      { x: bx - 38, y: top + 24 },     // valley
+      { x: bx - 60, y: top + 16 },     // tip 2
+      { x: bx - 64, y: top + 38 },     // valley
+      { x: bx - 76, y: top + 36 },     // tip 3 (far end)
+      { x: bx - 70, y: top + 56 },     // bottom edge
+      { x: bx - 50, y: top + 60 },
+      { x: bx - 30, y: top + 50 },
+      { x: bx - 10, y: top + 56 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(leftWing, true);
+    g.fillStyle(CAPE_DARK, 1);
+    g.fillPoints(
+      leftWing.map((p) => ({ x: p.x + 1, y: p.y })),
+      true,
+    );
+    g.fillStyle(CAPE, 1);
+    g.fillTriangle(bx - 8, top + 26, bx - 64, top + 30, bx - 16, top + 52);
+    // Wing-bone struts (cape fingers)
+    g.lineStyle(1.5, CAPE_HI, 0.8);
+    g.beginPath();
+    g.moveTo(bx - 6, top + 28);
+    g.lineTo(bx - 28, top + 14);
+    g.moveTo(bx - 6, top + 30);
+    g.lineTo(bx - 60, top + 18);
+    g.moveTo(bx - 6, top + 32);
+    g.lineTo(bx - 76, top + 38);
+    g.strokePath();
+
+    // Right wing (lower, shorter — asymmetric)
+    const rightWing = [
+      { x: bx + 4, y: top + 26 },
+      { x: bx + 22, y: top + 24 },
+      { x: bx + 32, y: top + 38 },     // valley
+      { x: bx + 50, y: top + 30 },     // tip 2
+      { x: bx + 56, y: top + 50 },     // valley
+      { x: bx + 64, y: top + 56 },     // tip 3 (far end, lower)
+      { x: bx + 56, y: top + 76 },     // bottom edge
+      { x: bx + 38, y: top + 78 },
+      { x: bx + 18, y: top + 70 },
+      { x: bx + 6, y: top + 70 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(rightWing, true);
+    g.fillStyle(CAPE_DARK, 1);
+    g.fillPoints(
+      rightWing.map((p) => ({ x: p.x - 1, y: p.y })),
+      true,
+    );
+    g.fillStyle(CAPE, 1);
+    g.fillTriangle(bx + 8, top + 30, bx + 56, top + 44, bx + 12, top + 68);
+    g.lineStyle(1.5, CAPE_HI, 0.8);
+    g.beginPath();
+    g.moveTo(bx + 6, top + 32);
+    g.lineTo(bx + 22, top + 24);
+    g.moveTo(bx + 6, top + 34);
+    g.lineTo(bx + 50, top + 30);
+    g.moveTo(bx + 6, top + 36);
+    g.lineTo(bx + 64, top + 56);
+    g.strokePath();
+
+    // Mirror-glint accents — small white sparkles on cape edges
+    for (const [px, py] of [
+      [bx - 50, top + 24],
+      [bx - 70, top + 44],
+      [bx + 38, top + 36],
+      [bx + 58, top + 60],
+    ]) {
+      g.fillStyle(0xffffff, 0.85);
+      g.fillRect(px, py, 1, 1);
+    }
+
+    // 2) BODY — slim vertical rod in the middle, no flare.
+    const body = [
+      { x: bx - 7, y: top + 24 },
+      { x: bx + 7, y: top + 24 },
+      { x: bx + 8, y: top + 80 },
+      { x: bx + 10, y: top + 130 },
+      { x: bx + 4, y: top + 142 },
+      { x: bx - 4, y: top + 142 },
+      { x: bx - 10, y: top + 130 },
+      { x: bx - 8, y: top + 80 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(body, true);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      body.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillRect(bx - 6, top + 30, 12, 100);
+
+    // Gold chest sash
+    g.fillStyle(TRIM, 1);
+    g.fillRect(bx - 7, top + 50, 14, 2);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx, top + 51, 2.5);
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(bx, top + 51, 1.5);
+
+    // 3) HEAD — slim, slightly wider for vampire fang silhouette
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx, top + 14, 9);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(bx, top + 14, 7);
+    // Slick hair top
+    g.fillStyle(0x100614, 1);
+    g.fillEllipse(bx, top + 8, 14, 5);
+    // Two glowing eyes (fanged silhouette)
+    g.fillStyle(EYE, 1);
+    g.fillRect(bx - 4, top + 13, 2, 2);
+    g.fillRect(bx + 2, top + 13, 2, 2);
+    // Hint of bared fangs
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(bx - 2, top + 17, 1, 2);
+    g.fillRect(bx + 1, top + 17, 1, 2);
+  }
+
+  /**
+   * VARIANT D — Shard-Crowned Sorcerer.
+   * Tall narrow column robe, no flare. Above the head: a fan-crown of 5
+   * mirror shards spiking up like a halo of broken glass. 3 free-floating
+   * shard fragments orbit the body at chest level. Reads as cosmic-mage,
+   * not figurine. Heavy emphasis on mirror motif.
+   */
+  private drawMarquisVariantShardCrown(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+  ): void {
+    const OUT = 0x000814;
+    const ROBE_DARK = 0x0c1030;
+    const ROBE = 0x1f2864;
+    const ROBE_HI = 0x4858a0;
+    const TRIM = 0xffd84a;
+    const SKIN = 0xd8c0d0;
+    const SILVER = 0xd0d8e8;
+    const SILVER_HI = 0xffffff;
+    const SHARD_DARK = 0x6890b0;
+    const EYE = 0xff2040;
+
+    const bx = cx;
+    const top = cy - 90;
+
+    // 1) SHARD-CROWN halo behind the head — 5 sharp triangle spikes fanning up.
+    g.fillStyle(SILVER, 0.18);
+    g.fillCircle(bx, top + 26, 36);
+    const shards: Array<{ angle: number; len: number }> = [
+      { angle: -Math.PI / 2 - 0.6, len: 30 },
+      { angle: -Math.PI / 2 - 0.3, len: 36 },
+      { angle: -Math.PI / 2, len: 42 },          // tallest center spike
+      { angle: -Math.PI / 2 + 0.3, len: 36 },
+      { angle: -Math.PI / 2 + 0.6, len: 30 },
+    ];
+    const cax = bx;
+    const cay = top + 26;
+    for (const s of shards) {
+      const tipX = cax + Math.cos(s.angle) * s.len;
+      const tipY = cay + Math.sin(s.angle) * s.len;
+      const baseW = 4;
+      const px1 = cax + Math.cos(s.angle + Math.PI / 2) * baseW;
+      const py1 = cay + Math.sin(s.angle + Math.PI / 2) * baseW;
+      const px2 = cax - Math.cos(s.angle + Math.PI / 2) * baseW;
+      const py2 = cay - Math.sin(s.angle + Math.PI / 2) * baseW;
+      g.fillStyle(OUT, 1);
+      g.fillTriangle(tipX, tipY, px1, py1, px2, py2);
+      g.fillStyle(SHARD_DARK, 1);
+      g.fillTriangle(
+        tipX, tipY,
+        px1 + Math.cos(s.angle) * 2, py1 + Math.sin(s.angle) * 2,
+        px2 + Math.cos(s.angle) * 2, py2 + Math.sin(s.angle) * 2,
+      );
+      g.fillStyle(SILVER, 1);
+      g.fillTriangle(
+        tipX - Math.cos(s.angle) * 2, tipY - Math.sin(s.angle) * 2,
+        cax + Math.cos(s.angle) * 4, cay + Math.sin(s.angle) * 4,
+        cax + Math.cos(s.angle + 0.2) * 8, cay + Math.sin(s.angle + 0.2) * 8,
+      );
+      // Crisp catchlight dot near tip
+      g.fillStyle(SILVER_HI, 1);
+      g.fillRect(
+        tipX - Math.cos(s.angle) * 4 - 1,
+        tipY - Math.sin(s.angle) * 4 - 1,
+        1,
+        1,
+      );
+    }
+
+    // 2) ROBE — tall narrow straight column, no flare.
+    const robe = [
+      { x: bx - 12, y: top + 42 },
+      { x: bx + 12, y: top + 42 },
+      { x: bx + 14, y: top + 80 },
+      { x: bx + 16, y: top + 130 },
+      { x: bx + 16, y: top + 168 },
+      { x: bx + 8, y: top + 174 },
+      { x: bx, y: top + 172 },
+      { x: bx - 8, y: top + 174 },
+      { x: bx - 16, y: top + 168 },
+      { x: bx - 16, y: top + 130 },
+      { x: bx - 14, y: top + 80 },
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(robe, true);
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      robe.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillRect(bx - 10, top + 46, 20, 124);
+    g.fillStyle(ROBE_HI, 0.6);
+    g.fillRect(bx + 4, top + 46, 4, 120);
+
+    // Vertical gold embroidery stripes — pure mage-robe feel
+    g.fillStyle(TRIM, 0.85);
+    g.fillRect(bx - 10, top + 50, 1, 116);
+    g.fillRect(bx + 9, top + 50, 1, 116);
+    g.fillRect(bx - 1, top + 50, 1, 116);
+
+    // 3) HEAD — pale, calm
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx, top + 32, 9);
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(bx, top + 32, 7);
+    // Long flowing hair behind shoulders
+    g.fillStyle(0x100614, 1);
+    g.fillEllipse(bx, top + 26, 16, 4);
+    // Single red eye, calm
+    g.fillStyle(EYE, 1);
+    g.fillRect(bx - 4, top + 32, 2, 2);
+    g.fillRect(bx + 2, top + 32, 2, 2);
+
+    // 4) Gold collar
+    g.fillStyle(TRIM, 1);
+    g.fillRect(bx - 10, top + 42, 20, 2);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(bx, top + 50, 3);
+    g.fillStyle(0x4ad8ff, 1);
+    g.fillCircle(bx, top + 50, 1.8);
+
+    // 5) ORBITAL SHARDS — 3 floating mirror fragments around the body.
+    const orbs: Array<readonly [number, number, number, number]> = [
+      [bx - 32, top + 90, 8, 0.5],     // x, y, size, angle
+      [bx + 36, top + 110, 7, -0.4],
+      [bx - 24, top + 142, 6, 0.2],
+    ];
+    for (const [ox, oy, sz, angle] of orbs) {
+      const tipX = ox + Math.cos(angle) * sz;
+      const tipY = oy + Math.sin(angle) * sz;
+      const tipX2 = ox - Math.cos(angle) * sz;
+      const tipY2 = oy - Math.sin(angle) * sz;
+      g.fillStyle(SILVER, 0.30);
+      g.fillCircle(ox, oy, sz + 4);
+      g.fillStyle(OUT, 1);
+      g.fillTriangle(tipX, tipY, tipX2, tipY2, ox + sz * 0.4, oy + sz * 1.2);
+      g.fillStyle(SHARD_DARK, 1);
+      g.fillTriangle(
+        tipX - Math.cos(angle) * 0.7,
+        tipY - Math.sin(angle) * 0.7,
+        tipX2 + Math.cos(angle) * 0.7,
+        tipY2 + Math.sin(angle) * 0.7,
+        ox + sz * 0.3,
+        oy + sz * 1.0,
+      );
+      g.fillStyle(SILVER_HI, 1);
+      g.fillRect(ox - 1, oy - 1, 1, 1);
+    }
   }
 }
 

@@ -537,6 +537,71 @@ export const SAPPHIRE_MARQUIS_BERSERKER_SKIPPED_ARMS = 1;
 /** Phase-flash duration for both bodies (visual feedback on phase change). */
 export const VAMPIRE_PHASE_FLASH_MS = 220;
 
+// --- Marquis of Mirages (Onyx Mansion boss, single body) -------------------
+// Single vampire-mage boss replacing the old Vampire Twins (Crimson Lord +
+// Sapphire Marquis). Reuses the marquis attack patterns (fan + teleport +
+// berserker spin) and adds a Mirror-Portal special:
+//   - Two mirrors materialize: entry near the boss, exit in the opposite
+//     room corner.
+//   - Boss fades into the entry portal, emerges at the exit, fires 3
+//     homing projectiles in sequence (Cursed-Mirror style).
+//   - Player can destroy the entry portal (3 hits) to nullify all live
+//     homing projectiles linked to this special — clear counter-strategy.
+
+export const MARQUIS_OF_MIRAGES_HP = 75;
+export const MARQUIS_OF_MIRAGES_VISUAL_SCALE = 1.6 * WORLD_SPRITE_SCALE;
+/** Phase-2 (berserker) HP threshold. Mirrors the old VAMPIRE setup. */
+export const MARQUIS_OF_MIRAGES_BERSERKER_HP_FRACTION = 0.30;
+
+/** Movement during Phase 1: kite the player at fixed distance, like the
+ * old Sapphire Marquis. Numbers carry over so the early-phase feel is
+ * stable for anyone used to the twins fight. */
+export const MARQUIS_OF_MIRAGES_KITE_SPEED = 60;
+export const MARQUIS_OF_MIRAGES_KITE_DISTANCE = 180;
+
+/** Phase 1 fan: 5 projectiles, ±30° spread, every 1800 ms. Initial delay
+ * at spawn so the player isn't hit before they read the boss. */
+export const MARQUIS_OF_MIRAGES_FAN_COUNT = 5;
+export const MARQUIS_OF_MIRAGES_FAN_SPREAD_RAD = (60 * Math.PI) / 180;
+export const MARQUIS_OF_MIRAGES_FAN_INTERVAL_MS = 1800;
+export const MARQUIS_OF_MIRAGES_FAN_INITIAL_DELAY_MS = 900;
+
+/** Teleport cadence + min distance from PLAYER (not the boss) to avoid the
+ * "materializes on the player" race when the player chases the fade-out. */
+export const MARQUIS_OF_MIRAGES_TELEPORT_INTERVAL_MS = 4000;
+export const MARQUIS_OF_MIRAGES_TELEPORT_MIN_PLAYER_DISTANCE = 180;
+export const MARQUIS_OF_MIRAGES_TELEPORT_FADE_MS = 220;
+
+/** Mirror Special — first trigger after spawn + random window between
+ * subsequent triggers. User wanted "nicht zu oft / leicht random". */
+export const MARQUIS_OF_MIRAGES_SPECIAL_INITIAL_DELAY_MS = 10000;
+export const MARQUIS_OF_MIRAGES_SPECIAL_INTERVAL_MIN_MS = 8000;
+export const MARQUIS_OF_MIRAGES_SPECIAL_INTERVAL_MAX_MS = 12000;
+
+/** Mirror Special timing — sub-stages of the state machine. */
+export const MARQUIS_OF_MIRAGES_SUMMON_MS = 380;        // portals materialize
+export const MARQUIS_OF_MIRAGES_ENTER_MS = 460;          // fade-into-entry
+export const MARQUIS_OF_MIRAGES_TRAVEL_MS = 200;         // invisible in-transit
+export const MARQUIS_OF_MIRAGES_EXIT_MS = 360;           // emerge-at-exit fade-in
+export const MARQUIS_OF_MIRAGES_FIRE_INTERVAL_MS = 320;  // gap between homing shots
+export const MARQUIS_OF_MIRAGES_FIRE_COUNT = 3;
+/** Lifetime added to the entry portal AFTER the firing finishes — gives
+ * the player enough time to destroy the entry to clear linked projectiles. */
+export const MARQUIS_OF_MIRAGES_ENTRY_LINGER_MS = 2500;
+/** Exit portal cleanup — short despawn window after the firing ends. */
+export const MARQUIS_OF_MIRAGES_EXIT_LINGER_MS = 700;
+
+/** Homing-missile parameters for the special. Same turn rate as the
+ * Cursed Mirror mob so the threat reads identically. */
+export const MARQUIS_OF_MIRAGES_HOMING_TURN_RATE_DEG = 110;
+export const MARQUIS_OF_MIRAGES_HOMING_LIFETIME_MS = 2200;
+
+/** Mirror portal HP (entry portal — exit portal is non-destructible visual). */
+export const MIRROR_PORTAL_HP = 3;
+/** Mirror portal hitbox radius — generous so missiles connect easily under
+ * pressure. */
+export const MIRROR_PORTAL_HITBOX_RADIUS = 18;
+
 // --- Lord Onyx (secret endboss, Onyx Mansion) -------------------------------
 // Rooted endgame boss. Three phases of snappy bullet-hell base patterns,
 // each with a per-phase timer that triggers a Prism Special — the special
@@ -756,8 +821,14 @@ export const TextureKeys = {
   WaxPuddle: 'tex-hazard-wax-puddle',
   BossCrimsonLord: 'tex-boss-crimson-lord',
   BossSapphireMarquis: 'tex-boss-sapphire-marquis',
+  /** Marquis of Mirages — single vampire-mage replacement for the old
+   * twins. Caped conjurer silhouette, oval hand-mirror raised. */
+  BossMarquisOfMirages: 'tex-boss-marquis-of-mirages',
+  /** Mirror portal (entry) — active state with cyan rune-glow halo + lit glass. */
+  MirrorPortalEntry: 'tex-mirror-portal-entry',
+  /** Mirror portal (exit) — passive state, dimmer trim + dark glass. */
+  MirrorPortalExit: 'tex-mirror-portal-exit',
   BloodProjectile: 'tex-projectile-blood',
-  BloodTrail: 'tex-hazard-blood-trail',
   BossLordOnyx: 'tex-boss-lord-onyx',
   /** Prismancy unlock — red/gold wizard skin awarded by defeating Lord
    * Onyx. Auto-applied at Player construction if unlocked. */
@@ -920,6 +991,7 @@ export const SceneKeys = {
   UI: 'UIScene',
   GameOver: 'GameOverScene',
   End: 'EndScene',
+  Pause: 'PauseScene',
   StyleMockup: 'StyleMockupScene',
 } as const;
 
