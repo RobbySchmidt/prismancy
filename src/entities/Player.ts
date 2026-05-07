@@ -118,6 +118,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       damage: this.stats.getEffective('damage'),
       scale: this.stats.getEffective('missileScale'),
       tint: this.stats.getMissileTint(),
+      piercing: this.stats.getEffective('piercingCount'),
+      homingTurnRate: this.stats.getEffective('homingTurnRate'),
+      burnDamageFactor: this.stats.getEffective('burnDamageFactor'),
     });
     this.nextFireAt = time + interval;
     this.spawnWandSparkle();

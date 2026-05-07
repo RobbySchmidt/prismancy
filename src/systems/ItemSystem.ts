@@ -1,4 +1,5 @@
 import { type ItemDefinition, type ItemModifier } from '../types';
+import { MetaProgress } from './MetaProgress';
 import { type PlayerHealth } from './PlayerHealth';
 import { type StatsSystem } from './StatsSystem';
 import { EventBus } from '../utils/EventBus';
@@ -39,6 +40,11 @@ export class ItemSystem {
       this.playerHealth?.addMaxHealth(item.maxHealthBonus);
     }
     this.picked.add(item.id);
+    // Trophy/collection: log the discovery in MetaProgress. Idempotent —
+    // re-picking an already-discovered item is a no-op there. Hydrate
+    // (floor-transition replay) intentionally bypasses this method, so
+    // first-pickup is captured once per actual collect.
+    MetaProgress.recordItemDiscovered(item.id);
     EventBus.emit('item:picked', { itemId: item.id });
   }
 

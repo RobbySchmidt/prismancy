@@ -216,6 +216,42 @@ export const ITEMS = {
     missileTint: 0x8a4ad8,
     floor: 'onyx-mansion',
   },
+  // --- Missile-Modifier-Items (Phase 6) -------------------------------------
+  magicShard: {
+    id: 'magicShard',
+    displayName: 'Magic Shard',
+    description: 'Pierce up to 2 enemies (100% / 75% / 50%).',
+    textureKey: TextureKeys.ItemMagicShard,
+    pools: [ItemPool.Shop],
+    effects: [{ stat: 'piercingCount', add: 2 }],
+    shopPrice: 15,
+  },
+  wizardGlasses: {
+    id: 'wizardGlasses',
+    displayName: 'Wizard Glasses',
+    description: 'Missiles home in on the nearest enemy. +10% missile speed.',
+    textureKey: TextureKeys.ItemWizardGlasses,
+    pools: [ItemPool.Boss],
+    effects: [
+      { stat: 'homingTurnRate', add: 80 },
+      // +10% Missile-Speed statt eines klassischen Range-Stats — gibt
+      // effektiv mehr Reichweite in der fixen MISSILE_LIFETIME_MS, ohne
+      // den Range-Stat wieder einzuführen (Phase-5-Polish-Entscheidung:
+      // Range trivialisierte Bosse). Synergiert sauber mit Homing —
+      // die Tracking-Korrekturen kommen schneller am Ziel an.
+      { stat: 'missileSpeed', mult: 1.1 },
+    ],
+    /** No `floor` tag — drops on every floor's boss-pool roll. */
+  },
+  fireOrb: {
+    id: 'fireOrb',
+    displayName: 'Fire Orb',
+    description: 'Hits ignite enemies for a brief burn.',
+    textureKey: TextureKeys.ItemFireOrb,
+    pools: [ItemPool.Treasure],
+    effects: [{ stat: 'burnDamageFactor', add: 0.3 }],
+    missileTint: 0xff7030,
+  },
 } as const satisfies Record<string, ItemDefinition>;
 
 export type ItemId = keyof typeof ITEMS;

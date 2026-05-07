@@ -2,7 +2,11 @@ import Phaser from 'phaser';
 import { MISSILE_POOL_SIZE } from '../../config/GameConfig';
 import { type Direction } from '../../types';
 import { EventBus } from '../../utils/EventBus';
-import { MagicMissile, type MagicMissileFireOptions } from './MagicMissile';
+import {
+  MagicMissile,
+  type HomingTarget,
+  type MagicMissileFireOptions,
+} from './MagicMissile';
 
 /**
  * Pre-allocated pool for MagicMissiles. Missiles are spawned/destroyed many
@@ -21,6 +25,16 @@ export class MagicMissilePool {
     for (let i = 0; i < MISSILE_POOL_SIZE; i++) {
       this.group.create(0, 0, undefined, undefined, false, false);
     }
+  }
+
+  /** Wird vom GameScene einmal nach dem Pool-Build gesetzt — propagiert den
+   * Nearest-Enemy-Lookup an alle Pool-Kinder, die ihn pro Frame in
+   * `tickHoming` aufrufen. */
+  setHomingTargetGetter(getter: (x: number, y: number) => HomingTarget | null): void {
+    this.group.children.iterate((child) => {
+      (child as MagicMissile).homingTargetGetter = getter;
+      return true;
+    });
   }
 
   fire(

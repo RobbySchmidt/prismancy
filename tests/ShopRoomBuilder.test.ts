@@ -143,4 +143,31 @@ describe('ShopRoomBuilder', () => {
     expect(host.spawnItemPickup).not.toHaveBeenCalled();
     expect(host.drawPriceLabel).not.toHaveBeenCalled();
   });
+
+  // Regression: shop slots used to roll without knowing about items already
+  // committed elsewhere on the floor (treasure pedestals, boss-room rewards),
+  // so the same id could appear twice on a single floor. Picking up the
+  // duplicate from the other room then made the shop slot vanish on re-entry
+  // (slot-render-time hide-on-pickup gating). The `floorReserved` parameter
+  // folds those ids into the roll-time exclude.
+  it('excludes ids in `floorReserved` from rolled item slots', () => {
+    // First, find which two ids the shop would normally roll for this seed.
+    const probeHost = makeHost();
+    const probeDesc = makeShopDescriptor();
+    ShopRoomBuilder.build(probeHost, probeDesc, 'reserve-clash', center);
+    const baselineIds = probeHost.spawnItemPickup.mock.calls.map(
+      (c) => (c[2] as ItemDefinition).id,
+    );
+    expect(baselineIds).toHaveLength(2);
+
+    // Now reserve the first of those ids and rebuild — the shop must roll a
+    // different pair (at minimum, the reserved id must not appear).
+    const host = makeHost();
+    const desc = makeShopDescriptor();
+    const reserved = new Set<string>([baselineIds[0]!]);
+    ShopRoomBuilder.build(host, desc, 'reserve-clash', center, new Set(), reserved);
+    const ids = host.spawnItemPickup.mock.calls.map((c) => (c[2] as ItemDefinition).id);
+    expect(ids).not.toContain(baselineIds[0]);
+    expect(ids[0]).not.toBe(ids[1]);
+  });
 });

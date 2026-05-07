@@ -7,6 +7,15 @@ export interface GameEvents {
   'player:healthChanged': { current: number; max: number };
   'enemy:killed': { x: number; y: number };
   'enemy:droppedCoin': { x: number; y: number };
+  /** Burn-DoT (Fire Orb) tick landed on an enemy — GameScene spawns a small
+   * flame particle at (x, y). Distinct from `enemy:hit` so missile-hit
+   * blood and burn-tick flames stay visually separated. */
+  'enemy:burnTick': { x: number; y: number };
+  /** Missile-hit landed on an enemy — GameScene spawns blood splatter
+   * particles at the impact point. Fired from the missile↔enemy overlap
+   * (NOT from `BaseEnemy.takeDamage`) so it only triggers for player hits,
+   * not for enemy-projectile or contact damage. */
+  'enemy:hit': { x: number; y: number };
   'room:cleared': void;
   'missile:fired': { x: number; y: number };
   'floor:roomEntered': { roomId: string };
@@ -23,7 +32,16 @@ export interface GameEvents {
   'crate:opened': { kind: PickupKind; goldCrate: boolean };
   'boss:spawned': { name: string; maxHp: number };
   'boss:hpChanged': { current: number; max: number };
-  'boss:killed': { x: number; y: number; name: string; noHit: boolean };
+  'boss:killed': {
+    x: number;
+    y: number;
+    name: string;
+    /** Stable enemy id (matches `EnemyDefinition.id`). Used by
+     * `MetaProgress.recordBossDefeated` so the trophy save survives a
+     * future displayName-rename pass. */
+    enemyId: string;
+    noHit: boolean;
+  };
   'boss:phaseChanged': { phase: number };
   'gem:collected': { floorId: string };
   /** Fired BEFORE `gem:collected`, with the pickup's world position. The

@@ -59,8 +59,9 @@ export class MainMenuScene extends Phaser.Scene {
     // 5) Title + subtitle on top of everything ------------------------------
     this.paintTitle(cx);
 
-    // 6) Skin toggle (only if Prismancy is unlocked).
+    // 6) Skin toggle (only if Prismancy is unlocked) + stats overlay hint.
     this.setupSkinToggle(wizard);
+    this.setupStatsHint();
 
     const startGame = (): void => {
       // Explicit fresh-run payload. Without this Phaser's `scene.start(key)`
@@ -126,6 +127,33 @@ export class MainMenuScene extends Phaser.Scene {
   private skinHintText(skin: SkinId): string {
     const name = skin === 'prismancy' ? 'PRISMANCY' : 'WIZARD';
     return `[S] SKIN: ${name}`;
+  }
+
+  /**
+   * Always-visible hint that opens the trophy/collection overlay
+   * (`StatsScene`) on `T`. Sits ABOVE the controls line so it doesn't
+   * collide with it (the previous bottom-stack layout pushed `[T] STATS`
+   * onto the same Y as `MOVE WASD · CAST ARROW KEYS`). The skin toggle
+   * stays at the very bottom when unlocked. We `launch` the scene (not
+   * `start`) so the title art keeps rendering behind the overlay and
+   * the player just sees the stats panel pop on top.
+   */
+  private setupStatsHint(): void {
+    const cx = GAME_WIDTH / 2;
+    // Stats hint above the controls line (which lives at GAME_HEIGHT - 50).
+    this.add
+      .text(cx, GAME_HEIGHT - 76, '[T] STATS', {
+        fontSize: '14px',
+        color: '#fff8c0',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.85);
+
+    this.input.keyboard?.on('keydown-T', () => {
+      this.scene.launch(SceneKeys.Stats);
+    });
   }
 
   // ---------------------------------------------------------------------------

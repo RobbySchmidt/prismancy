@@ -39,6 +39,12 @@ export class GemPickup extends BasePickup {
   private readonly floorId: string;
   private readonly glow: Phaser.GameObjects.Arc;
 
+  /** Floor id this gem belongs to — read by the boss-room teardown snapshot
+   * so a re-entry can rebuild the same gem. */
+  get gemFloorId(): string {
+    return this.floorId;
+  }
+
   constructor(scene: Phaser.Scene, x: number, y: number, floorId: string) {
     super(scene, x, y, gemTextureKey(floorId), PickupKind.Gem);
     this.floorId = floorId;

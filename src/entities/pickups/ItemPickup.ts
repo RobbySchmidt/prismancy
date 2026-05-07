@@ -21,6 +21,12 @@ export class ItemPickup extends BasePickup {
   private readonly itemDef: ItemDefinition;
   private readonly itemSystem: ItemSystem;
 
+  /** Item id the pedestal currently displays — read by the boss-room teardown
+   * snapshot so a re-entry can rebuild the same pedestal. */
+  get itemId(): string {
+    return this.itemDef.id;
+  }
+
   constructor(
     scene: Phaser.Scene,
     x: number,

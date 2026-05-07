@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import {
+  BURN_TICK_INTERVAL_MS,
+  BURN_TINT,
   HIT_FLASH_DURATION_MS,
   HIT_FLASH_TINT_ENEMY,
   KNOCKBACK_DURATION_MS,
@@ -97,6 +99,11 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
    * `boss:killed` while reusing the same disable + tween + destroy flow.
    */
   protected die(): void {
+    // Cancel any in-flight burn ticks so they don't fire after the death
+    // tween destroys the sprite (active stays true for ~220 ms during the
+    // tween — without this clearBurn the tick callback could re-enter
+    // die() and double-emit `enemy:killed`).
+    this.clearBurn();
     EventBus.emit('enemy:killed', { x: this.x, y: this.y });
     // Roll the per-enemy coin drop. Bosses set chance=0, so this is a no-op
     // for them — boss rewards go through the dedicated `boss:killed` flow.
@@ -143,5 +150,44 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
   /** Contact damage this enemy deals to the player on touch. */
   getContactDamage(): number {
     return this.definition.contactDamage;
+  }
+
+  // --- Burn DoT (Fire Orb item) ---------------------------------------------
+
+  private burnTimers: Phaser.Time.TimerEvent[] = [];
+
+  /**
+   * Apply a Burn-DoT: `tickCount` damage ticks of `damagePerTick` each,
+   * `BURN_TICK_INTERVAL_MS` apart. Re-applying burn cancels any prior burn
+   * (latest-wins) so multi-pierce hits stack predictably without
+   * compounding into a runaway DoT. Each tick orange-flashes the sprite +
+   * emits `enemy:burnTick` so GameScene can spawn a flame particle. Burn
+   * ticks intentionally don't knock back — adding force per tick would
+   * lock enemy AI for the entire DoT and make burnt mobs drift around.
+   */
+  applyBurn(damagePerTick: number, tickCount: number): void {
+    if (!this.active || damagePerTick <= 0 || tickCount <= 0) return;
+    this.clearBurn();
+    for (let i = 0; i < tickCount; i++) {
+      const ev = this.scene.time.delayedCall(BURN_TICK_INTERVAL_MS * (i + 1), () => {
+        if (!this.active || this.hp <= 0) return;
+        this.hp -= damagePerTick;
+        this.setTintFill(BURN_TINT);
+        this.scene.time.delayedCall(140, () => {
+          if (this.active) this.clearTint();
+        });
+        EventBus.emit('enemy:burnTick', { x: this.x, y: this.y });
+        if (this.hp <= 0) {
+          this.clearBurn();
+          this.die();
+        }
+      });
+      this.burnTimers.push(ev);
+    }
+  }
+
+  protected clearBurn(): void {
+    for (const t of this.burnTimers) t.remove(false);
+    this.burnTimers = [];
   }
 }

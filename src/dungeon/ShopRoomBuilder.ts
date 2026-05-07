@@ -53,6 +53,15 @@ export class ShopRoomBuilder {
     dungeonSeed: string,
     roomCenter: { x: number; y: number },
     pickedIds: ReadonlySet<string> = new Set<string>(),
+    /**
+     * Item ids already committed elsewhere on the floor (other shops,
+     * treasure rooms, cleared boss rewards, currently-live pickups).
+     * Folded into the roll-time exclude on first build so two pools can
+     * never offer the same item simultaneously. Render-time hide-on-pickup
+     * still uses `pickedIds` only — the snapshot must stay stable across
+     * re-entries even after another room's identical item drops out.
+     */
+    floorReserved: ReadonlySet<string> = new Set<string>(),
   ): ShopBuildResult {
     const purchased = new Set(desc.purchasedShopSlots ?? []);
 
@@ -85,6 +94,7 @@ export class ShopRoomBuilder {
     } else {
       const rng = new RNG(`${dungeonSeed}-shop-${desc.id}`);
       const exclude = new Set<ItemId>(pickedIds as ReadonlySet<ItemId>);
+      for (const id of floorReserved) exclude.add(id as ItemId);
       const slot2 = pickItemFromPool(ItemPool.Shop, rng, exclude);
       itemDefs[0] = slot2;
       if (slot2) exclude.add(slot2.id as ItemId);

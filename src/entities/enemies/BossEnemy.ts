@@ -136,6 +136,7 @@ export abstract class BossEnemy extends BaseEnemy {
       x: this.x,
       y: this.y,
       name: this.displayName,
+      enemyId: this.definition.id,
       noHit,
     });
   }

@@ -6,27 +6,23 @@ import {
   TOAD_SOVEREIGN_PHASE1_HOP_DURATION_MS,
   TOAD_SOVEREIGN_PHASE1_IDLE_MS,
   TOAD_SOVEREIGN_PHASE1_TELEGRAPH_MS,
-  TOAD_SOVEREIGN_PHASE2_ADD_INTERVAL_MS,
   TOAD_SOVEREIGN_PHASE2_COMBO_GAP_MS,
   TOAD_SOVEREIGN_PHASE2_HOP_DURATION_MS,
   TOAD_SOVEREIGN_PHASE2_HOP_GAP_MS,
   TOAD_SOVEREIGN_PHASE2_HOPS_PER_COMBO,
   TOAD_SOVEREIGN_PHASE2_LANDING_THORNS,
-  TOAD_SOVEREIGN_PHASE2_MAX_ADDS,
   TOAD_SOVEREIGN_PHASE_FLASH_MS,
   TOAD_SOVEREIGN_TONGUE_SPEED,
   TOAD_SOVEREIGN_TONGUE_SPREAD_RAD,
   TOAD_SOVEREIGN_VISUAL_SCALE,
 } from '../../config/GameConfig';
-import { ENEMIES, type EnemyId } from '../../data/enemies';
+import { ENEMIES } from '../../data/enemies';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
-import { type BaseEnemy } from './BaseEnemy';
 import { BossEnemy, type BossPhaseDefinition } from './BossEnemy';
 
 export interface ToadSovereignHost {
   enemyProjectilePool: EnemyProjectilePool;
-  spawnEnemyAt(id: EnemyId, x: number, y: number): BaseEnemy | null;
   getPlayer(): Player;
   getRoomBounds(): { minX: number; maxX: number; minY: number; maxY: number };
 }
@@ -38,8 +34,13 @@ type Phase2State = 'comboHop' | 'comboLand' | 'comboGap';
  * Toad Sovereign — Sapphire Swamp boss based on Bog Frog. Phase 1: a slow
  * idle → cheek-puff telegraph → 3-tongue burst (centre + ±25°) toward the
  * player → hop to a new spot. Phase 2 (≤ 50 % HP): drops the telegraph in
- * favour of a 3-hop combo, each landing fires a 5-thorn radial burst, and
- * the boss summons up to 2 Bog Frog adds to harass the player.
+ * favour of a 3-hop combo, each landing fires a 5-thorn radial burst.
+ *
+ * The Phase-2 Bog-Frog adds were removed (2026-05-07): combo-hop landings
+ * already cover most of the arena with thorns, the player has to dodge
+ * three radial bursts back-to-back, and adding mobs on top of that read
+ * as "unfair piling on" rather than escalation. The boss now stands on
+ * its movement + radial-thorn density.
  */
 export class ToadSovereign extends BossEnemy {
   override readonly displayName = 'Toad Sovereign';
@@ -57,8 +58,6 @@ export class ToadSovereign extends BossEnemy {
   private p2State: Phase2State = 'comboHop';
   private p2NextChangeAt = 0;
   private p2HopsTakenInCombo = 0;
-  private p2NextAddAt = 0;
-  private adds: BaseEnemy[] = [];
 
   constructor(scene: Phaser.Scene, x: number, y: number, host: ToadSovereignHost) {
     super(scene, x, y, ENEMIES['boss-toad-sovereign']);
@@ -164,7 +163,6 @@ export class ToadSovereign extends BossEnemy {
           break;
       }
     }
-    this.tickPhase2Adds(time);
   }
 
   private p2BeginCombo(time: number): void {
@@ -221,26 +219,6 @@ export class ToadSovereign extends BossEnemy {
     }
   }
 
-  private tickPhase2Adds(time: number): void {
-    if (time < this.p2NextAddAt) return;
-    this.adds = this.adds.filter((a) => a.active);
-    if (this.adds.length < TOAD_SOVEREIGN_PHASE2_MAX_ADDS) {
-      const bounds = this.host.getRoomBounds();
-      const margin = 0.2;
-      const onLeft = Math.random() < 0.5;
-      const onTop = Math.random() < 0.5;
-      const x = onLeft
-        ? bounds.minX + (bounds.maxX - bounds.minX) * margin * Math.random()
-        : bounds.maxX - (bounds.maxX - bounds.minX) * margin * Math.random();
-      const y = onTop
-        ? bounds.minY + (bounds.maxY - bounds.minY) * margin * Math.random()
-        : bounds.maxY - (bounds.maxY - bounds.minY) * margin * Math.random();
-      const add = this.host.spawnEnemyAt('bog-frog', x, y);
-      if (add) this.adds.push(add);
-    }
-    this.p2NextAddAt = time + TOAD_SOVEREIGN_PHASE2_ADD_INTERVAL_MS;
-  }
-
   // --- Phase change ----------------------------------------------------------
 
   protected onPhaseChanged(newPhase: number): void {
@@ -253,11 +231,10 @@ export class ToadSovereign extends BossEnemy {
     });
     this.scene.cameras.main.shake(180, 0.005);
 
-    // Drop into a fresh combo right after the flash; first add fires a beat later.
+    // Drop into a fresh combo right after the flash.
     const now = this.scene.time.now;
     this.p2State = 'comboGap';
     this.p2NextChangeAt = now + 400;
     this.p2HopsTakenInCombo = 0;
-    this.p2NextAddAt = now + 1500;
   }
 }

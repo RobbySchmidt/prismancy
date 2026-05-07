@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
 import {
   BASE_PLAYER_STATS,
+  BURN_TICK_COUNT,
   CAMERA_ZOOM,
   ENEMY_PROJECTILE_DAMAGE,
   GAME_HEIGHT,
   GAME_WIDTH,
   KNOCKBACK_FORCE_ENEMY,
   KNOCKBACK_FORCE_PLAYER,
+  PIERCING_DAMAGE_FACTORS,
   RESTART_HOLD_DURATION_MS,
   ROOM_ENTRY_GRACE_MS,
   ROOM_HEIGHT_TILES,
@@ -63,6 +65,7 @@ import { Room } from '../dungeon/Room';
 import { ShopRoomBuilder, type ShopRoomBuilderHost } from '../dungeon/ShopRoomBuilder';
 import { CombatSystem } from '../systems/CombatSystem';
 import { Cosmetics } from '../systems/Cosmetics';
+import { MetaProgress } from '../systems/MetaProgress';
 import { DropSystem } from '../systems/DropSystem';
 import { InputManager } from '../systems/InputManager';
 import { Inventory } from '../systems/Inventory';
@@ -74,6 +77,7 @@ import {
   RoomKind,
   type Direction,
   type ItemDefinition,
+  type PickupSnapshot,
   type RoomDescriptor,
 } from '../types';
 import { ITEMS, pickItemFromPool, type ItemId } from '../data/items';
@@ -190,6 +194,12 @@ export class GameScene extends Phaser.Scene {
   private readonly enemyDroppedCoinHandler = (payload: { x: number; y: number }): void => {
     this.spawnPickup(PickupKind.Coin, payload.x, payload.y);
   };
+  private readonly enemyHitHandler = (payload: { x: number; y: number }): void => {
+    this.spawnBloodParticles(payload.x, payload.y);
+  };
+  private readonly enemyBurnTickHandler = (payload: { x: number; y: number }): void => {
+    this.spawnFlameParticle(payload.x, payload.y);
+  };
   private readonly mapOpenedHandler = (): void => {
     if (!this.scene.isPaused()) this.scene.pause();
   };
@@ -267,6 +277,7 @@ export class GameScene extends Phaser.Scene {
     x: number;
     y: number;
     name: string;
+    enemyId: string;
     noHit: boolean;
   }): void => this.handleBossKilled(payload);
 
@@ -292,6 +303,17 @@ export class GameScene extends Phaser.Scene {
       data.dungeonSeed ?? `prismancy-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
     this.floorIndex = data.floorIndex ?? 1;
     this.carryOverFromInit = data.carryOver ?? null;
+    // Trophy/collection: a fresh init (no carry-over) marks the start of a
+    // new run. Floor transitions re-enter `init` with `data.carryOver` set
+    // and must NOT increment the started counter — only the player's
+    // first arrival on Floor 1 counts as a run start. Stash the start
+    // timestamp on the global game registry (survives scene restarts but
+    // gets overwritten by the next fresh init) so the win-screen handler
+    // can compute duration without threading it through carry-over.
+    if (this.carryOverFromInit === null) {
+      MetaProgress.recordRunStarted();
+      this.registry.set('runStartedAt', Date.now());
+    }
     this.registry.set('currentFloorId', this.currentFloorId);
     this.registry.set('dungeonSeed', this.dungeonSeed);
     this.registry.set('floorIndex', this.floorIndex);
@@ -321,6 +343,11 @@ export class GameScene extends Phaser.Scene {
     // before ItemSystem so the latter can hold a `playerHealth` reference for
     // HP-up items.
     this.missilePool = new MagicMissilePool(this);
+    // Wizard Glasses (Homing): missiles need a way to find the nearest
+    // active enemy each frame. We hand them a closure that peeks at the
+    // current enemies group — the group itself is rebuilt per room
+    // (see `enterRoom`), so we go through `this.enemies` lazily.
+    this.missilePool.setHomingTargetGetter((x, y) => this.findNearestEnemyTo(x, y));
     this.enemyProjectilePool = new EnemyProjectilePool(this);
     this.waxPuddleGroup = new WaxPuddleGroup(this);
     this.mirrorPortals = this.physics.add.group({
@@ -394,6 +421,8 @@ export class GameScene extends Phaser.Scene {
     EventBus.on('player:died', this.playerDiedHandler);
     EventBus.on('enemy:killed', this.enemyKilledHandler);
     EventBus.on('enemy:droppedCoin', this.enemyDroppedCoinHandler);
+    EventBus.on('enemy:hit', this.enemyHitHandler);
+    EventBus.on('enemy:burnTick', this.enemyBurnTickHandler);
     EventBus.on('map:opened', this.mapOpenedHandler);
     EventBus.on('map:closed', this.mapClosedHandler);
     EventBus.on('map:teleport', this.mapTeleportHandler);
@@ -406,6 +435,8 @@ export class GameScene extends Phaser.Scene {
       EventBus.off('player:died', this.playerDiedHandler);
       EventBus.off('enemy:killed', this.enemyKilledHandler);
       EventBus.off('enemy:droppedCoin', this.enemyDroppedCoinHandler);
+      EventBus.off('enemy:hit', this.enemyHitHandler);
+      EventBus.off('enemy:burnTick', this.enemyBurnTickHandler);
       EventBus.off('map:opened', this.mapOpenedHandler);
       EventBus.off('map:closed', this.mapClosedHandler);
       EventBus.off('map:teleport', this.mapTeleportHandler);
@@ -500,6 +531,55 @@ export class GameScene extends Phaser.Scene {
           console.log(
             '[__wiz.lockSkin] All cosmetic unlocks cleared. Restart for default skin.',
           );
+        },
+        /**
+         * Apply an item's effects directly to the player's stats without
+         * spawning a pedestal. Skips the pickup toast + sound but does count
+         * as picked (item enters `pickedIds` so the duplicate-prevention
+         * paths know about it). Useful for stress-testing modifiers like
+         * Magic Shard / Wizard Glasses / Fire Orb without rolling them out
+         * of a pool. Usage: `__wiz.give('magicShard')`.
+         */
+        give: (itemId: string) => {
+          const def = (ITEMS as Record<string, ItemDefinition | undefined>)[itemId];
+          if (!def) {
+            // eslint-disable-next-line no-console
+            console.warn(`[__wiz.give] Unknown item id: ${itemId}`);
+            return;
+          }
+          this.itemSystem.pickUp(def);
+          // eslint-disable-next-line no-console
+          console.log(`[__wiz.give] Applied ${def.displayName}.`);
+        },
+        /**
+         * Spawn a pedestal for the named item in the current room (center).
+         * Goes through the standard ItemPickup constructor so the pickup
+         * triggers the toast + sound when the player walks over it. Lets you
+         * test the actual pickup flow + visual rather than just the stat
+         * application. Usage: `__wiz.spawnItem('wizardGlasses')`.
+         */
+        spawnItem: (itemId: string) => {
+          const def = (ITEMS as Record<string, ItemDefinition | undefined>)[itemId];
+          if (!def || !this.currentRoom) {
+            // eslint-disable-next-line no-console
+            console.warn(`[__wiz.spawnItem] Unknown item id or no active room: ${itemId}`);
+            return;
+          }
+          const center = this.currentRoom.getCenter();
+          const pickup = new ItemPickup(this, center.x, center.y, def, this.itemSystem);
+          pickup.setSpawnProtection(700);
+          this.pickups.add(pickup);
+          // eslint-disable-next-line no-console
+          console.log(`[__wiz.spawnItem] Pedestal for ${def.displayName} spawned.`);
+        },
+        /**
+         * List all items in the catalogue (id → displayName) so you can pick
+         * a target for `__wiz.give` / `__wiz.spawnItem`. Pure-read helper.
+         */
+        listItems: () => {
+          const out = Object.entries(ITEMS).map(([id, def]) => `${id} — ${def.displayName}`);
+          // eslint-disable-next-line no-console
+          console.log(out.join('\n'));
         },
       };
     }
@@ -638,7 +718,8 @@ export class GameScene extends Phaser.Scene {
   spawnTreasureItem(): void {
     if (!this.currentRoom) return;
     const center = this.currentRoom.getCenter();
-    this.spawnTreasureItemAt(center.x, center.y);
+    const desc = this.layout.rooms.get(this.currentRoomId);
+    this.spawnTreasureItemAt(center.x, center.y, desc?.kind === RoomKind.Treasure ? desc : undefined);
   }
 
   /**
@@ -647,23 +728,81 @@ export class GameScene extends Phaser.Scene {
    * crate's location instead of the room center. Same deterministic seed
    * scheme as the room-center spawn. Returns the spawned ItemPickup so
    * callers (e.g. gold crate) can apply spawn-protection.
+   *
+   * `pedestalRoom`: when provided, the rolled item id is snapshotted to
+   * `desc.treasureItemId` so re-entry rebuilds the same pedestal (and
+   * other roll paths can exclude it via `getFloorReservedItemIds`). Crate
+   * callers omit it — crate items are intentionally ephemeral.
    */
-  spawnTreasureItemAt(x: number, y: number): ItemPickup | null {
+  spawnTreasureItemAt(
+    x: number,
+    y: number,
+    pedestalRoom?: RoomDescriptor,
+  ): ItemPickup | null {
     if (!this.currentRoom) return null;
     const pickedIds = this.itemSystem.getPickedIds();
+
+    // If this is a treasure-room pedestal AND we already rolled an item for
+    // this room on a previous visit, replay it from the snapshot. We only
+    // discard the snapshot if the player has since picked the item up
+    // elsewhere (then it would silently no-op into a stat re-application).
+    if (pedestalRoom?.treasureItemId) {
+      const snap = ITEMS[pedestalRoom.treasureItemId as ItemId];
+      if (snap && !pickedIds.has(snap.id)) {
+        const pickup = new ItemPickup(this, x, y, snap, this.itemSystem);
+        this.pickups.add(pickup);
+        return pickup;
+      }
+    }
+
+    const reserved = this.getFloorReservedItemIds();
+    const exclude = new Set<ItemId>(pickedIds as ReadonlySet<ItemId>);
+    for (const id of reserved) exclude.add(id as ItemId);
+
     const seedSuffix = Array.from(pickedIds).sort().join(',');
     const rng = new RNG(
       `${this.dungeonSeed}-treasure-${this.currentRoomId}-${Math.floor(x)}-${Math.floor(y)}-${seedSuffix}`,
     );
-    // ItemSystem.picked is a Set<string> — the picker accepts a stricter
-    // ReadonlySet<ItemId>, but `has` only consumes ids it knows about, so
-    // narrowing the element type here is safe.
-    const exclude = pickedIds as ReadonlySet<ItemId>;
     const itemDef = pickItemFromPool(ItemPool.Treasure, rng, exclude);
     if (!itemDef) return null;
+    if (pedestalRoom) pedestalRoom.treasureItemId = itemDef.id;
     const pickup = new ItemPickup(this, x, y, itemDef, this.itemSystem);
     this.pickups.add(pickup);
     return pickup;
+  }
+
+  /**
+   * Item ids the floor has already committed to: every shop slot's snapshot,
+   * every cleared boss room's snapshotted reward (in `pendingPickups`), every
+   * treasure-room pedestal's snapshot, plus everything currently displayed
+   * in the active room's live pickup group (covers e.g. crate-dropped items
+   * that haven't been picked up yet). Roll paths (treasure / shop / boss)
+   * union this with `pickedIds` so the same id can never appear twice on a
+   * floor — the user-flagged bug "shop slot vanished after I picked the same
+   * item up from the boss / treasure room" is the symptom of two pools
+   * rolling the same id without knowing about each other.
+   */
+  private getFloorReservedItemIds(): Set<string> {
+    const out = new Set<string>();
+    if (!this.layout) return out;
+    for (const desc of this.layout.rooms.values()) {
+      if (desc.shopItemIds) {
+        const purchased = new Set(desc.purchasedShopSlots ?? []);
+        // Slot 2 maps to shopItemIds[0], slot 3 to shopItemIds[1].
+        if (desc.shopItemIds[0] && !purchased.has(2)) out.add(desc.shopItemIds[0]);
+        if (desc.shopItemIds[1] && !purchased.has(3)) out.add(desc.shopItemIds[1]);
+      }
+      if (desc.treasureItemId && !desc.looted) out.add(desc.treasureItemId);
+      if (desc.pendingPickups) {
+        for (const snap of desc.pendingPickups) {
+          if (snap.itemId) out.add(snap.itemId);
+        }
+      }
+    }
+    for (const child of this.pickups.getChildren()) {
+      if (child instanceof ItemPickup) out.add(child.itemId);
+    }
+    return out;
   }
 
   // --- DropSystem host hooks --------------------------------------------------
@@ -709,6 +848,90 @@ export class GameScene extends Phaser.Scene {
     }
     this.pickups.add(pickup);
     return pickup;
+  }
+
+  /**
+   * Find the active enemy nearest to (x, y) within the current room. Used
+   * by Wizard-Glasses-equipped missiles to acquire a homing target each
+   * frame. Returns null if no active enemy exists. The lookup is O(n) on
+   * a small group (≤10 enemies per room), well below any frame budget.
+   */
+  private findNearestEnemyTo(x: number, y: number): BaseEnemy | null {
+    if (!this.enemies) return null;
+    let best: BaseEnemy | null = null;
+    let bestSq = Infinity;
+    for (const child of this.enemies.getChildren()) {
+      const e = child as BaseEnemy;
+      if (!e.active) continue;
+      const dx = e.x - x;
+      const dy = e.y - y;
+      const sq = dx * dx + dy * dy;
+      if (sq < bestSq) {
+        bestSq = sq;
+        best = e;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Spawn 5 small red drops at (x, y) flying outward + slightly downward
+   * (gravity-arc feel) and fading. Triggered by `enemy:hit` from the
+   * missile↔enemy overlap, NOT from contact damage — only player damage
+   * gets blood feedback. Each drop is a Phaser.GameObjects.Arc with a
+   * tween; cleans itself up onComplete. Total ~250 ms lifetime.
+   */
+  private spawnBloodParticles(x: number, y: number): void {
+    const count = 5;
+    const baseAngle = Math.random() * Math.PI * 2;
+    for (let i = 0; i < count; i++) {
+      const angle = baseAngle + (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+      const dist = 14 + Math.random() * 10;
+      const drop = this.scene
+        ? this.add.circle(x, y, 2 + Math.random() * 1.2, 0xb83020, 1)
+        : null;
+      if (!drop) continue;
+      drop.setDepth(DepthLayers.Particle);
+      this.tweens.add({
+        targets: drop,
+        x: x + Math.cos(angle) * dist,
+        y: y + Math.sin(angle) * dist + 6,
+        alpha: 0,
+        scale: 0.4,
+        duration: 240 + Math.random() * 80,
+        ease: 'Sine.Out',
+        onComplete: () => drop.destroy(),
+      });
+    }
+  }
+
+  /**
+   * Spawn a single small flame flicker at (x, y). Triggered by
+   * `enemy:burnTick` (Fire Orb DoT). Same cheap-tween idiom as the blood
+   * particles but with an orange palette and an upward drift.
+   */
+  private spawnFlameParticle(x: number, y: number): void {
+    const count = 3;
+    for (let i = 0; i < count; i++) {
+      const flame = this.add
+        .circle(
+          x + (Math.random() - 0.5) * 14,
+          y + (Math.random() - 0.5) * 8,
+          2.5,
+          i === 0 ? 0xfff2a0 : 0xff8030,
+          1,
+        )
+        .setDepth(DepthLayers.Particle);
+      this.tweens.add({
+        targets: flame,
+        y: flame.y - 18 - Math.random() * 8,
+        alpha: 0,
+        scale: 0.4,
+        duration: 360,
+        ease: 'Sine.Out',
+        onComplete: () => flame.destroy(),
+      });
+    }
   }
 
   /**
@@ -867,6 +1090,21 @@ export class GameScene extends Phaser.Scene {
     // teardown will refresh it from the live state.
     if (desc.pendingPickups) {
       for (const snap of desc.pendingPickups) {
+        if (snap.kind === PickupKind.Item && snap.itemId) {
+          // Boss-room item reward round-trip. Look up the item id and rebuild
+          // the pedestal at its original position. Skip silently if the id no
+          // longer resolves (data drift between runs / dev edits).
+          const def = ITEMS[snap.itemId as ItemId];
+          if (!def) continue;
+          const pickup = new ItemPickup(this, snap.x, snap.y, def, this.itemSystem);
+          this.pickups.add(pickup);
+          continue;
+        }
+        if (snap.kind === PickupKind.Gem && snap.gemFloorId) {
+          const gem = new GemPickup(this, snap.x, snap.y, snap.gemFloorId);
+          this.pickups.add(gem);
+          continue;
+        }
         this.spawnPickup(snap.kind, snap.x, snap.y);
       }
       delete desc.pendingPickups;
@@ -893,6 +1131,7 @@ export class GameScene extends Phaser.Scene {
           this.dungeonSeed,
           center,
           this.itemSystem.getPickedIds(),
+          this.getFloorReservedItemIds(),
         );
         if (result.allBought) desc.looted = true;
       }
@@ -987,25 +1226,45 @@ export class GameScene extends Phaser.Scene {
     // Snapshot uncollected pickups into the room descriptor so they reappear
     // when the player comes back. The group itself persists across rooms — we
     // only destroy the live children here.
+    //
+    // Item / Gem pickups are usually skipped: treasure pedestals are tracked
+    // via `desc.looted`, shop slots via `desc.purchasedShopSlots`, gold-crate
+    // items are intentionally ephemeral. Boss-room rewards are the exception:
+    // there's no separate re-spawn path for them, so leaving the boss room
+    // without picking the boss-pool item or the no-hit gem used to delete
+    // them outright. For cleared boss rooms we capture the item id / gem
+    // floor id so re-entry rebuilds the exact same pedestal / gem.
     const leavingDesc = this.layout.rooms.get(this.currentRoomId);
+    const captureBossRewards =
+      leavingDesc?.kind === RoomKind.Boss && leavingDesc.cleared === true;
     if (leavingDesc) {
-      const snapshots = [];
+      const snapshots: PickupSnapshot[] = [];
       for (const child of this.pickups.getChildren()) {
-        // Item pedestals are tracked via `desc.looted`, not via
-        // `pendingPickups`, so skip them here. Shop slots are tracked via
-        // `desc.purchasedShopSlots` — the shop builder rebuilds the room on
-        // re-entry, so snapshotting them would double up. Gems carry a
-        // floorId we don't store in the snapshot — since a gem only ever
-        // exists in the current floor's boss room and the room is cleared
-        // by the time the gem appears, we keep gems in-scene only.
-        if (
-          child instanceof BasePickup &&
-          child.kind !== PickupKind.Item &&
-          child.kind !== PickupKind.Gem &&
-          child.shopSlotIndex === undefined
-        ) {
-          snapshots.push({ kind: child.kind, x: child.x, y: child.y });
+        if (!(child instanceof BasePickup)) continue;
+        if (child.shopSlotIndex !== undefined) continue;
+        if (child.kind === PickupKind.Item) {
+          if (captureBossRewards && child instanceof ItemPickup) {
+            snapshots.push({
+              kind: child.kind,
+              x: child.x,
+              y: child.y,
+              itemId: child.itemId,
+            });
+          }
+          continue;
         }
+        if (child.kind === PickupKind.Gem) {
+          if (captureBossRewards && child instanceof GemPickup) {
+            snapshots.push({
+              kind: child.kind,
+              x: child.x,
+              y: child.y,
+              gemFloorId: child.gemFloorId,
+            });
+          }
+          continue;
+        }
+        snapshots.push({ kind: child.kind, x: child.x, y: child.y });
       }
       leavingDesc.pendingPickups = snapshots;
     }
@@ -1266,8 +1525,19 @@ export class GameScene extends Phaser.Scene {
    * player took zero damage during the fight. Spawn-protection is applied
    * to every reward so they don't auto-collect under the player's feet.
    */
-  private handleBossKilled(payload: { x: number; y: number; name: string; noHit: boolean }): void {
+  private handleBossKilled(payload: {
+    x: number;
+    y: number;
+    name: string;
+    enemyId: string;
+    noHit: boolean;
+  }): void {
     this.markCurrentRoomCleared();
+    // Trophy/collection: log this boss as defeated, keyed by stable enemy
+    // id so the save survives any future displayName rename pass (e.g.
+    // 'Lord Onyx' → 'The Prismarch' renamed only the displayName, the id
+    // is still 'boss-lord-onyx'). Idempotent — repeat kills no-op.
+    MetaProgress.recordBossDefeated(payload.enemyId);
 
     // The Prismarch is the run finale — no reward pedestal, no exit stairs,
     // no further boss-rooms. Persist the cosmetic unlock and emit the
@@ -1506,6 +1776,17 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.shake(360, 0.006);
 
     EventBus.emit('run:onyxFullVictory');
+    // Trophy/collection: count the win + update best run time. The start
+    // timestamp comes from the registry slot we set at fresh-run init —
+    // floor transitions don't reset it, so this measures the full
+    // start-to-Prismarch span. If the registry has no start (e.g. dev
+    // hooks like `__wiz.spawnLordOnyx` skipped the normal flow) we still
+    // count the win but pass a zero duration which `recordRunWonFull`
+    // treats as "don't update bestRunMs" via the strict-greater-zero
+    // gate below — `bestRunMs` should only ever reflect real runs.
+    const runStartedAt = (this.registry.get('runStartedAt') as number | undefined) ?? null;
+    const durationMs = runStartedAt !== null ? Math.max(0, Date.now() - runStartedAt) : 0;
+    MetaProgress.recordRunWonFull(durationMs);
     // Brief celebration window so the player reads "VICTORY" + the skin
     // toast before the EndScene takes over and fades to black. Time tuned
     // against the 600 ms Back.Out tween + 700 ms toast delay above.
@@ -1525,6 +1806,7 @@ export class GameScene extends Phaser.Scene {
       console.log('[run:onyxExitTaken] No-gems exit taken on Onyx Mansion.');
     }
     EventBus.emit('run:onyxExitTaken');
+    MetaProgress.recordRunWonIncomplete();
     this.transitionToEndScene('incomplete');
   }
 
@@ -1629,7 +1911,8 @@ export class GameScene extends Phaser.Scene {
     const rng = new RNG(
       `${this.dungeonSeed}-boss-${this.currentRoomId}-${Math.floor(x)}-${Math.floor(y)}-${seedSuffix}`,
     );
-    const exclude = pickedIds as ReadonlySet<ItemId>;
+    const exclude = new Set<ItemId>(pickedIds as ReadonlySet<ItemId>);
+    for (const id of this.getFloorReservedItemIds()) exclude.add(id as ItemId);
     const itemDef = pickItemFromPool(ItemPool.Boss, rng, exclude, this.currentFloorId);
     if (!itemDef) return null;
     const pickup = new ItemPickup(this, x, y, itemDef, this.itemSystem);
@@ -1706,6 +1989,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Missile ↔ enemy: use instanceof to be safe against arg-order swaps.
+    // Piercing (Magic Shard): a missile with `piercingRemaining > 0` keeps
+    // flying after a hit, with damage tapering via `PIERCING_DAMAGE_FACTORS`
+    // (1.0 → 0.75 → 0.5). The same enemy can't be hit twice by one missile —
+    // `missile.hitEnemies` tracks who's been processed and Phaser overlaps
+    // fire every frame the bodies overlap.
+    // Burn (Fire Orb): if `missile.burnDamageFactor > 0`, the hit splits
+    // `factor × hitDamage` evenly across `BURN_TICK_COUNT` ticks via
+    // `BaseEnemy.applyBurn`.
     this.missileEnemyOverlap = this.physics.add.overlap(
       this.missilePool.getGroup(),
       this.enemies,
@@ -1714,15 +2005,36 @@ export class GameScene extends Phaser.Scene {
           const missile = (a instanceof MagicMissile ? a : b) as MagicMissile;
           const enemy = (a instanceof BaseEnemy ? a : b) as BaseEnemy;
           if (!missile.active || !enemy.active) return;
+          if (missile.hitEnemies.has(enemy)) return;
+          missile.hitEnemies.add(enemy);
+
+          const factorIdx = Math.min(
+            missile.hitCount,
+            PIERCING_DAMAGE_FACTORS.length - 1,
+          );
+          const factor = PIERCING_DAMAGE_FACTORS[factorIdx]!;
+          const hitDamage = missile.damage * factor;
+
           const mx = missile.x;
           const my = missile.y;
-          missile.deactivate();
           const knockback = CombatSystem.knockbackVector(
             { x: mx, y: my },
             { x: enemy.x, y: enemy.y },
             KNOCKBACK_FORCE_ENEMY,
           );
-          enemy.takeDamage(missile.damage, knockback);
+          EventBus.emit('enemy:hit', { x: enemy.x, y: enemy.y });
+          enemy.takeDamage(hitDamage, knockback);
+          if (missile.burnDamageFactor > 0 && enemy.active) {
+            const totalBurn = hitDamage * missile.burnDamageFactor;
+            enemy.applyBurn(totalBurn / BURN_TICK_COUNT, BURN_TICK_COUNT);
+          }
+
+          missile.hitCount++;
+          if (missile.piercingRemaining > 0) {
+            missile.piercingRemaining--;
+          } else {
+            missile.deactivate();
+          }
         } catch (err) {
           console.error('[missile↔enemy overlap] error:', err);
         }
@@ -2152,6 +2464,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handlePlayerDied(): void {
+    MetaProgress.recordRunDied();
     this.time.delayedCall(400, () => {
       this.scene.launch(SceneKeys.GameOver);
       this.scene.pause();

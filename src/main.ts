@@ -8,6 +8,7 @@ import { UIScene } from './scenes/UIScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { EndScene } from './scenes/EndScene';
 import { PauseScene } from './scenes/PauseScene';
+import { StatsScene } from './scenes/StatsScene';
 import { StyleMockupScene } from './scenes/StyleMockupScene';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -37,6 +38,7 @@ const config: Phaser.Types.Core.GameConfig = {
     GameOverScene,
     EndScene,
     PauseScene,
+    StatsScene,
     StyleMockupScene,
   ],
 };

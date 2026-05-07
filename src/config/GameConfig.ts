@@ -299,8 +299,8 @@ export const TOAD_SOVEREIGN_PHASE2_HOP_DURATION_MS = 280;
 export const TOAD_SOVEREIGN_PHASE2_HOP_GAP_MS = 220;
 export const TOAD_SOVEREIGN_PHASE2_COMBO_GAP_MS = 1300;
 export const TOAD_SOVEREIGN_PHASE2_LANDING_THORNS = 5;
-export const TOAD_SOVEREIGN_PHASE2_ADD_INTERVAL_MS = 4500;
-export const TOAD_SOVEREIGN_PHASE2_MAX_ADDS = 2;
+// Phase-2 Bog-Frog adds were removed (2026-05-07) — combo-thorn density
+// alone is enough threat; mobs on top read as "unfair piling on".
 
 // --- Bloomheart (boss, Floor 2) ----------------------------------------------
 
@@ -821,6 +821,9 @@ export const TextureKeys = {
   ItemBloodboundChalice: 'tex-item-bloodbound-chalice',
   ItemVampireSignet: 'tex-item-vampire-signet',
   ItemObsidianHeart: 'tex-item-obsidian-heart',
+  ItemMagicShard: 'tex-item-magic-shard',
+  ItemWizardGlasses: 'tex-item-wizard-glasses',
+  ItemFireOrb: 'tex-item-fire-orb',
   BossMossyBehemoth: 'tex-boss-mossy-behemoth',
   BossPixieQueen: 'tex-boss-pixie-queen',
   BossForestHeart: 'tex-boss-forest-heart',
@@ -972,7 +975,22 @@ export const BASE_PLAYER_STATS: PlayerStats = {
   missileSpeed: MISSILE_SPEED,
   moveSpeed: PLAYER_SPEED,
   missileScale: 1.0,
+  piercingCount: 0,
+  homingTurnRate: 0,
+  burnDamageFactor: 0,
 };
+
+/** Damage-Multiplier-Sequenz für die Magic-Shard-Pierces. Index 0 = erster
+ * Hit (volle Schadensapplikation), Index 1 = nach erstem Pierce (75 %),
+ * Index 2 = nach zweitem Pierce (50 %). Längere Arrays würden mehr Pierces
+ * erlauben — momentan ist das 1+piercingCount-Hits gegated. */
+export const PIERCING_DAMAGE_FACTORS = [1.0, 0.75, 0.5] as const;
+/** Anzahl der Burn-Ticks pro Fire-Orb-Treffer. */
+export const BURN_TICK_COUNT = 2;
+/** Abstand zwischen Burn-Ticks in ms. */
+export const BURN_TICK_INTERVAL_MS = 600;
+/** Fixes Brightness-Tinting für brennende Gegner während des DoT. */
+export const BURN_TINT = 0xff8030;
 
 /**
  * Default loot table for a cleared normal room. 55% chance to drop
@@ -1003,6 +1021,7 @@ export const SceneKeys = {
   GameOver: 'GameOverScene',
   End: 'EndScene',
   Pause: 'PauseScene',
+  Stats: 'StatsScene',
   StyleMockup: 'StyleMockupScene',
 } as const;
 

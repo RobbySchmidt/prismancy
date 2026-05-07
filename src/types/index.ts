@@ -162,12 +162,30 @@ export interface RoomDescriptor {
    * means "no eligible item could be rolled for this slot".
    */
   shopItemIds?: readonly [string, string];
+  /**
+   * Snapshot of the item id rolled by a Treasure room's pedestal on first
+   * visit. Treasure rooms used to re-roll on every entry (seed keyed to
+   * `pickedIds`), which let an item that's currently sitting in a Shop
+   * slot also appear on the treasure pedestal — picking the duplicate up
+   * then made the shop slot vanish. Snapshotting locks the rolled item to
+   * the room and lets `getFloorReservedItemIds()` flag it for cross-room
+   * exclusion.
+   */
+  treasureItemId?: string;
 }
 
 export interface PickupSnapshot {
   kind: PickupKind;
   x: number;
   y: number;
+  /** Item id for `kind === Item` snapshots. Boss-room item rewards round-trip
+   * through `pendingPickups` so an uncollected pedestal reappears intact on
+   * re-entry; treasure / shop items use their own re-spawn paths and never
+   * sit in the snapshot list. */
+  itemId?: string;
+  /** Floor id for `kind === Gem` snapshots. Same boss-room round-trip as
+   * `itemId` — uncollected no-hit gems persist across leave/return cycles. */
+  gemFloorId?: string;
 }
 
 // --- Items, stats, pickups, drops -------------------------------------------
@@ -190,6 +208,17 @@ export interface PlayerStats {
   missileSpeed: number;  // base = MISSILE_SPEED
   moveSpeed: number;     // base = PLAYER_SPEED
   missileScale: number;  // base 1.0 — visual scale (additiv via Items)
+  /** Wie viele Pierces eine Missile zusätzlich zum ersten Hit ausführen darf.
+   * Base 0 = klassische single-hit Missile. Magic Shard setzt das auf 2 →
+   * Hit 1 voller Schaden, Hit 2 = 75 %, Hit 3 = 50 %, dann deactivate. */
+  piercingCount: number;
+  /** Homing-Turnrate der Missile in Grad/Sekunde. Base 0 = kein Homing.
+   * Wizard Glasses setzt das auf 80 — sanfter als Cursed Mirror (110), damit
+   * scharfe 90°-Cuts vom Spieler nicht trivialisiert werden. */
+  homingTurnRate: number;
+  /** Anteil des Hit-Damages der zusätzlich als Burn-DoT appliziert wird (über
+   * 2 Ticks à 600 ms). Base 0 = kein Burn. Fire Orb setzt das auf 0.30. */
+  burnDamageFactor: number;
 }
 export type StatKey = keyof PlayerStats;
 

@@ -138,6 +138,9 @@ export class PreloadScene extends Phaser.Scene {
     this.drawItemBloodboundChaliceTexture(g);
     this.drawItemVampireSignetTexture(g);
     this.drawItemObsidianHeartTexture(g);
+    this.drawItemMagicShardTexture(g);
+    this.drawItemWizardGlassesTexture(g);
+    this.drawItemFireOrbTexture(g);
     this.drawStairsTexture(g);
 
     for (const theme of Object.values(FLOORS)) {
@@ -4662,6 +4665,152 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(cx - 2, 4, 1, 1);
 
     g.generateTexture(TextureKeys.ItemObsidianHeart, w, h);
+  }
+
+  /**
+   * Magic Shard — Pierce-Item-Icon. Schmaler, scharfer Crystal-Shard mit
+   * Light-Cyan-Faceting + ein paar weißen Sparkle-Pixeln. Lese als
+   * "schneidet sich durch Gegner".
+   */
+  private drawItemMagicShardTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    const cx = w / 2;
+    g.clear();
+    const OUT = 0x102838;
+    const SHARD_DARK = 0x4a8aa8;
+    const SHARD = 0x80c8e0;
+    const SHARD_HI = 0xc8f0ff;
+    const SPARK = 0xffffff;
+
+    // Outline (vertical shard, slightly tilted right at the tip)
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx, 1, cx - 3, 9, cx + 3, 9);
+    g.fillTriangle(cx - 3, 9, cx + 3, 9, cx + 1, 13);
+
+    // Mid fill
+    g.fillStyle(SHARD_DARK, 1);
+    g.fillTriangle(cx, 2, cx - 2, 9, cx + 2, 9);
+    g.fillTriangle(cx - 2, 9, cx + 2, 9, cx + 1, 12);
+
+    // Front facet
+    g.fillStyle(SHARD, 1);
+    g.fillTriangle(cx, 3, cx - 1, 8, cx + 2, 8);
+    g.fillTriangle(cx - 1, 8, cx + 2, 8, cx + 1, 11);
+
+    // Bright highlight strip (left edge of the front facet)
+    g.fillStyle(SHARD_HI, 1);
+    g.fillRect(cx - 1, 4, 1, 4);
+    g.fillRect(cx, 8, 1, 2);
+
+    // Sparkle pixels
+    g.fillStyle(SPARK, 1);
+    g.fillRect(cx + 1, 5, 1, 1);
+    g.fillRect(cx - 2, 11, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemMagicShard, w, h);
+  }
+
+  /**
+   * Wizard Glasses — Homing-Item-Icon. Zwei kleine runde Brillenkreise mit
+   * goldenem Bügel + glühenden cyan-Linsen. Lese als "fokussiert auf das
+   * Ziel" / weise Augen.
+   */
+  private drawItemWizardGlassesTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    g.clear();
+    const OUT = 0x101820;
+    const GOLD = 0xd0a050;
+    const GOLD_HI = 0xffd870;
+    const LENS = 0x4ae0ff;
+    const LENS_HI = 0xc0f8ff;
+    const NOSE = 0xb08840;
+
+    // Bridge bar between the lenses
+    g.fillStyle(OUT, 1);
+    g.fillRect(6, 7, 2, 1);
+    g.fillStyle(GOLD, 1);
+    g.fillRect(6, 7, 2, 1);
+
+    // Outline rings
+    g.fillStyle(OUT, 1);
+    g.fillCircle(4, 7, 3);
+    g.fillCircle(10, 7, 3);
+
+    // Inner lens (cyan glow)
+    g.fillStyle(LENS, 1);
+    g.fillCircle(4, 7, 2);
+    g.fillCircle(10, 7, 2);
+
+    // Lens highlight
+    g.fillStyle(LENS_HI, 1);
+    g.fillRect(3, 6, 1, 1);
+    g.fillRect(9, 6, 1, 1);
+
+    // Gold rim accents
+    g.fillStyle(GOLD, 1);
+    g.fillRect(4, 4, 1, 1);
+    g.fillRect(10, 4, 1, 1);
+    g.fillRect(4, 10, 1, 1);
+    g.fillRect(10, 10, 1, 1);
+
+    // Bridge highlight
+    g.fillStyle(GOLD_HI, 1);
+    g.fillRect(6, 7, 1, 1);
+
+    // Tiny earpiece-like nose pads (hint of dimension)
+    g.fillStyle(NOSE, 1);
+    g.fillRect(1, 7, 1, 1);
+    g.fillRect(12, 7, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemWizardGlasses, w, h);
+  }
+
+  /**
+   * Fire Orb — Burn-DoT-Item-Icon. Orange-roter Glow-Orb mit drei Flame-
+   * Tongues nach oben. Lese als "permanent brennende Ember".
+   */
+  private drawItemFireOrbTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    const cx = w / 2;
+    g.clear();
+    const OUT = 0x300800;
+    const EMBER_DARK = 0xa02810;
+    const EMBER = 0xff5020;
+    const FLAME = 0xff8030;
+    const FLAME_HI = 0xfff060;
+    const CORE = 0xffffd0;
+
+    // Orb body — solid sphere centered at (cx, 9)
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx, 9, 4);
+    g.fillStyle(EMBER_DARK, 1);
+    g.fillCircle(cx, 9, 3.2);
+    g.fillStyle(EMBER, 1);
+    g.fillCircle(cx, 9, 2.4);
+    g.fillStyle(FLAME, 1);
+    g.fillCircle(cx - 1, 8, 1.4);
+    g.fillStyle(CORE, 1);
+    g.fillRect(cx - 1, 8, 1, 1);
+
+    // Three flame tongues licking upward (tall central + short left/right)
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx - 1, 5, cx + 1, 5, cx, 1);
+    g.fillTriangle(cx - 3, 6, cx - 1, 6, cx - 2, 3);
+    g.fillTriangle(cx + 1, 6, cx + 3, 6, cx + 2, 3);
+
+    g.fillStyle(FLAME, 1);
+    g.fillTriangle(cx - 1, 5, cx + 1, 5, cx, 2);
+    g.fillStyle(FLAME_HI, 1);
+    g.fillRect(cx, 3, 1, 2);
+
+    g.fillStyle(EMBER, 1);
+    g.fillTriangle(cx - 3, 6, cx - 1, 6, cx - 2, 4);
+    g.fillTriangle(cx + 1, 6, cx + 3, 6, cx + 2, 4);
+
+    g.generateTexture(TextureKeys.ItemFireOrb, w, h);
   }
 
   /**

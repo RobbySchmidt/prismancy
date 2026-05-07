@@ -1,84 +1,32 @@
 /**
- * Persistent cosmetic-unlock storage. Backed by localStorage so the unlock
- * survives reloads + browser sessions. All access is wrapped in try/catch
- * so private-browsing or disabled-storage environments degrade silently to
- * "no unlocks" rather than throwing.
+ * Cosmetic-skin facade kept around so the existing call-sites in Player.ts,
+ * MainMenuScene.ts, and the dev hooks don't all need to be migrated in one
+ * pass. The actual storage moved to `MetaProgress.ts` (single-slot
+ * versioned blob covering bosses defeated / items discovered / run
+ * counters / best time / selected skin) — `Cosmetics` just re-exports the
+ * skin-related entry points.
  *
- * Currently tracks one unlock: the Prismancy red/gold wizard skin earned
- * by defeating Lord Onyx. Future cosmetics / item unlocks slot in as
- * additional getter/setter pairs against new keys.
+ * New skin / cosmetic features should go directly through `MetaProgress`;
+ * this shim is purely for backwards compatibility.
  */
-const STORAGE_KEY_LORD_ONYX = 'prismancy.unlocks.lordOnyxBeaten';
-const STORAGE_KEY_SELECTED_SKIN = 'prismancy.cosmetics.selectedSkin';
+import { MetaProgress, type SkinId } from './MetaProgress';
 
-export type SkinId = 'default' | 'prismancy';
-
-function safeRead(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function safeWrite(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Storage unavailable — silently no-op.
-  }
-}
-
-function safeRemove(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    // Storage unavailable — silently no-op.
-  }
-}
+export type { SkinId };
 
 export const Cosmetics = {
-  /** True if the player has ever defeated Lord Onyx (= red/gold skin
-   * unlocked + auto-applied to the player sprite). */
   hasPrismancySkin(): boolean {
-    return safeRead(STORAGE_KEY_LORD_ONYX) === 'true';
+    return MetaProgress.hasPrismancySkin();
   },
-
-  /** Mark the Prismancy skin as unlocked. Idempotent. */
   unlockPrismancySkin(): void {
-    safeWrite(STORAGE_KEY_LORD_ONYX, 'true');
+    MetaProgress.unlockPrismancySkin();
   },
-
-  /** Dev-only: clear all unlocks so testing the unlock flow + the locked
-   * default state is one console call away. */
-  resetAll(): void {
-    safeRemove(STORAGE_KEY_LORD_ONYX);
-    safeRemove(STORAGE_KEY_SELECTED_SKIN);
-  },
-
-  /**
-   * The skin the player has chosen for the wizard. If no explicit choice
-   * has ever been made, the unlock-state decides the default: a fresh
-   * Prismancy unlock auto-applies (preserves the trophy reveal moment),
-   * everyone else gets the default purple/white wizard. Once the player
-   * makes a manual choice via the main-menu toggle, that choice sticks
-   * across sessions until they toggle again.
-   *
-   * If the player has Prismancy stored as their preference but the skin
-   * isn't unlocked (e.g. localStorage edited / unlocks reset), we fall
-   * back to the default skin so the cosmetic stays earned.
-   */
   getSelectedSkin(): SkinId {
-    const stored = safeRead(STORAGE_KEY_SELECTED_SKIN);
-    const unlocked = safeRead(STORAGE_KEY_LORD_ONYX) === 'true';
-    if (stored === 'prismancy') return unlocked ? 'prismancy' : 'default';
-    if (stored === 'default') return 'default';
-    // No explicit preference yet — auto-apply the unlock.
-    return unlocked ? 'prismancy' : 'default';
+    return MetaProgress.getSelectedSkin();
   },
-
-  /** Persist the player's skin choice. The main-menu toggle calls this. */
   setSelectedSkin(skin: SkinId): void {
-    safeWrite(STORAGE_KEY_SELECTED_SKIN, skin);
+    MetaProgress.setSelectedSkin(skin);
+  },
+  resetAll(): void {
+    MetaProgress.resetAll();
   },
 };
