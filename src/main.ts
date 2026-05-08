@@ -10,6 +10,8 @@ import { EndScene } from './scenes/EndScene';
 import { PauseScene } from './scenes/PauseScene';
 import { StatsScene } from './scenes/StatsScene';
 import { StyleMockupScene } from './scenes/StyleMockupScene';
+import { SoundSettingsScene } from './scenes/SoundSettingsScene';
+import { ControlsScene } from './scenes/ControlsScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -40,6 +42,8 @@ const config: Phaser.Types.Core.GameConfig = {
     PauseScene,
     StatsScene,
     StyleMockupScene,
+    SoundSettingsScene,
+    ControlsScene,
   ],
 };
 

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, SceneKeys, TextureKeys } from '../config/GameConfig';
 import { STARTING_FLOOR_ID } from '../data/floors';
 import { Cosmetics, type SkinId } from '../systems/Cosmetics';
+import { getMusicManager } from '../systems/MusicManager';
 
 /**
  * Title screen styled as a key-art illustration: the wizard duels the
@@ -11,14 +12,46 @@ import { Cosmetics, type SkinId } from '../systems/Cosmetics';
  * sprites are reused from the in-game textures, scaled up 4× for poster
  * scale. Magic missiles + pixie thorns fly between them so the moment
  * reads as combat rather than two characters posing.
+ *
+ * Layered on top of the painting: a left-anchored vertical menu with five
+ * items (Start Game / Options / Stats / Controls / Close Game). Mouse
+ * hover or arrow-key navigation focuses an item (visualised by a yellow
+ * tint + scale-up tween), Enter / Space / click activates it. Overlays
+ * (Sound Settings / Stats / Controls) pause the menu so a stray
+ * Enter-press doesn't bleed through.
  */
+
+interface MenuEntry {
+  label: string;
+  action: () => void;
+  text: Phaser.GameObjects.Text;
+  shadow: Phaser.GameObjects.Text;
+  baseY: number;
+}
+
+const MENU_ITEM_FONT_SIZE = 22;
+const MENU_ITEM_HOVER_SCALE = 1.25;
+const MENU_ITEM_X = 44;
+const MENU_ITEM_TOP_Y = 200;
+const MENU_ITEM_LINE_HEIGHT = 38;
+const MENU_COLOR_DEFAULT = '#aab8c0';
+const MENU_COLOR_HOVER = '#fff8c0';
+
 export class MainMenuScene extends Phaser.Scene {
+  private menuStarted = false;
+  private menuFocusIndex = 0;
+  private menuItems: MenuEntry[] = [];
+
   constructor() {
     super({ key: SceneKeys.MainMenu });
   }
 
   create(): void {
     const cx = GAME_WIDTH / 2;
+
+    this.menuStarted = false;
+    this.menuFocusIndex = 0;
+    this.menuItems = [];
 
     // 1) Sky + ground backdrop ------------------------------------------------
     const bg = this.add.graphics();
@@ -28,8 +61,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.paintQueenHalo();
     const queen = this.add.image(GAME_WIDTH - 240, GAME_HEIGHT / 2 - 30, TextureKeys.BossPixieQueen);
     queen.setScale(4);
-    queen.setRotation(0.08); // slight forward lean toward the wizard
-    // Subtle hover bob
+    queen.setRotation(0.08);
     this.tweens.add({
       targets: queen,
       y: queen.y - 8,
@@ -39,11 +71,7 @@ export class MainMenuScene extends Phaser.Scene {
       ease: 'Sine.InOut',
     });
 
-    // 3) Wizard (left side) — heroic stance with magic glow underfoot.
-    // Uses the Prismancy red/gold skin if the player has selected it (auto-
-    // applied on first Lord Onyx kill, manually toggleable from here on
-    // out). The title screen reads as a permanent trophy of the player's
-    // run history.
+    // 3) Wizard (left side).
     this.paintWizardAura();
     const wizard = this.add.image(
       240,
@@ -53,38 +81,205 @@ export class MainMenuScene extends Phaser.Scene {
     wizard.setScale(4);
     wizard.setRotation(-0.08);
 
-    // 4) Action effects between them — wizard's missile streak + queen's thorn volley.
+    // 4) Action effects between them.
     this.paintActionEffects();
 
-    // 5) Title + subtitle on top of everything ------------------------------
+    // 5) Title (just the big text — the bottom prompts moved into the menu).
     this.paintTitle(cx);
 
-    // 6) Skin toggle (only if Prismancy is unlocked) + stats overlay hint.
+    // 6) Vertical menu (left side).
+    this.buildVerticalMenu();
+
+    // 7) Skin toggle bottom-of-screen — survives the menu rewrite as a
+    // dedicated [S] keybind plus a small label, since toggling a cosmetic
+    // mid-menu is more useful as a hotkey than a full sub-menu.
     this.setupSkinToggle(wizard);
-    this.setupStatsHint();
 
-    const startGame = (): void => {
-      // Explicit fresh-run payload. Without this Phaser's `scene.start(key)`
-      // keeps the previous run's `settings.data` — so finishing a run on Onyx
-      // and starting a new one from MainMenu would respawn on Onyx with the
-      // last carry-over still attached. Same fix already applied in
-      // `GameOverScene.handleRestart` for the Game-Over → R path.
-      this.scene.start(SceneKeys.Game, {
-        floorIndex: 1,
-        floorId: STARTING_FLOOR_ID,
-      });
-      this.scene.launch(SceneKeys.UI);
-    };
-
-    this.input.keyboard?.once('keydown-SPACE', startGame);
-    this.input.keyboard?.once('keydown-ENTER', startGame);
-    this.input.once('pointerdown', startGame);
+    // Title music plays only on subsequent visits — the first page-load has a
+    // locked WebAudio context, and we'd rather have a quick first-press start
+    // than tease the user with half a second of music on a forced unlock.
+    // After the first run, context is unlocked and the track plays immediately.
+    if (!this.sound.locked) {
+      getMusicManager().playTrack(this, 'title');
+    }
 
     if (import.meta.env.DEV) {
       this.input.keyboard?.once('keydown-M', () => {
         this.scene.start(SceneKeys.StyleMockup);
       });
     }
+  }
+
+  private buildVerticalMenu(): void {
+    const items: { label: string; action: () => void }[] = [
+      { label: 'START  GAME', action: () => this.activateStart() },
+      { label: 'OPTIONS', action: () => this.launchOverlay(SceneKeys.SoundSettings) },
+      { label: 'STATS', action: () => this.launchOverlay(SceneKeys.Stats) },
+      { label: 'CONTROLS', action: () => this.launchOverlay(SceneKeys.Controls) },
+      { label: 'CLOSE  GAME', action: () => this.activateClose() },
+    ];
+
+    this.menuItems = items.map((entry, idx) => {
+      const baseY = MENU_ITEM_TOP_Y + idx * MENU_ITEM_LINE_HEIGHT;
+      const shadow = this.add
+        .text(MENU_ITEM_X + 3, baseY + 3, entry.label, {
+          fontFamily: 'monospace',
+          fontSize: `${MENU_ITEM_FONT_SIZE}px`,
+          fontStyle: 'bold',
+          color: '#000000',
+        })
+        .setOrigin(0, 0.5)
+        .setAlpha(0.55);
+      const text = this.add
+        .text(MENU_ITEM_X, baseY, entry.label, {
+          fontFamily: 'monospace',
+          fontSize: `${MENU_ITEM_FONT_SIZE}px`,
+          fontStyle: 'bold',
+          color: MENU_COLOR_DEFAULT,
+          stroke: '#1a0828',
+          strokeThickness: 4,
+        })
+        .setOrigin(0, 0.5);
+
+      // Hit-area: text is interactive, hover updates focus, click activates.
+      text.setInteractive({ useHandCursor: true });
+      text.on('pointerover', () => this.setMenuFocus(idx));
+      text.on('pointerdown', () => this.activateMenuItem(idx));
+
+      return { label: entry.label, action: entry.action, text, shadow, baseY };
+    });
+
+    this.setMenuFocus(0);
+
+    this.input.keyboard?.on('keydown-UP', () => this.moveFocus(-1));
+    this.input.keyboard?.on('keydown-DOWN', () => this.moveFocus(1));
+    this.input.keyboard?.on('keydown-ENTER', () => this.activateMenuItem(this.menuFocusIndex));
+    this.input.keyboard?.on('keydown-SPACE', () => this.activateMenuItem(this.menuFocusIndex));
+  }
+
+  private setMenuFocus(idx: number): void {
+    if (idx < 0 || idx >= this.menuItems.length) return;
+    this.menuFocusIndex = idx;
+    for (let i = 0; i < this.menuItems.length; i++) {
+      const item = this.menuItems[i];
+      const focused = i === idx;
+      item.text.setColor(focused ? MENU_COLOR_HOVER : MENU_COLOR_DEFAULT);
+      // Tween scale + tracking shadow so the focus change reads as a soft
+      // pop rather than a snap. Killing the previous tween on the same
+      // target stops mid-flight scaling from queueing up if the user
+      // sweeps the mouse fast.
+      this.tweens.killTweensOf([item.text, item.shadow]);
+      this.tweens.add({
+        targets: [item.text, item.shadow],
+        scale: focused ? MENU_ITEM_HOVER_SCALE : 1,
+        duration: 120,
+        ease: 'Sine.Out',
+      });
+    }
+  }
+
+  private moveFocus(delta: number): void {
+    if (this.menuStarted) return;
+    const len = this.menuItems.length;
+    if (len === 0) return;
+    const next = (this.menuFocusIndex + delta + len) % len;
+    this.setMenuFocus(next);
+  }
+
+  private activateMenuItem(idx: number): void {
+    if (this.menuStarted) return;
+    const item = this.menuItems[idx];
+    if (!item) return;
+    this.setMenuFocus(idx);
+    item.action();
+  }
+
+  /**
+   * Pause MainMenu while an overlay (Sound Settings / Stats / Controls)
+   * is up so the menu's keyboard / pointer listeners don't bleed through
+   * — without this, pressing Enter to dismiss an overlay would also
+   * activate whatever item happens to be focused on MainMenu underneath.
+   * The overlay's `scene.stop` triggers SHUTDOWN, which we use to resume.
+   */
+  private launchOverlay(key: string): void {
+    this.scene.pause();
+    this.scene.launch(key);
+    const overlayScene = this.scene.get(key);
+    if (!overlayScene) {
+      this.scene.resume();
+      return;
+    }
+    overlayScene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.scene.isPaused()) this.scene.resume();
+    });
+  }
+
+  private activateStart(): void {
+    if (this.menuStarted) return;
+    this.menuStarted = true;
+
+    // Camera fade-to-black mirrors the floor-transition look so the descent
+    // into Floor 1 reads as the same "going somewhere" beat the rest of
+    // the game uses.
+    this.cameras.main.fadeOut(260, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      // Explicit fresh-run payload — see GameOverScene.handleRestart for the
+      // full reasoning (without it, Phaser keeps the previous run's
+      // settings.data and you'd respawn on Onyx with stale carry-over).
+      this.scene.start(SceneKeys.Game, {
+        floorIndex: 1,
+        floorId: STARTING_FLOOR_ID,
+      });
+      this.scene.launch(SceneKeys.UI);
+    });
+  }
+
+  /**
+   * Best-effort window close. `window.close()` is a no-op in most modern
+   * browsers (it only works on JS-opened popups, or in Electron / packaged
+   * builds). The fallback is a fade-to-black + "thanks for playing" screen
+   * — the user can refresh the page to come back.
+   */
+  private activateClose(): void {
+    if (this.menuStarted) return;
+    this.menuStarted = true;
+    getMusicManager().stop(this, { fadeMs: 600 });
+    try {
+      window.close();
+    } catch {
+      // ignore — falls through to the fade-out overlay.
+    }
+    const overlay = this.add
+      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0)
+      .setOrigin(0, 0)
+      .setDepth(10000);
+    this.tweens.add({
+      targets: overlay,
+      alpha: 1,
+      duration: 800,
+      ease: 'Sine.In',
+      onComplete: () => {
+        this.add
+          .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 18, 'THANKS  FOR  PLAYING', {
+            fontFamily: 'monospace',
+            fontSize: '32px',
+            fontStyle: 'bold',
+            color: '#fff8c0',
+            stroke: '#000000',
+            strokeThickness: 4,
+          })
+          .setOrigin(0.5)
+          .setDepth(10001);
+        this.add
+          .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 28, 'Refresh the page to return', {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#aab8c0',
+          })
+          .setOrigin(0.5)
+          .setDepth(10001);
+      },
+    });
   }
 
   private skinTextureKey(skin: SkinId): string {
@@ -127,33 +322,6 @@ export class MainMenuScene extends Phaser.Scene {
   private skinHintText(skin: SkinId): string {
     const name = skin === 'prismancy' ? 'PRISMANCY' : 'WIZARD';
     return `[S] SKIN: ${name}`;
-  }
-
-  /**
-   * Always-visible hint that opens the trophy/collection overlay
-   * (`StatsScene`) on `T`. Sits ABOVE the controls line so it doesn't
-   * collide with it (the previous bottom-stack layout pushed `[T] STATS`
-   * onto the same Y as `MOVE WASD · CAST ARROW KEYS`). The skin toggle
-   * stays at the very bottom when unlocked. We `launch` the scene (not
-   * `start`) so the title art keeps rendering behind the overlay and
-   * the player just sees the stats panel pop on top.
-   */
-  private setupStatsHint(): void {
-    const cx = GAME_WIDTH / 2;
-    // Stats hint above the controls line (which lives at GAME_HEIGHT - 50).
-    this.add
-      .text(cx, GAME_HEIGHT - 76, '[T] STATS', {
-        fontSize: '14px',
-        color: '#fff8c0',
-        stroke: '#000000',
-        strokeThickness: 3,
-      })
-      .setOrigin(0.5)
-      .setAlpha(0.85);
-
-    this.input.keyboard?.on('keydown-T', () => {
-      this.scene.launch(SceneKeys.Stats);
-    });
   }
 
   // ---------------------------------------------------------------------------
@@ -382,39 +550,9 @@ export class MainMenuScene extends Phaser.Scene {
       ease: 'Sine.InOut',
     });
 
-    // Subtitle — pulsing prompt
-    const prompt = this.add
-      .text(cx, GAME_HEIGHT - 90, 'PRESS  [SPACE]  OR  [ENTER]', {
-        fontSize: '22px',
-        fontStyle: 'bold',
-        color: '#e9d5ff',
-        stroke: '#1a0828',
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5);
-    this.tweens.add({
-      targets: prompt,
-      alpha: { from: 0.55, to: 1 },
-      duration: 900,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.InOut',
-    });
-
-    // Controls hint
-    this.add
-      .text(cx, GAME_HEIGHT - 50, 'MOVE  WASD     ·     CAST  ARROW KEYS', {
-        fontSize: '14px',
-        color: '#aab8c0',
-        stroke: '#000000',
-        strokeThickness: 3,
-      })
-      .setOrigin(0.5)
-      .setAlpha(0.85);
-    // [M] StyleMockupScene keybind is still wired in DEV (see `create()`)
-    // so the mockup viewer remains accessible for design work, but the
-    // visible hint is intentionally omitted now that the game is closer
-    // to a finished state.
+    // The old SPACE / ENTER prompt + controls hint moved into the new
+    // vertical menu (`buildVerticalMenu`) and the dedicated ControlsScene
+    // overlay. [M] dev-only StyleMockup keybind is still wired in `create()`.
   }
 }
 

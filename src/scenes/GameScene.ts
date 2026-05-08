@@ -70,6 +70,11 @@ import { DropSystem } from '../systems/DropSystem';
 import { InputManager } from '../systems/InputManager';
 import { Inventory } from '../systems/Inventory';
 import { ItemSystem } from '../systems/ItemSystem';
+import {
+  bossTrackForFloor,
+  floorIdToFloorTrack,
+  getMusicManager,
+} from '../systems/MusicManager';
 import { StatsSystem } from '../systems/StatsSystem';
 import {
   ItemPool,
@@ -394,6 +399,13 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, ROOM_WIDTH_TILES * TILE_SIZE, ROOM_HEIGHT_TILES * TILE_SIZE);
     this.cameras.main.setZoom(CAMERA_ZOOM);
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
+
+    // Start the floor track for the current floor. If `enterRoom` immediately
+    // hits a boss room (only happens via dev hooks like __wiz.gotoFloor + a
+    // tiny seed where the start IS the boss room — not normal play),
+    // `spawnBossForRoom` below will swap to the boss track via crossfade.
+    const floorTrack = floorIdToFloorTrack(this.currentFloorId);
+    if (floorTrack) getMusicManager().playTrack(this, floorTrack);
 
     this.enterRoom(this.layout.startId, null);
 
@@ -1414,6 +1426,18 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('bossNoHitInProgress', true);
     this.bossDamageCount = 0;
     EventBus.emit('boss:spawned', { name: boss.displayName, maxHp: boss.maxHp });
+    this.switchToBossTrack(boss.displayName);
+  }
+
+  /**
+   * Crossfade to the boss-track that matches the active floor (or to
+   * `prismarch` if the spawned boss IS the Prismarch — checked via
+   * displayName since that's the same predicate the death-handler uses).
+   */
+  private switchToBossTrack(displayName: string): void {
+    const isPrismarch = displayName === 'The Prismarch';
+    const trackKey = bossTrackForFloor(this.currentFloorId, isPrismarch);
+    if (trackKey) getMusicManager().playTrack(this, trackKey);
   }
 
   /**
@@ -1444,6 +1468,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('bossNoHitInProgress', true);
     this.bossDamageCount = 0;
     EventBus.emit('boss:spawned', { name: boss.displayName, maxHp: boss.maxHp });
+    this.switchToBossTrack(boss.displayName);
     this.currentRoom.closeAllDoors();
     // eslint-disable-next-line no-console
     console.log(`[__wiz.spawnBoss] Spawned ${boss.displayName}.`);
@@ -1547,6 +1572,13 @@ export class GameScene extends Phaser.Scene {
       this.handleLordOnyxKilled(payload);
       return;
     }
+
+    // Crossfade back from the boss track to the floor track. EndScene's own
+    // music handling kicks in if/when the player descends stairs or activates
+    // the seal; until then the floor track plays for stair-walk-up + reward
+    // collection.
+    const floorTrack = floorIdToFloorTrack(this.currentFloorId);
+    if (floorTrack) getMusicManager().playTrack(this, floorTrack);
 
     const center = this.currentRoom?.getCenter();
     if (center) {
@@ -1820,6 +1852,10 @@ export class GameScene extends Phaser.Scene {
   private transitionToEndScene(variant: 'incomplete' | 'full'): void {
     if (this.inTransition) return;
     this.inTransition = true;
+    // Fade music out together with the camera fade so the EndScene starts
+    // in cinematic silence. EndScene re-uses MainMenu's title track when it
+    // auto-returns; nothing plays during the EndScene itself.
+    getMusicManager().stop(this, { fadeMs: 600 });
     this.cameras.main.fadeOut(600, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.stop(SceneKeys.UI);
@@ -1896,6 +1932,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('bossNoHitInProgress', true);
     this.bossDamageCount = 0;
     EventBus.emit('boss:spawned', { name: boss.displayName, maxHp: boss.maxHp });
+    this.switchToBossTrack(boss.displayName);
   }
 
   /**
@@ -2465,6 +2502,9 @@ export class GameScene extends Phaser.Scene {
 
   private handlePlayerDied(): void {
     MetaProgress.recordRunDied();
+    // Stop the current track with a slow fade so the death sting (the
+    // GameOver overlay's fade-in + R-restart hint) lands in silence.
+    getMusicManager().stop(this, { fadeMs: 800 });
     this.time.delayedCall(400, () => {
       this.scene.launch(SceneKeys.GameOver);
       this.scene.pause();

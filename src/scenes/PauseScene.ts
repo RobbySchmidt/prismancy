@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, SceneKeys } from '../config/GameConfig';
+import { getMusicManager } from '../systems/MusicManager';
 
 /**
  * Pause overlay launched in parallel to GameScene + UIScene. Translucent
@@ -27,6 +28,11 @@ export class PauseScene extends Phaser.Scene {
 
     this.exited = false;
     this.ready = false;
+
+    // Dim the background music while paused so the silence reads as a
+    // "tab away from gameplay" beat. Both resume and quit unduck — quit
+    // restarts MainMenu's title track which crossfades from current state.
+    getMusicManager().duck();
 
     // Translucent black backdrop covering the viewport.
     this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.65).setOrigin(0, 0);
@@ -87,6 +93,7 @@ export class PauseScene extends Phaser.Scene {
   private resumeGame(): void {
     if (this.exited) return;
     this.exited = true;
+    getMusicManager().unduck();
     this.scene.stop(SceneKeys.Pause);
     this.scene.resume(SceneKeys.Game);
   }
@@ -100,6 +107,7 @@ export class PauseScene extends Phaser.Scene {
   private quitToMainMenu(): void {
     if (this.exited) return;
     this.exited = true;
+    getMusicManager().unduck();
     this.scene.stop(SceneKeys.UI);
     this.scene.stop(SceneKeys.Game);
     this.scene.stop(SceneKeys.Pause);

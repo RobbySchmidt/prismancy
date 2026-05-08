@@ -1023,6 +1023,8 @@ export const SceneKeys = {
   Pause: 'PauseScene',
   Stats: 'StatsScene',
   StyleMockup: 'StyleMockupScene',
+  SoundSettings: 'SoundSettingsScene',
+  Controls: 'ControlsScene',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];

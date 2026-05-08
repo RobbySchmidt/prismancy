@@ -20,6 +20,7 @@ import {
   wallTileKey,
 } from '../config/GameConfig';
 import { FLOORS } from '../data/floors';
+import { ALL_MUSIC_TRACKS } from '../systems/MusicManager';
 import { type FloorTheme } from '../types';
 import { RNG } from '../utils/RNG';
 
@@ -43,6 +44,19 @@ export class PreloadScene extends Phaser.Scene {
 
   preload(): void {
     this.drawProgressBar();
+    this.loadMusicTracks();
+  }
+
+  /**
+   * Queue every known music track. Files missing from `public/audio/music/`
+   * trigger a `loaderror` event on the loader but don't crash — Phaser just
+   * leaves no cache entry, and `MusicManager.playTrack` checks `cache.audio
+   * .exists` before playing, so the absence is silent ingame.
+   */
+  private loadMusicTracks(): void {
+    for (const key of ALL_MUSIC_TRACKS) {
+      this.load.audio(key, `audio/music/${key}.mp3`);
+    }
   }
 
   create(): void {
