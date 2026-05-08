@@ -104,11 +104,40 @@ export class MainMenuScene extends Phaser.Scene {
       getMusicManager().playTrack(this, 'title');
     }
 
-    if (import.meta.env.DEV) {
-      this.input.keyboard?.once('keydown-M', () => {
-        this.scene.start(SceneKeys.StyleMockup);
+    this.setupTitleMusicHint();
+  }
+
+  /**
+   * Bottom-of-screen "[M] PLAY MUSIC" hint shown only when the title track
+   * isn't currently playing (i.e. first page-load with a locked WebAudio
+   * context). [M] starts the title track manually, which doubles as a
+   * user-gesture unlock for the audio context. Once the music starts, the
+   * hint fades out — there's nothing left to do.
+   */
+  private setupTitleMusicHint(): void {
+    if (getMusicManager().getCurrentKey() === 'title') return;
+
+    const hint = this.add
+      .text(GAME_WIDTH - 18, GAME_HEIGHT - 18, '[M]  PLAY  TITLE  MUSIC', {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#e9d5ff',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(1, 1)
+      .setAlpha(0.85);
+
+    this.input.keyboard?.once('keydown-M', () => {
+      getMusicManager().playTrack(this, 'title');
+      this.tweens.add({
+        targets: hint,
+        alpha: 0,
+        duration: 400,
+        onComplete: () => hint.destroy(),
       });
-    }
+    });
   }
 
   private buildVerticalMenu(): void {
@@ -142,8 +171,19 @@ export class MainMenuScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5);
 
-      // Hit-area: text is interactive, hover updates focus, click activates.
-      text.setInteractive({ useHandCursor: true });
+      // Wider rectangle hit area than the tight text bounds. Without this
+      // the focus-scale tween (1.0 → 1.25) shifts the visible glyphs above
+      // the un-scaled hit rect, and the cursor sweeping between items can
+      // briefly fall into a gap — that gap suppresses pointerover, which
+      // is the user-visible "menu sound only fires on keyboard, not mouse"
+      // bug. Spans the full row width so vertical hover always lands.
+      const hitW = GAME_WIDTH - MENU_ITEM_X * 2;
+      const hitH = MENU_ITEM_LINE_HEIGHT;
+      text.setInteractive({
+        hitArea: new Phaser.Geom.Rectangle(0, -hitH / 2, hitW, hitH),
+        hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+        useHandCursor: true,
+      });
       text.on('pointerover', () => this.setMenuFocus(idx));
       text.on('pointerdown', () => this.activateMenuItem(idx));
 

@@ -32,7 +32,8 @@ export type MusicTrackKey =
   | 'boss-sapphire'
   | 'floor-onyx'
   | 'boss-marquis-of-mirages'
-  | 'boss-the-prismarch';
+  | 'boss-the-prismarch'
+  | 'victory-credits';
 
 export const ALL_MUSIC_TRACKS: readonly MusicTrackKey[] = [
   'title',
@@ -43,6 +44,7 @@ export const ALL_MUSIC_TRACKS: readonly MusicTrackKey[] = [
   'floor-onyx',
   'boss-marquis-of-mirages',
   'boss-the-prismarch',
+  'victory-credits',
 ] as const;
 
 const DUCK_LEVEL = 0.3;
@@ -190,8 +192,18 @@ class MusicManager {
    * crossfade over `fadeMs` (old fades out + new fades in simultaneously).
    * If `key` isn't in the audio cache, leaves the current track playing
    * (no abrupt stop).
+   *
+   * `firstPlayFadeMs` lets a caller override the near-instant ramp used when
+   * there's no current track. Cinematic moments (e.g. the post-fade EndScene
+   * credits theme) want this longer so the new track swells in instead of
+   * snapping; the default 120 ms exists because for the title screen any
+   * slower trap means a quick SPACE press cuts the title fade-out short.
    */
-  playTrack(scene: Phaser.Scene, key: MusicTrackKey, opts: { fadeMs?: number } = {}): void {
+  playTrack(
+    scene: Phaser.Scene,
+    key: MusicTrackKey,
+    opts: { fadeMs?: number; firstPlayFadeMs?: number } = {},
+  ): void {
     if (this.currentKey === key && this.current?.isPlaying) return;
 
     if (!scene.cache.audio.exists(key)) {
@@ -218,12 +230,10 @@ class MusicManager {
       this.startFade(sound as MusicSound, 0, this.effectiveVolume(), fadeMs);
     } else {
       // First play with nothing to crossfade against (e.g. opening MainMenu).
-      // A slow fade-in here is a trap: if the user presses SPACE before it
-      // completes, the next track switch reads `old.volume` at half-mast and
-      // the audible fade-out is correspondingly short. Use a near-instant
-      // ramp so the title track is at full volume by the time the user
-      // can interact, which makes the title→game crossfade actually audible.
-      this.startFade(sound as MusicSound, 0, this.effectiveVolume(), 120);
+      // Default is a near-instant ramp; cinematic callers (EndScene credits)
+      // can opt into a longer swell via `firstPlayFadeMs`.
+      const firstPlayFade = opts.firstPlayFadeMs ?? 120;
+      this.startFade(sound as MusicSound, 0, this.effectiveVolume(), firstPlayFade);
     }
 
     this.current = sound;

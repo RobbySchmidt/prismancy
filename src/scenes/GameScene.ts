@@ -251,7 +251,9 @@ export class GameScene extends Phaser.Scene {
   /** Gem seal placed in the Onyx vampire room after the Twins die. Holds
    * the activation state + tear-down handle. Null on every other floor. */
   private gemSeal: GemSeal | null = null;
-  private gemSealOverlap: Phaser.Physics.Arcade.Collider | null = null;
+  /** Phaser Key for the [E] interact (used for placing gems on the seal).
+   * Polled in update(); see `tickGemSealInteract`. */
+  private interactKey: Phaser.Input.Keyboard.Key | null = null;
 
   /**
    * Stairs sprite spawned in the boss room after a kill. Held as a field
@@ -308,12 +310,13 @@ export class GameScene extends Phaser.Scene {
     x: number;
     y: number;
   }): void => {
-    // Always play the gem SFX, regardless of whether a seal is in this room
-    // (Floor-1 / Floor-2 gems get picked up before the seal exists, but the
-    // sound should still fire). Seal animation is the conditional part.
+    // Always play the gem SFX (Floor-1 / Floor-2 gems get picked up before
+    // the seal exists, but the sound should still fire).
     getSfxSynth().playPickupGem();
-    if (!this.gemSeal) return;
-    this.gemSeal.addGem(payload.floorId, payload.x, payload.y);
+    // Sync the seal's availability set if it exists in this room — the gem
+    // doesn't auto-fly into a socket anymore, but [E] later needs to know
+    // the player has it. No animation here.
+    this.gemSeal?.markGemAvailable(payload.floorId);
   };
 
   /**
@@ -497,6 +500,10 @@ export class GameScene extends Phaser.Scene {
     // don't get repeat-firing while the key is held.
     this.pauseKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC) ?? null;
 
+    // [E] interact for the gem seal on Onyx Mansion. Same JustDown poll
+    // pattern as ESC so a held key doesn't repeat-fire activation.
+    this.interactKey = this.input.keyboard?.addKey('E') ?? null;
+
     this.dropSystem = new DropSystem(
       {
         getLayout: () => this.getLayout(),
@@ -574,7 +581,7 @@ export class GameScene extends Phaser.Scene {
       this.stairsSprite = null;
       this.stairsOverlap = null;
       this.gemSeal = null;
-      this.gemSealOverlap = null;
+      this.interactKey = null;
       this.restartHoldStartedAt = null;
       this.restartKey = null;
       this.pauseKey = null;
@@ -1351,8 +1358,6 @@ export class GameScene extends Phaser.Scene {
     this.stairsSprite = null;
 
     // Gem seal — same room-scoped lifecycle as the stairs.
-    this.gemSealOverlap?.destroy();
-    this.gemSealOverlap = null;
     this.gemSeal?.destroy();
     this.gemSeal = null;
 
@@ -1846,8 +1851,6 @@ export class GameScene extends Phaser.Scene {
     if (!center) return;
 
     // Tear down a previous instance (re-entry).
-    this.gemSealOverlap?.destroy();
-    this.gemSealOverlap = null;
     this.gemSeal?.destroy();
     this.gemSeal = null;
 
@@ -1855,13 +1858,35 @@ export class GameScene extends Phaser.Scene {
     const sealY = center.y + TILE_SIZE * 3;
 
     this.gemSeal = new GemSeal(this, sealX, sealY, this.inventory.getGems());
-    this.gemSealOverlap = this.physics.add.overlap(
-      this.player,
-      this.gemSeal.trigger,
-      () => {
-        this.gemSeal?.tryActivate();
-      },
-    );
+    // No overlap-driven auto-activation — the player has to confirm with [E].
+    // `tickGemSealInteract` polls overlap + the interact key each frame.
+  }
+
+  /**
+   * Per-frame gem-seal interaction tick. Walks two state branches:
+   *   1. Mirror the live overlap into the seal so the "[E] PLACE GEMS" prompt
+   *      tracks the player.
+   *   2. On a fresh [E] press while in range, hand off to `tryInteract` —
+   *      that's where the 3/3 vs missing-gems branch lives.
+   * Skipped during room transitions so a stale key press across a fade
+   * doesn't fire on the next room. Inexpensive when no seal is alive (early
+   * return after the null check).
+   */
+  private tickGemSealInteract(): void {
+    const seal = this.gemSeal;
+    if (!seal) return;
+    if (this.inTransition) return;
+    const inRange = this.physics.overlap(this.player, seal.trigger);
+    seal.setInRange(inRange);
+    if (
+      inRange &&
+      this.interactKey &&
+      Phaser.Input.Keyboard.JustDown(this.interactKey)
+    ) {
+      // Pass the player's current position so the placement animation
+      // springs from the wizard rather than from a hardcoded point.
+      seal.tryInteract(this.player.x, this.player.y);
+    }
   }
 
   /**
@@ -1891,48 +1916,10 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
-    // Placeholder visual until #5 ships the real win screen: a centered
-    // banner with "VICTORY" + cosmetic-unlock toast underneath.
-    const cx = payload.x;
-    const cy = payload.y;
-    const victory = this.add
-      .text(cx, cy - 80, 'VICTORY', {
-        fontFamily: 'monospace',
-        fontSize: '36px',
-        color: '#ffd84a',
-        stroke: '#1a0408',
-        strokeThickness: 6,
-      })
-      .setOrigin(0.5, 0.5)
-      .setDepth(DepthLayers.HUD - 1)
-      .setAlpha(0)
-      .setScale(0.4);
-    this.tweens.add({
-      targets: victory,
-      alpha: 1,
-      scale: 1,
-      duration: 600,
-      ease: 'Back.Out',
-    });
-    if (!wasAlreadyUnlocked) {
-      const skinToast = this.add
-        .text(cx, cy - 40, 'Prismancy Skin Unlocked', {
-          fontFamily: 'monospace',
-          fontSize: '16px',
-          color: '#ff80a0',
-          stroke: '#1a0408',
-          strokeThickness: 4,
-        })
-        .setOrigin(0.5, 0.5)
-        .setDepth(DepthLayers.HUD - 1)
-        .setAlpha(0);
-      this.tweens.add({
-        targets: skinToast,
-        alpha: 1,
-        delay: 700,
-        duration: 500,
-      });
-    }
+    // Brief celebratory flash + shake, then immediately into the EndScene.
+    // The banner / unlock toast that used to live here was pulled — the
+    // EndScene's "VICTORY" headline owns that beat now, and the in-room text
+    // duplicated against the camera fade.
     this.cameras.main.flash(420, 240, 200, 100, false);
     this.cameras.main.shake(360, 0.006);
 
@@ -1948,10 +1935,10 @@ export class GameScene extends Phaser.Scene {
     const runStartedAt = (this.registry.get('runStartedAt') as number | undefined) ?? null;
     const durationMs = runStartedAt !== null ? Math.max(0, Date.now() - runStartedAt) : 0;
     MetaProgress.recordRunWonFull(durationMs);
-    // Brief celebration window so the player reads "VICTORY" + the skin
-    // toast before the EndScene takes over and fades to black. Time tuned
-    // against the 600 ms Back.Out tween + 700 ms toast delay above.
-    this.time.delayedCall(2400, () => this.transitionToEndScene('full'));
+    // Short window so the camera flash + shake reads, then the EndScene
+    // takes over and fades to black. The headline appears in the EndScene
+    // post-fade, so there's nothing to read in-room.
+    this.time.delayedCall(900, () => this.transitionToEndScene('full'));
     void payload;
   }
 
@@ -2678,6 +2665,8 @@ export class GameScene extends Phaser.Scene {
       this.openPauseMenu();
       return;
     }
+
+    this.tickGemSealInteract();
 
     if (!this.restartKey) return;
 

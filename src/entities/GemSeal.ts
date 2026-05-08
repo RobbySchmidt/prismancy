@@ -46,16 +46,26 @@ export class GemSeal {
   readonly trigger: Phaser.GameObjects.Zone;
 
   private readonly scene: Phaser.Scene;
-  /** Mutable internal copy — `addGem` mutates after construction so the
-   * seal can flip a socket from empty → filled live when the player picks
-   * up the Onyx gem in the same room. */
-  private readonly ownedGems: Set<string>;
+  /** Gems the player currently has in their inventory and could place into
+   * the seal. Mutable — `markGemAvailable` adds when the player picks up
+   * a gem mid-room, and `tryInteract` reads from this to decide whether
+   * 3/3 placement can run. The seal's own `placedGems` is the separate
+   * "what's actually in the sockets" set. */
+  private readonly availableGems: Set<string>;
+  /** Gems that have been physically placed into sockets (by [E] activation
+   * animation). Drives the visuals + the consume-on-special pipeline. */
+  private readonly placedGems = new Set<string>();
   private readonly visuals: Phaser.GameObjects.Container;
   private readonly graphics: Phaser.GameObjects.Graphics;
   private activated = false;
   private nextHintAt = 0;
   /** Active hint label, kept so a re-show within cooldown can replace it. */
   private hintLabel: Phaser.GameObjects.Text | null = null;
+  /** Floating "[E] PLACE GEMS" prompt. Visible whenever the player is in
+   * range and the seal hasn't been activated yet. Owned + tweened by the
+   * seal so its lifetime tracks `setInRange`. */
+  private prompt: Phaser.GameObjects.Text | null = null;
+  private inRange = false;
   /** Per-floor socket plate sprite + (optional) halo, kept so `addGem` can
    * upgrade an empty plate to filled in place. */
   private readonly socketSprites = new Map<
@@ -71,7 +81,7 @@ export class GemSeal {
 
   constructor(scene: Phaser.Scene, x: number, y: number, ownedGems: ReadonlySet<string>) {
     this.scene = scene;
-    this.ownedGems = new Set(ownedGems);
+    this.availableGems = new Set(ownedGems);
 
     // Visuals — single Container at (x, y), depth slightly above floor decos
     // so the player + projectiles render *over* the seal (no occlusion).
@@ -84,7 +94,10 @@ export class GemSeal {
 
     // Socket gems (one per floor in REQUIRED_GEM_FLOORS). Spaced evenly
     // across the central socket band; offset is symmetric around 0 (the
-    // container's local origin is the seal center).
+    // container's local origin is the seal center). All sockets start
+    // empty — even if the player carried gems in, they get placed on
+    // [E] interact via the activation animation, never pre-rendered as
+    // filled.
     const spacing = 24;
     const startX = -spacing;
     const socketY = -2;
@@ -93,23 +106,33 @@ export class GemSeal {
       const sx = startX + i * spacing;
       const plate = scene.add.image(sx, socketY, gemTextureKey(floorId));
       plate.setScale(1.0);
-      let halo: Phaser.GameObjects.Arc | null = null;
-      if (this.ownedGems.has(floorId)) {
-        plate.setAlpha(1);
-        halo = this.makeFilledHalo(sx, socketY, floorId);
-      } else {
-        // Empty — desaturated + dimmed so the missing slot is obvious
-        plate.setAlpha(0.18);
-        plate.setTintFill(0x1a0c20);
-      }
+      // Empty — desaturated + dimmed so the missing slot reads as a void
+      // socket waiting for its gem.
+      plate.setAlpha(0.18);
+      plate.setTintFill(0x1a0c20);
       this.visuals.add(plate);
-      this.socketSprites.set(floorId, { plate, halo });
+      this.socketSprites.set(floorId, { plate, halo: null });
     }
 
     // Trigger zone — broader than the seal frame so the player doesn't have
     // to tap pixel-perfect. ~1.5 tiles in front of the seal.
     this.trigger = scene.add.zone(x, y + TILE_SIZE * 0.4, SEAL_WIDTH + 16, TILE_SIZE * 1.5);
     scene.physics.add.existing(this.trigger, true);
+
+    // "[E] PLACE GEMS" prompt — sits above the seal, hidden until the player
+    // walks into the trigger zone. Created once, alpha-tweened on enter/exit.
+    this.prompt = this.scene.add
+      .text(x, y - SEAL_HEIGHT / 2 - 14, '[E]  PLACE GEMS', {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#ffd0a0',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(DepthLayers.HUD - 1)
+      .setAlpha(0);
 
     // The Prismarch fires a Prism Special once per phase — the matching
     // gem flies from its socket into the boss's prism, then the socket
@@ -122,67 +145,106 @@ export class GemSeal {
   }
 
   /**
-   * Live-insert a gem into the matching socket. Called by GameScene when
-   * the player picks up a gem while the seal exists in the same room (the
-   * Onyx no-hit drop). Animates a copy of the gem flying from the pickup
-   * point into the socket, then upgrades the empty plate in place.
-   * No-op if the floor isn't a required gem or the gem is already inserted.
+   * Register that the player has the named floor's gem in inventory and
+   * could place it via [E]. Cheap bookkeeping only — does NOT animate
+   * anything. Called from GameScene's `gem:pickedUp` handler so the seal
+   * stays in sync with the live inventory if the player earns the Onyx
+   * no-hit gem in the same room as the altar.
    */
-  addGem(floorId: string, fromX: number, fromY: number): void {
+  markGemAvailable(floorId: string): void {
     if (!REQUIRED_GEM_FLOORS.includes(floorId as FloorId)) return;
-    if (this.ownedGems.has(floorId)) return;
-    // Once a gem has been consumed by a Prism Special the socket stays
-    // empty for the rest of the fight — don't accept a late re-fill.
-    if (this.consumedSockets.has(floorId)) return;
-    const socket = this.socketSprites.get(floorId);
-    if (!socket) return;
-    this.ownedGems.add(floorId);
+    this.availableGems.add(floorId);
+  }
 
-    // World-space socket position (container is at this.visuals.x/y; the
-    // socket plate is at local sx/socketY relative to it).
+  /**
+   * Animate one gem flying from `fromX/fromY` into its socket, then upgrade
+   * the plate in place (empty → filled + halo). `delayMs` lets the caller
+   * stagger multiple placements so 3 gems land in sequence rather than all
+   * at once. Resolves the returned promise on land, so `placeAllGems` can
+   * await the last one before triggering the activation cinematic.
+   */
+  private animateGemToSocket(
+    floorId: FloorId,
+    fromX: number,
+    fromY: number,
+    delayMs: number,
+  ): Promise<void> {
+    const socket = this.socketSprites.get(floorId);
+    if (!socket) return Promise.resolve();
+
     const targetX = this.visuals.x + socket.plate.x;
     const targetY = this.visuals.y + socket.plate.y;
 
-    // Flying gem: a sibling sprite in world coords (NOT in the container
-    // — we want it to live in the world transform until it lands).
     const flyer = this.scene.add
       .image(fromX, fromY, gemTextureKey(floorId))
-      .setScale(1.6 * 1)
-      .setDepth(DepthLayers.HUD - 2);
-    const haloColor = FLOORS[floorId as FloorId]?.palette.glow ?? 0xffffff;
+      .setScale(1.6)
+      .setDepth(DepthLayers.HUD - 2)
+      .setAlpha(0);
+    const haloColor = FLOORS[floorId]?.palette.glow ?? 0xffffff;
     const flyerHalo = this.scene.add
       .circle(fromX, fromY, 12, haloColor, 0.5)
-      .setDepth(DepthLayers.HUD - 3);
+      .setDepth(DepthLayers.HUD - 3)
+      .setAlpha(0);
 
-    // Curve via a quadratic-ish path: midpoint lifted upward so the gem
-    // arcs into the socket instead of dragging across the floor.
     const midX = (fromX + targetX) / 2;
     const midY = Math.min(fromY, targetY) - 60;
     const duration = 520;
-    this.scene.tweens.add({
-      targets: { t: 0 },
-      t: 1,
-      duration,
-      ease: 'Sine.InOut',
-      onUpdate: (tween) => {
-        const t = tween.getValue() ?? 0;
-        // Quadratic Bézier: (1-t)²P0 + 2(1-t)tP1 + t²P2
-        const u = 1 - t;
-        const x = u * u * fromX + 2 * u * t * midX + t * t * targetX;
-        const y = u * u * fromY + 2 * u * t * midY + t * t * targetY;
-        flyer.setPosition(x, y);
-        flyerHalo.setPosition(x, y);
-        // Scale shrinks slightly toward the socket so it "settles in".
-        const s = 1.6 - t * 0.5;
-        flyer.setScale(s);
-        flyerHalo.setScale(s);
-      },
-      onComplete: () => {
-        flyer.destroy();
-        flyerHalo.destroy();
-        this.fillSocket(floorId);
-      },
+
+    return new Promise<void>((resolve) => {
+      this.scene.time.delayedCall(delayMs, () => {
+        flyer.setAlpha(1);
+        flyerHalo.setAlpha(1);
+        this.scene.tweens.add({
+          targets: { t: 0 },
+          t: 1,
+          duration,
+          ease: 'Sine.InOut',
+          onUpdate: (tween) => {
+            const t = tween.getValue() ?? 0;
+            const u = 1 - t;
+            const x = u * u * fromX + 2 * u * t * midX + t * t * targetX;
+            const y = u * u * fromY + 2 * u * t * midY + t * t * targetY;
+            flyer.setPosition(x, y);
+            flyerHalo.setPosition(x, y);
+            const s = 1.6 - t * 0.5;
+            flyer.setScale(s);
+            flyerHalo.setScale(s);
+          },
+          onComplete: () => {
+            flyer.destroy();
+            flyerHalo.destroy();
+            this.placedGems.add(floorId);
+            this.fillSocket(floorId);
+            resolve();
+          },
+        });
+      });
     });
+  }
+
+  /**
+   * Place every available-but-not-yet-placed gem from `fromX/fromY` (the
+   * player's position when [E] was pressed) into its socket, staggered so
+   * they read as a sequence rather than a clump. Returns the list of
+   * floor ids that were queued so the caller can react if it was empty
+   * (the "press [E] with nothing new to place" branch).
+   */
+  private placeAllGems(fromX: number, fromY: number): {
+    placed: FloorId[];
+    done: Promise<void>;
+  } {
+    const STAGGER_MS = 220;
+    const promises: Promise<void>[] = [];
+    const placed: FloorId[] = [];
+    let i = 0;
+    for (const floorId of REQUIRED_GEM_FLOORS) {
+      if (!this.availableGems.has(floorId)) continue;
+      if (this.placedGems.has(floorId)) continue;
+      placed.push(floorId);
+      promises.push(this.animateGemToSocket(floorId, fromX, fromY, i * STAGGER_MS));
+      i++;
+    }
+    return { placed, done: Promise.all(promises).then(() => undefined) };
   }
 
   /**
@@ -236,28 +298,80 @@ export class GemSeal {
   }
 
   /**
-   * Player walked onto the trigger. If all 3 gems are present → run the
-   * activation sequence + emit `seal:activated`. Otherwise → show the
-   * "X / 3" hint (rate-limited so it doesn't spam).
+   * Update the seal's "player is touching me" state. Called every frame from
+   * GameScene's update loop with the result of an arcade overlap check
+   * against this.trigger. When true the "[E] PLACE GEMS" prompt fades in;
+   * when false it fades out. Activation no longer fires from overlap — the
+   * player has to confirm with [E] (see `tryInteract`).
    */
-  tryActivate(): void {
+  setInRange(inRange: boolean): void {
     if (this.activated) return;
-    const owned = this.countOwned();
+    if (this.inRange === inRange) return;
+    this.inRange = inRange;
+    if (!this.prompt) return;
+    this.scene.tweens.killTweensOf(this.prompt);
+    this.scene.tweens.add({
+      targets: this.prompt,
+      alpha: inRange ? 1 : 0,
+      duration: 180,
+      ease: 'Sine.Out',
+    });
+  }
+
+  /**
+   * Player pressed the interact key while in range. Always places whatever
+   * available-but-unplaced gems the player carries — partial placements
+   * (1 or 2 of 3) are explicitly allowed so the player can see their
+   * progress on the altar. The activation cinematic only fires once all
+   * three sockets are full, so the boss spawn still gates on a complete
+   * trophy set; partial states just leave the seal sitting with one or
+   * two glowing sockets and the others dim.
+   *
+   * The "Slay thy fiends unscathed" hint shows when there's nothing new
+   * to place (zero available gems, or every available gem is already in
+   * its socket and the player still isn't at 3/3).
+   *
+   * `fromX/fromY` is the player's world position when [E] was pressed —
+   * the placement animation springs from there so it reads as the wizard
+   * laying his trophies on the altar.
+   */
+  tryInteract(fromX: number, fromY: number): void {
+    if (this.activated) return;
+    if (!this.inRange) return;
     const total = REQUIRED_GEM_FLOORS.length;
-    if (owned === total) {
-      this.activated = true;
-      this.runActivationSequence();
-      EventBus.emit('seal:activated', {
-        x: this.visuals.x,
-        y: this.visuals.y,
-      });
+
+    const { placed, done } = this.placeAllGems(fromX, fromY);
+    if (placed.length === 0) {
+      // Nothing new to place — surface the hint so the player understands
+      // why pressing [E] did nothing this time.
+      const now = this.scene.time.now;
+      if (now < this.nextHintAt) return;
+      this.nextHintAt = now + HINT_COOLDOWN_MS;
+      this.showHint(this.countAvailable(), total);
+      EventBus.emit('seal:hintShown', { owned: this.countAvailable(), total });
       return;
     }
-    const now = this.scene.time.now;
-    if (now < this.nextHintAt) return;
-    this.nextHintAt = now + HINT_COOLDOWN_MS;
-    this.showHint(owned, total);
-    EventBus.emit('seal:hintShown', { owned, total });
+
+    // After this batch of placements lands, see if we're at 3/3 and (if so)
+    // chain the activation cinematic. Partial placements (1 or 2 sockets
+    // filled) just leave the seal as-is — re-press [E] later when the
+    // player has earned more gems and we'll place those too.
+    void done.then(() => {
+      if (this.placedGems.size < total) return;
+      this.activated = true;
+      if (this.prompt) {
+        this.scene.tweens.killTweensOf(this.prompt);
+        this.prompt.setAlpha(0);
+      }
+      // Brief beat after the last gem settles before the cinematic kicks in.
+      this.scene.time.delayedCall(200, () => {
+        this.runActivationSequence();
+        EventBus.emit('seal:activated', {
+          x: this.visuals.x,
+          y: this.visuals.y,
+        });
+      });
+    });
   }
 
   destroy(): void {
@@ -267,6 +381,11 @@ export class GemSeal {
     if (this.hintLabel) {
       this.hintLabel.destroy();
       this.hintLabel = null;
+    }
+    if (this.prompt) {
+      this.scene.tweens.killTweensOf(this.prompt);
+      this.prompt.destroy();
+      this.prompt = null;
     }
   }
 
@@ -284,13 +403,13 @@ export class GemSeal {
     targetY: number,
   ): void {
     const floorId = PHASE_TO_FLOOR[phase];
-    if (!this.ownedGems.has(floorId)) return;
+    if (!this.placedGems.has(floorId)) return;
     const socket = this.socketSprites.get(floorId);
     if (!socket) return;
 
-    // Mark consumed immediately — sticky against any addGem race + lets
-    // a duplicate special-fire (defensive) become a no-op.
-    this.ownedGems.delete(floorId);
+    // Mark consumed immediately — sticky against any race + lets a
+    // duplicate special-fire (defensive) become a no-op.
+    this.placedGems.delete(floorId);
     this.consumedSockets.add(floorId);
 
     const fromX = this.visuals.x + socket.plate.x;
@@ -452,29 +571,39 @@ export class GemSeal {
 
   // --- Interaction ---------------------------------------------------------
 
-  private countOwned(): number {
+  /** How many of the 3 required gems are currently in the player's
+   * inventory and could be placed via [E]. Counts the snapshot from
+   * construction plus any post-spawn `markGemAvailable` updates. */
+  private countAvailable(): number {
     let n = 0;
     for (const floorId of REQUIRED_GEM_FLOORS) {
-      if (this.ownedGems.has(floorId)) n++;
+      if (this.availableGems.has(floorId)) n++;
     }
     return n;
   }
 
   /**
-   * Floating "X / 3 trophies" message above the seal. Auto-fades after
-   * ~1.4s. Replaces an in-flight hint if one's still on screen.
+   * Floating "Slay thy fiends unscathed" message above the seal. Shown when
+   * the player presses [E] without all 3 gems collected — cues the player
+   * that the prerequisite is the no-hit boss runs that drop the gems.
+   * Auto-fades after ~1.6s. Replaces an in-flight hint if one's still on
+   * screen.
    */
   private showHint(owned: number, total: number): void {
+    void owned;
+    void total;
     if (this.hintLabel) {
       this.hintLabel.destroy();
       this.hintLabel = null;
     }
-    const text = `${owned} / ${total} trophies`;
+    const text = 'Slay thy fiends unscathed';
+    // Float higher than the [E] prompt so the two don't overlap.
     const label = this.scene.add
-      .text(this.visuals.x, this.visuals.y - SEAL_HEIGHT / 2 - 14, text, {
+      .text(this.visuals.x, this.visuals.y - SEAL_HEIGHT / 2 - 32, text, {
         fontFamily: 'monospace',
-        fontSize: '13px',
-        color: '#ffd0a0',
+        fontSize: '14px',
+        fontStyle: 'italic',
+        color: '#c898d8',
         stroke: '#000000',
         strokeThickness: 3,
       })
@@ -485,7 +614,7 @@ export class GemSeal {
       targets: label,
       y: label.y - 12,
       alpha: { from: 1, to: 0 },
-      duration: 1400,
+      duration: 1600,
       ease: 'Sine.Out',
       onComplete: () => {
         label.destroy();
