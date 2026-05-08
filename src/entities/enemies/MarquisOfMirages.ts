@@ -33,6 +33,7 @@ import {
   VAMPIRE_PHASE_FLASH_MS,
 } from '../../config/GameConfig';
 import { ENEMIES } from '../../data/enemies';
+import { getSfxSynth } from '../../systems/SfxSynth';
 import { MirrorPortal } from '../MirrorPortal';
 import { type EnemyProjectile } from '../projectiles/EnemyProjectile';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
@@ -311,6 +312,10 @@ export class MarquisOfMirages extends BossEnemy {
     this.specialStateEndsAt = this.scene.time.now + MARQUIS_OF_MIRAGES_SUMMON_MS;
     this.specialFireIndex = 0;
     this.linkedProjectiles = [];
+
+    // Glassy spatial whoosh while the portals materialize. Direct call (not
+    // event) — tightly coupled to the special's begin moment.
+    getSfxSynth().playMarquisMirrorSpecial();
   }
 
   /**
@@ -589,6 +594,14 @@ export class MarquisOfMirages extends BossEnemy {
 
   private cancelSpecialOnPhaseChange(): void {
     if (this.specialState === 'idle') return;
+    // Kill any active position/alpha tweens on the boss — entering/exiting
+    // tweens animate alpha 1↔0 over their full duration, and would otherwise
+    // keep ramping alpha back toward 0 mid-flight even after the phase-
+    // transition handler calls setAlpha(1). Without this kill the boss
+    // ends up invisible in berserker (User-flagged bug 2026-05-08: "wenn er
+    // im spiegel ist und ich den spiegel zerstöre, er währenddessen in die
+    // letzte phase geht, ist marquis unsichtbar").
+    this.scene.tweens.killTweensOf(this);
     // Deactivate linked projectiles.
     for (const p of this.linkedProjectiles) {
       if (p.active) p.deactivate();

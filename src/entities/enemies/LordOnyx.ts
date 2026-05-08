@@ -68,6 +68,7 @@ import {
 } from '../../config/GameConfig';
 import { ENEMIES, type EnemyId } from '../../data/enemies';
 import { type Vector2 } from '../../types';
+import { getSfxSynth } from '../../systems/SfxSynth';
 import { EventBus } from '../../utils/EventBus';
 import {
   type EnemyProjectile,
@@ -283,6 +284,7 @@ export class LordOnyx extends BossEnemy {
     this.teleportTargetX = target.x;
     this.teleportTargetY = target.y;
     this.teleportTelegraphStartedAt = time;
+    EventBus.emit('enemy:charge');
 
     // Boss fades — still visible enough to read the patterns he's firing.
     this.setAlpha(0.35);
@@ -453,6 +455,9 @@ export class LordOnyx extends BossEnemy {
     this.snipeAimX = player.x;
     this.snipeAimY = player.y;
     this.snipeFireAt = time + LORD_ONYX_P2_SNIPE_TELEGRAPH_MS;
+    // Audio cue for the snipe wind-up so the player knows to step off the
+    // line — same charge sound as every other telegraph in the game.
+    EventBus.emit('enemy:charge');
 
     // Telegraph beam: thin red line from boss to the locked aim point.
     const beam = this.scene.add.graphics();
@@ -522,6 +527,14 @@ export class LordOnyx extends BossEnemy {
     const count = LORD_ONYX_P3_WAVE_THORN_COUNT;
     const r = LORD_ONYX_P3_WAVE_SPAWN_RADIUS;
     const speed = LORD_ONYX_P3_WAVE_SPEED;
+    // Big-attack cue at the wave start. The 12 simultaneous projectile spawns
+    // get collapsed to one thwip by the enemy-cast 60ms throttle, which is
+    // way too small for the visual impact (12 red markers + circular thorn
+    // wave). Reuse the prism-explosion sound — it's the "boss is doing
+    // something big" cue, matches the "explosion with red aura" visual,
+    // and is loud enough to register over the boss-track music. Was
+    // previously `enemy:charge` (gain 0.13) — user-flagged as inaudible.
+    getSfxSynth().playPrismExplosion();
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
       const sx = this.x + Math.cos(a) * r;
@@ -786,6 +799,11 @@ export class LordOnyx extends BossEnemy {
       });
       this.chargeHalo = null;
     }
+
+    // Sub-thump explosion at the moment the charge releases — pairs with the
+    // visual burst-out halo. Direct call (not event) because this is tightly
+    // coupled to the boss's charge → fire transition.
+    getSfxSynth().playPrismExplosion();
 
     this.specialState = 'firing';
     this.specialStateStartedAt = this.scene.time.now;
@@ -1244,6 +1262,9 @@ export class LordOnyx extends BossEnemy {
       const c = ranked[i]!.corner;
       this.host.spawnEnemyAt('wraith', c.x, c.y);
     }
+    // One charge cue for the whole Phase-2 wraith batch (not per-wraith) so
+    // the back-to-back spawn doesn't double-fire the sound.
+    if (LORD_ONYX_P2_ADD_COUNT > 0) EventBus.emit('enemy:charge');
   }
 
   private flashPhaseTransition(color: number): void {

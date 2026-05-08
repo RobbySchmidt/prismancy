@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ENEMY_PROJECTILE_POOL_SIZE } from '../../config/GameConfig';
+import { getSfxSynth } from '../../systems/SfxSynth';
 import { EnemyProjectile } from './EnemyProjectile';
 
 /**
@@ -36,6 +37,8 @@ export class EnemyProjectilePool {
     const p = this.group.getFirstDead(false) as EnemyProjectile | null;
     if (!p) return null;
     p.fire(x, y, vx, vy, textureKey);
+    // Throttled inside SfxSynth so multi-thorn fans collapse to one cast sound.
+    getSfxSynth().playEnemyCast();
     return p;
   }
 

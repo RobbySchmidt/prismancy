@@ -15,7 +15,7 @@ interface EndSceneInitData {
 }
 
 const VARIANT_TEXT: Record<EndSceneVariant, string> = {
-  incomplete: 'EVIL IS LURKING IN THE LIGHT',
+  incomplete: 'HE IS STILL LURKING IN THE LIGHT',
   full: 'THE LIGHT HAS BEEN BANISHED',
 };
 

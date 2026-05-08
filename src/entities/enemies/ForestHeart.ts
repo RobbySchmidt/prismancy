@@ -16,6 +16,8 @@ import {
   FOREST_HEART_WAVE_THORN_COUNT,
 } from '../../config/GameConfig';
 import { ENEMIES, type EnemyId } from '../../data/enemies';
+import { safeAddSpawnPosition } from '../../utils/bossSpawn';
+import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
 import { type BaseEnemy } from './BaseEnemy';
@@ -95,8 +97,15 @@ export class ForestHeart extends BossEnemy {
       const y = onTopEdge
         ? bounds.minY + spanY * (Math.random() * edgeMargin)
         : bounds.maxY - spanY * (Math.random() * edgeMargin);
-      const add = this.host.spawnEnemyAt('forest-sprite', x, y);
-      if (add) this.adds.push(add);
+      // Player-proximity safety: if the rolled corner happens to be hugging
+      // the player, fall back to the corner farthest from them.
+      const player = this.host.getPlayer();
+      const safe = safeAddSpawnPosition({ x, y }, bounds, player.x, player.y);
+      const add = this.host.spawnEnemyAt('forest-sprite', safe.x, safe.y);
+      if (add) {
+        this.adds.push(add);
+        EventBus.emit('enemy:charge');
+      }
       this.nextAddAt = time + FOREST_HEART_PHASE2_ADD_INTERVAL_MS;
     }
   }

@@ -11,6 +11,8 @@ import {
   VINE_LORD_VISUAL_SCALE,
 } from '../../config/GameConfig';
 import { ENEMIES, type EnemyId } from '../../data/enemies';
+import { safeAddSpawnPosition } from '../../utils/bossSpawn';
+import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
 import { type BaseEnemy } from './BaseEnemy';
@@ -142,8 +144,16 @@ export class VineLord extends BossEnemy {
         const y = onTopEdge
           ? bounds.minY + spanY * (Math.random() * edgeMargin)
           : bounds.maxY - spanY * (Math.random() * edgeMargin);
-        const add = this.host.spawnEnemyAt('vine-sprout', x, y);
-        if (add) this.adds.push(add);
+        // If the player is hugging the rolled corner, fall back to the room
+        // corner farthest from them. Same safety the Lord Onyx wraith spawn
+        // already uses.
+        const player = this.host.getPlayer();
+        const safe = safeAddSpawnPosition({ x, y }, bounds, player.x, player.y);
+        const add = this.host.spawnEnemyAt('vine-sprout', safe.x, safe.y);
+        if (add) {
+          this.adds.push(add);
+          EventBus.emit('enemy:charge');
+        }
       }
       this.nextAddAt = time + VINE_LORD_PHASE2_ADD_INTERVAL_MS;
     }

@@ -12,6 +12,8 @@ import {
 } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
 import { ENEMIES, type EnemyId } from '../../data/enemies';
+import { safeAddSpawnPosition } from '../../utils/bossSpawn';
+import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
 import { type BaseEnemy } from './BaseEnemy';
@@ -77,6 +79,10 @@ export class MossyBehemoth extends BossEnemy {
     this.setVelocity((dx / len) * speed, (dy / len) * speed);
     this.hopState = 'hop';
     this.nextStateChangeAt = time + MOSSY_BEHEMOTH_HOP_DURATION_MS;
+    // Audio cue for the hop "leap" — Mossy Behemoth has no visual telegraph
+    // (instant velocity change), so this is the only feedback the player gets
+    // that the boss is acting rather than idling.
+    EventBus.emit('enemy:charge');
   }
 
   private endHop(time: number): void {
@@ -88,12 +94,25 @@ export class MossyBehemoth extends BossEnemy {
     if (this.currentPhase >= 2) {
       this.adds = this.adds.filter((a) => a.active);
       if (this.adds.length < MOSSY_BEHEMOTH_PHASE2_MAX_ADDS) {
-        const add = this.host.spawnEnemyAt(
-          'mossy-slime',
-          this.x + (Math.random() - 0.5) * 30,
-          this.y + (Math.random() - 0.5) * 30,
+        // Wrap the natural "spawn next to boss" position with player-proximity
+        // check — boss can hop right onto the player, so without the check
+        // the slime would spawn on top of them.
+        const player = this.host.getPlayer();
+        const candidate = {
+          x: this.x + (Math.random() - 0.5) * 30,
+          y: this.y + (Math.random() - 0.5) * 30,
+        };
+        const safe = safeAddSpawnPosition(
+          candidate,
+          this.host.getRoomBounds(),
+          player.x,
+          player.y,
         );
-        if (add) this.adds.push(add);
+        const add = this.host.spawnEnemyAt('mossy-slime', safe.x, safe.y);
+        if (add) {
+          this.adds.push(add);
+          EventBus.emit('enemy:charge');
+        }
       }
     }
 

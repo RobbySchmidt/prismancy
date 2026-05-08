@@ -9,6 +9,7 @@ import {
   TextureKeys,
 } from '../../config/GameConfig';
 import { ENEMIES } from '../../data/enemies';
+import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { BaseEnemy } from './BaseEnemy';
 
@@ -57,6 +58,7 @@ export class CursedMirror extends BaseEnemy {
     if (this.fireAt === 0 && time >= this.nextTelegraphAt) {
       this.fireAt = time + MIRROR_TELEGRAPH_MS;
       this.startTelegraphFlash();
+      EventBus.emit('enemy:charge');
       return;
     }
 

@@ -16,7 +16,17 @@ export interface GameEvents {
    * (NOT from `BaseEnemy.takeDamage`) so it only triggers for player hits,
    * not for enemy-projectile or contact damage. */
   'enemy:hit': { x: number; y: number };
+  /** Enemy started a wind-up / telegraph (Cursed Mirror flash, Bog Frog
+   * tongue charge, Pixie Queen teleport-fade etc.). GameScene listens and
+   * plays the generic charge SFX. Pure signal, no payload. */
+  'enemy:charge': void;
   'room:cleared': void;
+  /** All doors in the active room just opened (room cleared). Fires once
+   * regardless of door count so the SFX listener doesn't stack 4 plays. */
+  'room:doorsOpened': void;
+  /** All doors in the active room just closed (entered an uncleared room).
+   * Same once-per-action contract as `room:doorsOpened`. */
+  'room:doorsClosed': void;
   'missile:fired': { x: number; y: number };
   'floor:roomEntered': { roomId: string };
   'floor:roomCleared': { roomId: string };

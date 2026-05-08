@@ -9,6 +9,7 @@ import {
 } from '../../config/GameConfig';
 import { ENEMIES } from '../../data/enemies';
 import { type Vector2 } from '../../types';
+import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { BaseEnemy } from './BaseEnemy';
 
@@ -78,6 +79,7 @@ export class BogTortoise extends BaseEnemy {
     this.invulnerable = true;
     this.setVelocity(0, 0);
     this.nextStateChangeAt = time + BOG_TORTOISE_SHELL_DURATION_MS;
+    EventBus.emit('enemy:charge');
     // Pulse-tint so the player reads "shell is up — I'm wasting shots".
     this.scene.tweens.add({
       targets: this,

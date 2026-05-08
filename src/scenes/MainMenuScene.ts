@@ -3,6 +3,7 @@ import { GAME_HEIGHT, GAME_WIDTH, SceneKeys, TextureKeys } from '../config/GameC
 import { STARTING_FLOOR_ID } from '../data/floors';
 import { Cosmetics, type SkinId } from '../systems/Cosmetics';
 import { getMusicManager } from '../systems/MusicManager';
+import { getSfxSynth } from '../systems/SfxSynth';
 
 /**
  * Title screen styled as a key-art illustration: the wizard duels the
@@ -159,6 +160,12 @@ export class MainMenuScene extends Phaser.Scene {
 
   private setMenuFocus(idx: number): void {
     if (idx < 0 || idx >= this.menuItems.length) return;
+    // Only play the switch SFX when focus actually changes — the initial
+    // setMenuFocus(0) call during create() and pointerover events on the
+    // already-focused item should stay silent.
+    if (this.menuFocusIndex !== idx) {
+      getSfxSynth().playMenuSwitch();
+    }
     this.menuFocusIndex = idx;
     for (let i = 0; i < this.menuItems.length; i++) {
       const item = this.menuItems[i];

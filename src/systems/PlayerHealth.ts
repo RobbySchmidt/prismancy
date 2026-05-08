@@ -5,11 +5,22 @@ import { EventBus } from '../utils/EventBus';
  * dependency: takes the current time as a parameter so it can be unit-tested
  * deterministically. Emits health/death events via the EventBus.
  */
+export type InvincibilitySource = 'damage' | 'grace';
+
 export class PlayerHealth {
   private current: number;
   private max: number;
   private readonly invincibilityMs: number;
   private nextVulnerableAt = 0;
+  /**
+   * Why the current i-frame window is active. Lets the Player visual layer
+   * pick a different feedback for "you just took a hit" (alpha-blink) vs
+   * "you just walked into a new room and have a grace window" (no blink —
+   * looks too much like the post-hit blink and reads as taking damage,
+   * which the user flagged as confusing 2026-05-08). `null` whenever
+   * vulnerable.
+   */
+  private source: InvincibilitySource | null = null;
 
   constructor(max: number, invincibilityMs: number) {
     if (max <= 0) throw new Error(`PlayerHealth: max must be > 0 (got ${max})`);
@@ -34,6 +45,12 @@ export class PlayerHealth {
     return now >= this.nextVulnerableAt;
   }
 
+  /** Reason the i-frame window is active, or `null` when vulnerable. */
+  getInvincibilitySource(now: number): InvincibilitySource | null {
+    if (this.isVulnerable(now)) return null;
+    return this.source;
+  }
+
   /**
    * Apply damage if currently vulnerable. Returns true if the hit landed,
    * false if it was absorbed by i-frames. Emits `player:tookDamage`,
@@ -48,6 +65,7 @@ export class PlayerHealth {
     const before = this.current;
     this.current = Math.max(0, this.current - amount);
     this.nextVulnerableAt = now + this.invincibilityMs;
+    this.source = 'damage';
 
     EventBus.emit('player:tookDamage', { amount, source: 'enemy' });
     EventBus.emit('player:healthChanged', { current: this.current, max: this.max });
@@ -89,6 +107,13 @@ export class PlayerHealth {
     if (durationMs <= 0) return;
     const candidate = now + durationMs;
     if (candidate > this.nextVulnerableAt) {
+      // Only flip the source if the previous window was already over (player
+      // is vulnerable now). If a damage window is still running, leave the
+      // source as 'damage' so the post-hit blink doesn't get suppressed mid-
+      // recovery just because grantInvincibility extended it.
+      if (this.isVulnerable(now)) {
+        this.source = 'grace';
+      }
       this.nextVulnerableAt = candidate;
     }
   }

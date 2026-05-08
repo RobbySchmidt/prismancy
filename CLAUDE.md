@@ -176,7 +176,7 @@ src/
 - [x] `ItemSystem` (passive only — active items absichtlich out of scope, kein User-Bedarf)
 - [x] Treasure-Räume mit Item-Pedestals (auto-spawn, deterministisch via Seed, `desc.looted` verhindert Doppel-Spawn). **Treasure + Shop spawnen primär an Dead-End-Leaf-Räumen** (door-degree 1, nie adjacent zum Boss-Room). Der Fallback der einen 2-door Pass-Through-Raum als Special tagged wurde entfernt weil er auf locked floors das Boss-Room hinter einem Treasure-Schlüssel-Lock einsperren konnte. `MAX_RETRY_ROOMS = 16` damit der Generator genug Headroom hat um Leaves zu erzeugen. **Smart-Retry-Leaf-Bias (2026-05-07):** Pure-random `tryPlaceOne` produzierte ~3 % Seeds ohne Shop oder Treasure (User-Bug: "auf der letzten Ebene kein Shop und kein Item-Room"). Retry biased jetzt zu `tryPlaceLeaf` — Cells mit exakt 1 placed-Neighbor, präferiert nicht-boss-adjacent + nicht-boss-re-electing. **Non-leaf safety net** für die ~0.04 % Restfälle: `findSafeNonLeafs` picked non-leaf, non-boss-adjacent Räume die **keine articulation points** sind (BFS-without-them findet boss → start), so dass Locking ihrer Türen den Boss-Pfad nicht blockiert. Regression-Tests in `DungeonGenerator.test.ts`: dead-end-Invariante über 50 Seeds, special-coverage über 1000 Seeds, boss-reachability-without-specials über 200 Seeds.
 - [x] Item-Pickup-Animation: Toast unten-mittig (Name gold + Description), 7 Start-Items
-- [x] Items: `Magic Tome`, `Hot Tea`, `Wizard's Sneakers`, `Telescopic Wand` (**+1 dmg, +15% missileSpeed** — Post-Floor-Scaling-Pass-Tuning: war +20% fireRate, jetzt dmg weil Treasure/Shop-Pool zu fire-rate-lastig war), `Lead Cap`, `Caffeine Pill` (**+0.5 dmg, +10 moveSpeed** — Post-Floor-Scaling-Pass-Tuning: war +0.1 fireRate, jetzt dmg), `Pixie Dust` (+1 max HP, +60 missileSpeed, magenta — **refactored mit Floor-Scaling-Pass: war +0.5 dmg, jetzt HP-Up**), `Spyglass` (+1 max HP, +10% missileSpeed — **refactored mit Floor-Scaling-Pass: war +1 dmg, jetzt HP-Up**) + Emerald-Boss-Pool (`Crown of the Vine`, `Ancient Heart`, `Withered Fang`) + Sapphire-Boss-Pool (`Lily Diadem`, `Mire Pearl`, `Frog's Tongue`) + `Heart Container` (HP-Up). Items modifizieren auch Missile-Visuals (`missileScale`, `missileTint`). Boss-Pool-Items haben `floor`-Tag und werden via `pickItemFromPool(..., currentFloor)` floor-spezifisch gepickt.
+- [x] Items: `Magic Tome`, `Hot Tea`, `Wizard's Sneakers`, `Telescopic Wand` (**+1 dmg, +15% missileSpeed** — Post-Floor-Scaling-Pass-Tuning: war +20% fireRate, jetzt dmg weil Treasure/Shop-Pool zu fire-rate-lastig war), `Lead Cap`, `Magic Potion` (**+0.5 dmg, +10 moveSpeed** — Post-Floor-Scaling-Pass-Tuning: war +0.1 fireRate, jetzt dmg; **renamed 2026-05-08** von "Caffeine Pill" + Sprite redesign zu rundem Glasflakon mit arcane-blue Liquid + Cork + Halo, weil Caffeine Pill nicht zum Wizard-Setting passte. ID + Texture-Key + alle Refs gerenamed; Effekte unverändert), `Pixie Dust` (+1 max HP, +60 missileSpeed, magenta — **refactored mit Floor-Scaling-Pass: war +0.5 dmg, jetzt HP-Up**), `Spyglass` (+1 max HP, +10% missileSpeed — **refactored mit Floor-Scaling-Pass: war +1 dmg, jetzt HP-Up**) + Emerald-Boss-Pool (`Crown of the Vine`, `Ancient Heart`, `Withered Fang`) + Sapphire-Boss-Pool (`Lily Diadem`, `Mire Pearl`, `Frog's Tongue`) + `Heart Container` (HP-Up). Items modifizieren auch Missile-Visuals (`missileScale`, `missileTint`). Boss-Pool-Items haben `floor`-Tag und werden via `pickItemFromPool(..., currentFloor)` floor-spezifisch gepickt.
 - [~] Missile-Modifikatoren (Homing, Piercing, Splitting, Elemental) als Missile-Flags — bewusst auf Phase 6 verschoben (User-Wunsch: "wäre super cool tatsächlich")
 - [x] Pickups: Hearts, Coins, Keys, Items, Gems (Bombs out of scope — kein nicht-offensiver Use-Case sinnvoll)
 - [x] **Crates** (brown + gold) als Room-Drops mit deterministischen Inhalten + Spawn-Protection 700ms damit der Spieler den Loot sieht
@@ -332,10 +332,10 @@ Vorgängerdesign **Vampire Twins** (Crimson Lord melee + Sapphire Marquis mage, 
 
 **Ziel:** Aus dem Prototyp ein Spiel machen.
 
-- [ ] Sound-Effects für alle relevanten Actions
-- [ ] Background-Music pro Floor
+- [x] **Sound-Effects** — komplett 2026-05-08. 20 prozedurale 8-bit Web-Audio-Recipes in `src/systems/SfxSynth.ts` (kein File-Asset). Player-Cast/Hit, Pickup-Family (coin/key/heart/item/gem), Enemy-Cast (throttled) + Hit + Charge (gehookt an 7+ Telegraph-Punkte), Boss-Death, Door-Open/Close/Unlock + Floor-Teleport, Marquis-Mirror-Special, Prism-Special-Cast (auch GemSeal-Activation), Prism-Explosion. Volle Recipe-Doku + Wiring-Spots in `SFX_BRIEF.md` Repo-Root. Siehe SFX-System-Block unten.
+- [x] **Background-Music pro Floor** — komplett. 8 echte AI-generierte MP3-Tracks (Suno) in `public/audio/music/` + `MusicManager` singleton mit RAF-basierten Crossfades + Floor-/Boss-/EndScene-Wiring. Siehe Audio-System-Block.
 - [~] Partikel-Effekte (Blut, Explosionen, Item-Aura) — **Blut** done (`spawnBloodParticles` aus `enemy:hit` event, 5 rote drops mit gravity-arc); **Burn-Flames** done (`spawnFlameParticle` aus `enemy:burnTick`, gold/orange flicker upward). Item-Aura + Explosions noch offen.
-- [ ] Hauptmenü, Pause-Menü, Settings (Volume, Keybindings) — Pause-Menü ist live (Phase 5 Polish), fehlt Settings
+- [~] Hauptmenü, Pause-Menü, Settings (Volume, Keybindings) — **Pause-Menü** live (Phase 5 Polish), **Hauptmenü** komplett umgebaut (vertikales Menü mit Hover + Keyboard-Nav, siehe MainMenu-Block unten), **Sound-Settings** als Overlay live (Master-Volume-Slider in `SoundSettingsScene`), **Controls-Overlay** als read-only Liste live (`ControlsScene`). Echtes Keybinding-Remap noch nicht implementiert (UI-mäßig out-of-scope für die meisten Indie-Games).
 - [x] **Missile-Modifikatoren (Homing, Piercing, Burn-DoT)** — Phase-6-Einstieg 2026-05-07. Splitting bewusst weggelassen. Drei Items: **Magic Shard** (Shop, 15 Coins, +piercingCount 2 → 100/75/50% damage über 3 Hits), **Wizard Glasses** (Boss-Pool floor-agnostic, +homingTurnRate 80°/s, +10% missileSpeed — Speed-Bump statt Range-Stat-Reintroduce), **Fire Orb** (Treasure, +burnDamageFactor 0.30 → 30% des Hit-Damages über 2 Ticks à 600 ms). Synergien (Pierce × Burn → jeder Pierce-Hit ignites; Pierce × Homing → Missile sucht nach Pierce neues Target) sind explizit erlaubt. Missile-Modifier sind reguläre StatsSystem-Stats (`piercingCount`, `homingTurnRate`, `burnDamageFactor`); Missile liest sie pro `fire()` aus, alle pro-Frame-Mechanik (Homing-Turning, Pierce-Tracking via `hitEnemies` Set) lebt auf der Missile-Instanz.
 - [ ] Run-Stats-Tracking (Tode, Kills, Items gefunden)
 - [x] Save/Load für Meta-Progression (Localstorage): Trophy/Collection-System (passiv, kein Gameplay-Gating). Tracked: bossesDefeated[], itemsDiscovered[], runs counters (started/died/wonFull/wonIncomplete), bestRunMs, selectedSkin. Single-slot versionierter JSON-Blob in `'prismancy.save.v1'`. Migration aus alten Cosmetics-Keys. StatsScene Overlay vom MainMenu via `[T]`-Key. Hold-`R` für reset (1s).
@@ -428,6 +428,7 @@ Floors sind nach Edelsteinen benannt. Jeder Floor hat einen `FloorTheme` in `src
 - `__wiz.gotoFloor(n)` — restart auf Floor n (1=Emerald, 2=Sapphire, **3=Onyx**). Resettet alle Run-Stats; nur für Mob-/Theme-Testing. `DEV_FLOOR_ORDER` ist jetzt identisch mit `FLOOR_ORDER` (Onyx ist natural progression).
 - `__wiz.giveGems()` — granted alle 3 Floor-Gems instant. Test-Pfad für GemSeal mit 3/3 Sockets ohne perfect runs auf jedem Floor.
 - `__wiz.unlockSkin()` / `__wiz.lockSkin()` — toggle Cosmetics.unlockPrismancySkin / resetAll. Greift erst nach next scene start (Player + MainMenu lesen Cosmetics nur im Constructor). Kombo: `__wiz.unlockSkin()` + `__wiz.gotoFloor(1)` → Player ist jetzt rot/gold.
+- `__wiz.spawnCrate(gold?)` — spawnt eine Crate (brown default, gold mit `true`) im aktuellen Raum mit ±48 px Position-Jitter damit jede Invocation einen anderen `crateSeed(x, y)` produziert (sonst gibt jede Invocation am selben Spawn-Spot identischen Loot — Re-entry-Replay-Verhalten ist gewollt im normalen Game, im Dev-Hook aber nicht).
 - `__wiz.stats()`, `__wiz.itemSystem()` — Inspect
 
 **`STARTING_COINS = 0`** in GameConfig.ts (war zwischenzeitlich 50 zum Testen). Spieler startet jetzt ohne Coins, muss alles von Gegnern + Crates + Drops sammeln.
@@ -457,7 +458,7 @@ Drawn in `PreloadScene` per Floor-Theme. `drawLockBadge` ist shared zwischen Tre
 
 **Floor-Scaling Item-Pool-Rebalance:** Mit Boss-DPS-Scaling und Mob-HP-per-Floor war der dmg-Stack-Pool zu fett (9 von 17 Items granted dmg → in 3-Floor-Run easy 3+ dmg ups → Floor-Mobs 1-shot, Bosses gemeltet bevor Specials feuerten). Zwei Treasure/Shop-Items wurden auf HP-Up umgebaut um die dmg-Source-Count zu reduzieren: **`Spyglass`** (war +1 dmg / +10% missileSpeed → jetzt **+1 maxHP** / +10% missileSpeed) und **`Pixie Dust`** (war +0.5 dmg / +60 missileSpeed / magenta → jetzt **+1 maxHP** / +60 missileSpeed / magenta). Beide nutzen `maxHealthBonus: 2` (= 1 full heart). Effective dmg-Pool nach diesem Cut: 7 Items, Treasure/Shop-Pool hat jetzt 3 HP-Quellen (Heart Container + Spyglass + Pixie Dust).
 
-**Post-Cut-Re-Balance** (User-flagged: Treasure/Shop wurde zu fire-rate-lastig — Hot Tea + Telescopic Wand + Caffeine Pill = 3 fire-rate-Quellen vs nur 2 dmg-Quellen): zwei fire-rate-Items zurück auf dmg geswapt — **`Telescopic Wand`** (war +20% fireRate / +15% missileSpeed → jetzt **+1 dmg** / +15% missileSpeed) und **`Caffeine Pill`** (war +0.1 fireRate / +10 moveSpeed → jetzt **+0.5 dmg** / +10 moveSpeed). Final: 9 dmg-Items (4 floor-agnostic + 5 boss-locked), 5 fire-rate-Items (1 in Treasure/Shop = Hot Tea, 4 boss-locked). HP-Scaling fängt das ohne Plateau ab — Bosse werden nicht mehr gemeltet wie vor dem ganzen Pass.
+**Post-Cut-Re-Balance** (User-flagged: Treasure/Shop wurde zu fire-rate-lastig — Hot Tea + Telescopic Wand + Magic Potion = 3 fire-rate-Quellen vs nur 2 dmg-Quellen): zwei fire-rate-Items zurück auf dmg geswapt — **`Telescopic Wand`** (war +20% fireRate / +15% missileSpeed → jetzt **+1 dmg** / +15% missileSpeed) und **`Magic Potion`** (war +0.1 fireRate / +10 moveSpeed → jetzt **+0.5 dmg** / +10 moveSpeed; **rename + sprite-redesign 2026-05-08** von "Caffeine Pill" weil thematisch unpassend, neuer Sprite ist runder Glasflakon mit arcane-blue Liquid + Cork + Halo). Final: 9 dmg-Items (4 floor-agnostic + 5 boss-locked), 5 fire-rate-Items (1 in Treasure/Shop = Hot Tea, 4 boss-locked). HP-Scaling fängt das ohne Plateau ab — Bosse werden nicht mehr gemeltet wie vor dem ganzen Pass.
 
 **EnemyProjectile.passThroughWalls** — boolean Flag (default false, reset on `fire()`). GameScene's wall / blocker / door-barrier Collider haben einen `processCallback` der `false` returned wenn `passThroughWalls === true` — überspringt Separation + Deactivate. Player-Damage-Overlap ist eine separate `physics.add.overlap` (nicht processCallback-betroffen) → Schaden funktioniert weiter. Bisher nur von **Crimson Web Wave-Thorns** gesetzt: ohne den Flag würden die Wave-Bolts despawnen sobald ein Thorn die Wand erreicht (deactivateMissile-Callback), was den Lightning-Bolt-Visual zerreißt. Mit Pass-Through fliegen die Thorns durch und expirieren erst nach voller `WAVE_LIFETIME_MS`.
 
@@ -535,7 +536,97 @@ interface MetaSave {
 - **Hitbox unverändert**: `PLAYER_HITBOX_RADIUS = 11` + `PLAYER_HITBOX_OFFSET_Y = 10` leben in GameConfig und sind world-space-stabil — Texture-Größe-Änderungen ändern den Collider nicht. Die untersten ~8 px der Hitbox sind nach dem Shrink visuell unter den Stiefeln (war beim alten Pixel-Art-Wizard ähnlich, kein gameplay-relevanter Unterschied).
 - **Palette-Interface** (OUT/HAT/HAT_DARK/HAT_HI/SKIN/SKIN_SHADOW/ROBE/ROBE_HI/ROBE_SHADOW/BEARD/BEARD_SHADOW/BUCKLE/WAND/TIP/SHADOW/BOOT/BOOT_HI/EYE/TIP_SPARKLE) bleibt unverändert — die Default-Purple und die Prismancy-Crimson-Skins picken automatisch beide den neuen Style auf. MainMenu-Title-Screen rendert über dieselbe `TextureKeys.Player` und zeigt automatisch die neue painterly Variante.
 
-**Music** — Phase 6 wartet auf echte Audio-Files (OGG/MP3). Ein prozeduraler Web-Audio-Versuch (3 Tracks, lookahead-Scheduler, crossfade) wurde gebaut und wieder entfernt — proceduraler Sound passte nicht zum Aesthetic. Git-History hat den Code falls jemand das später als Placeholder reaktivieren will.
+---
+
+## Audio System (Phase 6 — 2026-05-08)
+
+**Stack:** Echte AI-generierte MP3-Tracks (Suno) + ein scene-unabhängiger MusicManager-Singleton mit RAF-basierten Crossfades. Ersetzt einen früheren prozeduralen Web-Audio-Versuch (3 Tracks, lookahead-Scheduler) der wieder rausgeflogen ist — proceduraler Sound passte nicht zum painterly Aesthetic. Git-History hat den prozeduralen Code falls je benötigt; aktuell ist nur das echte-Track-System aktiv.
+
+### Track-Files
+**Location:** `public/audio/music/` (Vite serves `public/` als root). 8 erwartete Tracks:
+- `title.mp3` — Title-Theme, läuft auf MainMenuScene
+- `floor-emerald.mp3` / `boss-emerald.mp3` — Floor 1 idle / Boss
+- `floor-sapphire.mp3` / `boss-sapphire.mp3` — Floor 2 idle / Boss
+- `floor-onyx.mp3` — Floor 3 idle
+- `boss-marquis-of-mirages.mp3` — Onyx Standard-Boss
+- `boss-the-prismarch.mp3` — Secret Endboss
+
+Filenames sind **content-based** (nicht "boss-onyx" etc.) damit erkennbar bleibt was wo läuft. `MusicTrackKey` in `MusicManager.ts` ist auf diese Filenames gemappt — bei Rename muss beides synchronisiert werden.
+
+### MusicManager (`src/systems/MusicManager.ts`)
+**Singleton** (via `getMusicManager()`), hält das aktive Phaser-Sound-Object und einen Master-Volume + Duck-Level. API:
+- `playTrack(scene, key, opts?)` — switches mit Crossfade. No-op wenn der Track schon läuft. Wenn Track im Cache fehlt: **bleibt der current Track weiterspielen** (kein abrupter Stop bei missing files).
+- `stop(scene, opts?)` — Fade-out + cleanup. Default 600 ms.
+- `duck(level=0.3)` / `unduck()` — instant Volume-Multiplikator (für Pause-Menu).
+- `setMasterVolume(0..1)` / `getMasterVolume()` — speichert auf der Singleton, nicht persistiert. SoundSettingsScene's Slider hängt hier dran.
+- `hardStop()` — escape hatch, no-op fade.
+
+### RAF-basierte Fades — kritisches Detail
+Frühere Implementierung verwendete `scene.tweens.add(...)` — das **bricht** beim Scene-Wechsel weil Phasers TweenManager scene-bound ist. Sichtbarstes Symptom: MainMenu→Game-Crossfade hatte keinen hörbaren Title-Fade-Out. Aktueller `startFade(sound, fromVol, toVol, durMs, onComplete?)` läuft als `requestAnimationFrame`-Loop — browser-global, scene-unabhängig. Pro-Sound-Generation-Token in einer `WeakMap<BaseSound, number>` invalidiert in-flight Fades wenn ein neuer auf demselben Sound startet. Try/catch um `setVolume` damit destroyed sounds keine Errors throwen.
+
+**Default Fade-Durations:**
+- Crossfade Track→Track: 1200 ms
+- Stop (z.B. Game-Over, EndScene): 600 ms (800 ms beim Player-Death)
+- First-Play (kein vorheriger Track): **120 ms** statt 1200 ms — sonst bleibt der Title-Track auf halber Lautstärke wenn der User schnell SPACE drückt, und der Title→Game-Fade-Out ist dann von der niedrigen Volume aus kaum hörbar. Mit 120 ms ist der Initial-Track in <1/8 Sek auf voller Lautstärke und der nächste Crossfade beginnt von 0.55.
+
+### Browser-Autoplay-Workaround
+WebAudio-Context bootet im `suspended` State, entsperrt nur bei erstem User-Gesture. Phaser handlet das via `sound.locked` Flag. Title-Musik-Logik in `MainMenuScene.create`:
+```ts
+if (!this.sound.locked) {
+  getMusicManager().playTrack(this, 'title');
+}
+```
+Erster Page-Load: Audio gesperrt → Title-Musik wird **nicht** abgespielt. Ein SPACE startet das Spiel direkt (keine Two-Step-Hürde). Nach dem ersten Run (User hat irgendwann interagiert → Audio entsperrt) → Title-Musik spielt sofort beim Rückkehr ins MainMenu. User-Decision (2026-05-08): "Title-Musik nur ab zweitem Visit" gegen Two-Step-Start mit Hint.
+
+### Scene-Wiring
+- **MainMenuScene** — Title-Track (siehe oben), plus 260 ms Camera-Fade-to-Black auf SPACE → GameScene mirror der Floor-Transition.
+- **GameScene.create** — startet Floor-Track basierend auf `currentFloorId` via `floorIdToFloorTrack(floorId)`.
+- **GameScene.spawnBossForRoom** + **devSpawnBoss** + **spawnLordOnyxInCurrentRoom** — alle rufen `switchToBossTrack(boss.displayName)` direkt nach `boss:spawned` Event. Predikat `displayName === 'The Prismarch'` routet auf `boss-the-prismarch`-Track, sonst pro Floor via `bossTrackForFloor(floorId, isPrismarch)`.
+- **GameScene.handleBossKilled** — switcht zurück zum Floor-Track. Prismarch-Branch geht zu `handleLordOnyxKilled` der `transitionToEndScene('full')` triggert (kein switch-back).
+- **GameScene.handlePlayerDied** — `stop(scene, { fadeMs: 800 })` damit der GameOver-Banner in Stille landet.
+- **GameScene.transitionToEndScene** — `stop(scene, { fadeMs: 600 })` parallel zum Camera-Fade.
+- **PauseScene.create** — `duck()` beim Open, **PauseScene.resumeGame** + **PauseScene.quitToMainMenu** — `unduck()` beim Schließen.
+- **PreloadScene.preload** — `loadMusicTracks()` queue't alle 8 Tracks via `this.load.audio(key, ...)`. Fehlende Files werfen `loaderror` aber crashen nicht — `MusicManager.playTrack` checkt `cache.audio.exists` vor dem Switch und behält bei Miss den current Track.
+
+### MainMenu-Redesign (Phase 6 — 2026-05-08)
+Komplett vom alten "PRESS SPACE OR ENTER" Center-Prompt-Layout auf ein **vertikales Menü links** umgestellt. Items:
+1. **START GAME** — existing fade + scene.start mit fresh-run Payload
+2. **OPTIONS** — `launchOverlay(SceneKeys.SoundSettings)` (Master-Volume-Slider, ESC/Q schließt)
+3. **STATS** — `launchOverlay(SceneKeys.Stats)` (existing trophy/collection-overlay)
+4. **CONTROLS** — `launchOverlay(SceneKeys.Controls)` (read-only Liste der Keybindings)
+5. **CLOSE GAME** — `try { window.close() }` + Fade-to-black overlay mit "THANKS FOR PLAYING" + "Refresh page to return". `window.close()` ist no-op in normalen Browser-Tabs aber funktioniert in Electron/Popup-Windows.
+
+**Layout:** x=44, ab y=200, 38 px Line-Height, 22 px Bold-Monospace-Font. Text origin (0, 0.5) = left-aligned. Items überlappen leicht mit der Wizard-Aura (Wizard ist bei x=240) — strong stroke (`#1a0828`, thickness 4) + drop-shadow macht's lesbar. Default-Color `#aab8c0`, Hover/Focus-Color `#fff8c0` (Gold).
+
+**Hover-Effekt:** Mouse-Over ODER Pfeiltasten Up/Down setzen Focus auf das Item, scale tweened auf **1.25×** über 120 ms via `tweens.add({ scale, duration: 120, ease: 'Sine.Out' })`. `tweens.killTweensOf` vor jedem Tween verhindert Queue-Up bei schnellen Mouse-Sweeps.
+
+**Aktivierung:** Click auf Item ODER `keydown-ENTER` / `keydown-SPACE` triggert `activateMenuItem(focusIndex)`. `menuStarted` Boolean lockt das ganze Menü nach Start-Game oder Close-Game damit ein zweiter Klick keinen doppelten Start auslöst.
+
+**Overlay-Pause-Pattern:** `launchOverlay(key)` ruft `this.scene.pause()` + `this.scene.launch(key)`, dann `events.once(SHUTDOWN, ...)` auf der Overlay-Scene um MainMenu beim Close wieder zu resumen. **Wichtig:** ohne den Pause würde ein ENTER-Druck zum Schließen der Overlay den darunter fokussierten MainMenu-Item gleichzeitig aktivieren.
+
+**Was raus ist:** Pulsing "PRESS [SPACE] OR [ENTER]" Subtitle (`paintTitle`), "MOVE WASD · CAST ARROW KEYS" Bottom-Hint (jetzt in ControlsScene), "[T] STATS" Standalone-Hint (jetzt im Menü). Geblieben: Title-Image + Title-Pulse + `[S] SKIN: ...` Toggle (User-Wunsch: bleibt als Hotkey, nicht im Menü).
+
+### SoundSettingsScene (`src/scenes/SoundSettingsScene.ts`)
+Overlay nach StatsScene/PauseScene-Konvention. Translucent Backdrop, "SOUND SETTINGS" Title, **Master-Volume-Slider** (280×12 px, Gold-Fill, klickbar + dragbar) mit `${Math.round(v*100)}%` Label. Hängt direkt an `MusicManager.setMasterVolume`. ESC/Q schließt. 150 ms Cool-off vor Listener-Bind verhindert Selbst-Schließen durch öffnenden Keydown.
+
+**Future-Sub-Settings (nicht implementiert):** SFX-Volume-Slider (sobald Phase 6 SFX läuft), Music-Mute-Toggle, Audio-Settings-persist via `MetaProgress.save`. Aktuell ist Master-Volume **nicht persistiert** — beim Reload steht's wieder auf 0.55.
+
+### ControlsScene (`src/scenes/ControlsScene.ts`)
+Reine Read-Only-Anzeige der Keybindings als zwei-Spalten-Tabelle (Action | Keys). Items:
+- Move: WASD
+- Cast Magic: Arrow Keys
+- Map / Inventory: TAB
+- Pause: ESC
+- Restart Run: Hold R (1 s)
+- Stats Overlay: T (from Main Menu)
+- Skin Toggle: S (from Main Menu, after unlock)
+
+ESC/Q schließt. Wenn echtes Keybinding-Remap kommt (out-of-scope für aktuelle Iteration), würde diese Scene umgebaut werden zu interaktiven Bindings.
+
+### SOUNDTRACK_BRIEF.md + SOUNDTRACK_SUNO_PROMPTS.md
+Beide Dateien liegen weiterhin im Repo-Root als Reference für Track-Generation. `SOUNDTRACK_BRIEF.md` ist der ausführliche Briefing-Brief (Lore, Mood-Tags, Length-Vorschläge). `SOUNDTRACK_SUNO_PROMPTS.md` hat tight Suno-spezifische Style-Prompts mit Anti-Cinematic-Tricks. Beide sind nicht zur Build-Zeit relevant aber hilfreich falls Tracks neu generiert werden müssen.
+
+
 
 **`WORLD_SPRITE_SCALE = 1.25`** in `GameConfig.ts` — visual-only sprite scale-up für **alle in-world entities** (Player, Enemies, Bosses, Pickups, Decorations, Item-Pedestals + Items, Stairs). Tile-Texturen (Floor, Wall, Door) werden **nicht** skaliert (würden Tile-Grid-Lücken erzeugen). Bosse haben eigene `*_VISUAL_SCALE`-Konstanten die alle mit `* WORLD_SPRITE_SCALE` multipliziert sind, damit ihre relative scale (z.B. VineLord 2.5×) erhalten bleibt + global mit-skaliert.
 
@@ -553,6 +644,60 @@ GemPickup + ItemPickup haben extra `setScale(1.8 * WORLD_SPRITE_SCALE)` für die
 2. *Emerald Showcase*: Wizard vs. Pixie Queen full-screen painted gameplay frame mit allen Atmospheric Layers + Combat-Effects + Boss HP Bar.
 3. *Sapphire Showcase*: Wizard vs. Toad Sovereign mit cyan halos + sapphire-themed atmospheres.
 4. *Onyx Showcase*: Wizard vs. **Lord Onyx** mit gothic mansion atmosphere + dust motes + amethyst shards. **Lord Onyx visual hier ist die Vorlage** für den Boss in Phase 5 Chunk 4 — User hat geflagged dass die Optik einen Rework braucht. `paintLordOnyx` + helpers (`paintWraith`, `paintPossessedCandelabra`, `paintCursedMirror`, `paintChandelier`, `paintWallSconce`, `paintPortrait`, `paintBrokenColumn`, `paintCandelabrum`, `paintCrackedVase`, `drawOnyxCrownIcon`) sind alle in StyleMockupScene als prozedurale Graphics — ports auf `PreloadScene` als Texturen wenn die ingame versions fertig werden.
+
+---
+
+## SFX System (Phase 6 — 2026-05-08)
+
+**Stack:** 20 procedural 8-bit-Synth Recipes via Web Audio API in `src/systems/SfxSynth.ts` — kein File-Asset, alles Square/Triangle-Oszillatoren + ADSR-Envelopes + gefilterter Noise. Singleton mit lazy-init AudioContext + Master-Gain. `getSfxSynth()` Accessor. Volle Recipe-Doku + Voice-Gains + Wiring-Spots in `SFX_BRIEF.md` (Repo-Root).
+
+**Aesthetic-Decision:** User-Wunsch war 8-bit/chiptune passend zur als "8-bit-mäßig" empfundenen Music. Programmatisch (statt File-basiert) gewählt nach Pilot-Iteration weil's:
+- Echtes 8-bit (nicht "8-bit-style sample"), 0 Bundle-Size, Instant-Iteration durch Code-Edit ohne File-Roundtrip
+- Konsistenter Synth-Stack über alle 20 Sounds (selbe Square/Triangle-Family + Noise-Filter)
+- Deterministisch + scene-shutdown-safe (Web-Audio-Nodes auf AudioContext, nicht Phaser)
+
+**Sound-Family (20 sounds):**
+
+*UI:* `playMenuSwitch` (1100→1450 Hz Square Tick, Hauptmenü-Hover, gain 0.18, gated auf `previousIndex !== idx` damit Initial-Focus stumm bleibt).
+
+*Player:* `playPlayerCast` (Square 620→1180→820 Hz pitch-slide + highpassed-noise bite, gain 0.28), `playPlayerHit` (Triangle 320→90 Hz body + lowpassed-noise burst @ 500 Hz, gain 0.36 — *lauteste Hit-Family*).
+
+*Pickups (5):* `playPickupCoin` (NES-style 880→1320 Hz two-note Square, gain 0.22), `playPickupKey` (Square 660→990 + highpassed-clink Noise, gain 0.24), `playPickupHeart` (Triangle C5→G5 perfect-fifth, gain 0.26), `playPickupItem` (Punch-Square-Blip + 4-note C-E-A-C Triangle-Arpeggio + Octave-up Half-vol Harmony + 3.5 kHz Sparkle, gain 0.26 main / 0.30 finale / 0.13 harmony — *upgegradet 2026-05-08* von 3-Note auf 4-Note + Harmony nach User-Feedback "etwas aufregender"), `playPickupGem` (4-note C-E-G-C Octave + Octave-up Harmony + 5 kHz Shimmer, gain 0.30 — *Trophy-Tier*).
+
+*Crate/Container:* `playChestOpen` (Triangle 180→280 Hz Wood-Creak + lowpass-Noise + 80 ms später 2-note Reveal-Pop, gain 0.26).
+
+*Enemies:* `playEnemyCast` (Square 480→220 Hz pitch-down + lowpassed-noise tail, gain **0.24** — bumped 2026-05-08 von 0.18 weil bei Boss-Music inaudible. **60 ms Throttle** in `lastEnemyCastAt` damit 5-Thorn-Fans zu einem Sound collapsen), `playEnemyHit` (Square 220→80 Hz Thump + bandpassed-noise burst @ 900 Hz, gain 0.32), `playEnemyCharge` (Triangle 200→480 Hz wind-up 340 ms, gain 0.13 — generisch für alle Telegraphs).
+
+*Boss-Big-Moments:* `playBossDeath` (Square 200→50 Hz fall + lowpass crash + Triangle 800→100 Hz ghost-trail decay, gain 0.42 main / 0.18 ghost), `playPrismSpecialCast` (Triangle 220→520 Hz rise + Octave-up Half-vol + bandpass-noise sweep 700→2500 Hz, gain 0.20 main / 0.09 octave / 0.07 noise — *gedimmt 2026-05-08* nach User-Flag "nervig", Pitch eine Octave runter), `playPrismExplosion` (Sub-thump 140→45 Hz + lowpass-noise blast, gain 0.34 thump / 0.26 noise — Flash-Click voice **entfernt** weil piercing), `playMarquisMirrorSpecial` (Triangle 600→400→500 Hz Wobble + highpass-Noise-Sweep 1.5k→3.5k Hz, gain 0.18 main / 0.08 noise — *gedimmt 2026-05-08* von 1100→700→900 Hz / gain 0.30 wegen "schrill").
+
+*Doors / Floor-Flow:* `playDoorOpen` (Triangle 200→320 Hz creak + lowpass-noise scrape, gain 0.34 — bumped von 0.20 nach User-Flag), `playDoorClose` (Triangle 320→140 Hz pitch-down + lowpass-scrape + 120 Hz Square-Thump @ 90ms, gain 0.36 + 0.30 thump — bumped + Thump-Frequenz von 80 → 120 Hz weil Laptop-Speaker unter 100 Hz wegrollen), `playDoorUnlock` (highpass-Noise-Click 3200 Hz + 1320 Hz Square-Blip + 80ms später ascending 660→990 Hz Triangle Magic-Tail, gain 0.26 — feuert auch direkt am Gold-Crate Key-Spend), `playFloorTeleport` (7-note Triangle ascending C4→C6 + parallel Octave-up Quarter-vol Harmony + sustained highpass-Sparkle, gain 0.30, ~650 ms).
+
+**Pickup-Slot-Queue:** `acquirePickupSlot(ctx, durationSec)` serialisiert simultan absorbed Pickups. Wenn 2+ Pickups in einem Frame aufgehoben werden (z.B. coin+key aus Crate), schedulet sich der zweite Sound **nach** dem ersten + 40 ms Gap statt zu überlappen. 500 ms Forward-Look-Cap damit 10er-Floods nicht endlos queuen. `nextPickupSoundAt` field trackt den nächsten freien Slot. Ohne diesen Queue klangen 2 simultane Pickups wie ein einziger merkwürdiger Composite-Sound (User-Bug 2026-05-08).
+
+**Enemy-Cast-Throttle:** `ENEMY_CAST_THROTTLE_MS = 60`. Multi-Thorn-Fans (5/8/12-Thorn-Patterns die alle in einem Frame `pool.fire()` callen) collapsen zu einem Sound. Tradeoff: für ne 12-Thorn-Wave (Phase 3 Lord Onyx) reicht ein einzelner thwip nicht — siehe nächster Punkt.
+
+**Lord-Onyx-Phase-3-Override:** `fireInwardWave` callt `playPrismExplosion()` direkt am Wave-Start (statt enemy:charge), weil die 12-Thorn-Circular-Wave einen großen Audio-Cue braucht. Throttled enemy-cast feuert weiterhin am Projektil-Spawn 500ms später. Snipe-Telegraph (Phase 2) emittiert `enemy:charge` für den Single-Line-Beam (kleinerer Scale).
+
+**Wiring-Patterns:**
+- *Event-driven*: Listener in GameScene auf existing/new EventBus-Events (`enemy:hit`, `enemy:charge`, `room:doorsOpened/Closed`, `door:unlocked`, `boss:killed`, `lordOnyx:specialFired`, `seal:activated`, `pickup:collected`, `item:picked`, `crate:opened`, `gem:pickedUp`, `player:tookDamage`)
+- *Direct calls*: `Player.handleShooting` → `playPlayerCast`; `EnemyProjectilePool.fire()` → `playEnemyCast`; `MarquisOfMirages.beginSpecial` → `playMarquisMirrorSpecial`; `LordOnyx.beginPatternFire` → `playPrismExplosion`; `LordOnyx.fireInwardWave` → `playPrismExplosion`; `MainMenuScene.setMenuFocus` → `playMenuSwitch`; `GameScene.advanceToNextFloor` → `playFloorTeleport`; Gold-Crate-spendKey-Path → `playDoorUnlock`
+- *EventBus*-Events neu für SFX: `enemy:charge: void`, `room:doorsOpened: void`, `room:doorsClosed: void`
+
+**Door-Open-Delay:** `doorsOpenedSfxHandler` schedulet `playDoorOpen` 250 ms gedelayt via `this.time.delayedCall` damit der Sound nicht mit dem letzten enemy-hit beim killing-blow überlappt (room cleared via `delayedCall(0)` nach dem letzten Kill = essentially same frame als enemy-hit-Sound).
+
+**Door-Close-Construction-Emit:** `Room.constructor` emittiert `room:doorsClosed` (delayed 1 Frame) wenn `!cleared && doors.some(isClosed)`. Ohne diesen Emit würde der close-Sound nie spielen weil normale Room-Entry-Pfade `closeAllDoors()` nicht callen — Doors werden direkt im Constructor closed konstruiert. Nur Boss-spawn + Onyx-Seal-Activated callen explicit `closeAllDoors()`.
+
+**Volume-Konvention (gelernt):** Cast-Sounds bewusst LEISER als Hit-Feedback — das eigene Geballer feuert konstant alle ~250 ms und soll Hintergrund-Layer sein, nicht jeder-Schuss-Vordergrund-Punch. Hit-Feedback (Treffer am Gegner) muss durchschneiden, sonst nimmt der Player Casten als "ins Leere" wahr. Master-Volume 0.6 default in SfxSynth.
+
+**Boss-Telegraph-Charge-Hooks (8 sites):** Cursed Mirror (telegraph), Bog Frog (`beginTelegraph`), Bog Tortoise (`beginShell`), Pixie Queen (`startTeleport`), Damselfly Empress (`beginTelegraph`), Bloomheart (`tickFan` telegraph), Lord Onyx (`beginTeleportTelegraph` + Snipe-Telegraph), Mossy Behemoth (`startHop` + Phase-2 add-spawn). Add-Spawn-Hooks fired alle 5 summoning Bosses (Mossy/Vine/Forest/Pixie/LordOnyx) — siehe nächster Block.
+
+**Boss-Add-Spawn-Safety:** `src/utils/bossSpawn.ts` mit `safeAddSpawnPosition(candidate, bounds, playerX, playerY, minDistance=192)` + `pickRoomCornerFarthestFromPlayer`. Alle 5 summoning Bosses (Mossy Behemoth Slimes, Vine Lord Sprouts, Forest Heart Sprites, Pixie Queen Dancers, Lord Onyx Wraiths) wrappen ihre natürliche Spawn-Position mit dem Helper — wenn Candidate < 192 px (3 Tiles) zum Player, fallback auf farthest room corner (margin 80 px). LordOnyx hatte sein eigenes 4-Corner-Sort-Pattern schon, der wurde nicht angetastet (sortiert nach Player-Distanz descending, picked die Top-N FAR corners).
+
+**I-Frame-Source-Tracking:** `PlayerHealth.source: 'damage' | 'grace' | null` + `getInvincibilitySource(now)`-API. `takeDamage` setzt 'damage', `grantInvincibility` setzt 'grace' **nur wenn currently vulnerable** (sonst lässt es 'damage' stehen). `Player.tickInvincibilityBlink` skipped Alpha-Blink wenn Source = 'grace'. Vorher sah die Room-Entry-700ms-Grace-Period visuell identisch zum Post-Hit-Blink aus → User dachte er wurde getroffen wenn er einen Raum betrat. Jetzt: Grace-Period stumm (kein Blink), Damage-Period blinkt wie gewohnt.
+
+**Marquis-Mirror-Phase-Transition Tween-Kill:** `cancelSpecialOnPhaseChange` callt jetzt `scene.tweens.killTweensOf(this)` als ersten Schritt. Vorher: wenn Boss in `entering` (alpha → 0 tween) phase-transitionte, killed der cancel den Tween nicht; das `setAlpha(1)` im Phase-Change-Handler wurde danach vom weiterlaufenden Tween überschrieben → Boss invisible in Berserker. User-flagged Bug 2026-05-08 ("wenn er im spiegel ist und ich den spiegel zerstöre, er währenddessen in die letzte phase geht, ist marquis unsichtbar").
+
+**Dev-only:** Browser-Autoplay-Policy heißt erste Sounds spielen erst nach erstem User-Gesture. In der Praxis kein Problem weil alle SFX in Game-Action-Pfaden leben (Cast/Hit/Pickup) die immer nach Player-Input kommen.
 
 ---
 

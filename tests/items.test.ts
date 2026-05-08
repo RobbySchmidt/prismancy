@@ -16,12 +16,12 @@ describe('items data', () => {
     expect(ids).toContain('hotTea');
     expect(ids).toContain('wizardSneakers');
     // Shop-only:
-    expect(ids).not.toContain('caffeinePill');
+    expect(ids).not.toContain('magicPotion');
   });
 
   it('getItemsForPool(Shop) includes shop-only and dual-pool items', () => {
     const ids = getItemsForPool(ItemPool.Shop).map((i) => i.id);
-    expect(ids).toContain('caffeinePill');
+    expect(ids).toContain('magicPotion');
     expect(ids).toContain('magicTome');
     expect(ids).toContain('hotTea');
     expect(ids).toContain('wizardSneakers');

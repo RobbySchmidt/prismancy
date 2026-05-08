@@ -13,6 +13,8 @@ import {
 } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
 import { ENEMIES, type EnemyId } from '../../data/enemies';
+import { safeAddSpawnPosition } from '../../utils/bossSpawn';
+import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
 import { type BaseEnemy } from './BaseEnemy';
@@ -73,8 +75,16 @@ export class PixieQueen extends BossEnemy {
         const bounds = this.host.getRoomBounds();
         const ax = bounds.minX + Math.random() * (bounds.maxX - bounds.minX);
         const ay = bounds.minY + Math.random() * (bounds.maxY - bounds.minY);
-        const add = this.host.spawnEnemyAt('pixie-dancer', ax, ay);
-        if (add) this.adds.push(add);
+        // Player-proximity safety: random anywhere in bounds means the roll
+        // can easily land on the player. Fall back to the farthest room
+        // corner if it does.
+        const player = this.host.getPlayer();
+        const safe = safeAddSpawnPosition({ x: ax, y: ay }, bounds, player.x, player.y);
+        const add = this.host.spawnEnemyAt('pixie-dancer', safe.x, safe.y);
+        if (add) {
+          this.adds.push(add);
+          EventBus.emit('enemy:charge');
+        }
       }
       this.nextAddAt = time + PIXIE_QUEEN_PHASE2_ADD_INTERVAL_MS;
     }
@@ -92,6 +102,7 @@ export class PixieQueen extends BossEnemy {
    */
   private startTeleport(time: number): void {
     this.spawnTeleportSparkles(this.x, this.y);
+    EventBus.emit('enemy:charge');
 
     this.scene.tweens.add({
       targets: this,

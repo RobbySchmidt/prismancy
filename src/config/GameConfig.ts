@@ -808,7 +808,7 @@ export const TextureKeys = {
   ItemWizardSneakers: 'tex-item-wizard-sneakers',
   ItemTelescopicWand: 'tex-item-telescopic-wand',
   ItemLeadCap: 'tex-item-lead-cap',
-  ItemCaffeinePill: 'tex-item-caffeine-pill',
+  ItemMagicPotion: 'tex-item-magic-potion',
   ItemPixieDust: 'tex-item-pixie-dust',
   ItemHeartContainer: 'tex-item-heart-container',
   ItemCrownOfTheVine: 'tex-item-crown-of-the-vine',

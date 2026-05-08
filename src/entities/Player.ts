@@ -17,6 +17,7 @@ import { type Direction, type Vector2 } from '../types';
 import { Cosmetics } from '../systems/Cosmetics';
 import { type InputManager } from '../systems/InputManager';
 import { PlayerHealth } from '../systems/PlayerHealth';
+import { getSfxSynth } from '../systems/SfxSynth';
 import { type StatsSystem } from '../systems/StatsSystem';
 import { type MagicMissilePool } from './projectiles/MagicMissilePool';
 
@@ -124,6 +125,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     });
     this.nextFireAt = time + interval;
     this.spawnWandSparkle();
+    getSfxSynth().playPlayerCast();
   }
 
   /**
@@ -173,6 +175,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   /** Subtle alpha blink while i-frames are active (visual cue). */
   private tickInvincibilityBlink(time: number): void {
     if (this.health.isVulnerable(time)) {
+      if (this.alpha !== 1) this.setAlpha(1);
+      return;
+    }
+    // Skip the blink during room-entry grace i-frames — the alpha pulse
+    // looks identical to the post-hit blink and reads as "I just took
+    // damage" when the player walks into a new room. User-flagged
+    // 2026-05-08. The grace window is short (700 ms) and silent enemy
+    // contact is enough cue that the player knows they're protected.
+    if (this.health.getInvincibilitySource(time) === 'grace') {
       if (this.alpha !== 1) this.setAlpha(1);
       return;
     }

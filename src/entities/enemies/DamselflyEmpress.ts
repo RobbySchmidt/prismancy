@@ -18,6 +18,7 @@ import {
   DAMSELFLY_EMPRESS_VISUAL_SCALE,
 } from '../../config/GameConfig';
 import { ENEMIES } from '../../data/enemies';
+import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
 import { BossEnemy, type BossPhaseDefinition } from './BossEnemy';
@@ -109,6 +110,7 @@ export class DamselflyEmpress extends BossEnemy {
     const telegraphMs = this.getTelegraphMs();
     this.nextStateChangeAt = time + telegraphMs;
     this.setVelocity(0, 0);
+    EventBus.emit('enemy:charge');
     // Wing-flutter feel: alpha pulse so the player reads "wind-up incoming".
     this.scene.tweens.killTweensOf(this);
     this.scene.tweens.add({

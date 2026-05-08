@@ -15,6 +15,7 @@ import {
 } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
 import { ENEMIES } from '../../data/enemies';
+import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
 import { BossEnemy, type BossPhaseDefinition } from './BossEnemy';
@@ -75,6 +76,7 @@ export class Bloomheart extends BossEnemy {
   private tickFan(time: number): void {
     if (!this.telegraphScheduled && time >= this.nextFanAt - BLOOMHEART_PHASE1_TELEGRAPH_MS) {
       this.telegraphScheduled = true;
+      EventBus.emit('enemy:charge');
       this.scene.tweens.killTweensOf(this);
       this.scene.tweens.add({
         targets: this,

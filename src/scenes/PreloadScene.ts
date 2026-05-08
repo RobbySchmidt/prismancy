@@ -139,7 +139,7 @@ export class PreloadScene extends Phaser.Scene {
     this.drawItemWizardSneakersTexture(g);
     this.drawItemTelescopicWandTexture(g);
     this.drawItemLeadCapTexture(g);
-    this.drawItemCaffeinePillTexture(g);
+    this.drawItemMagicPotionTexture(g);
     this.drawItemPixieDustTexture(g);
     this.drawItemHeartContainerTexture(g);
     this.drawItemCrownOfTheVineTexture(g);
@@ -4053,41 +4053,75 @@ export class PreloadScene extends Phaser.Scene {
     g.generateTexture(TextureKeys.ItemLeadCap, w, h);
   }
 
-  /** Caffeine Pill — half-red half-white capsule with highlight. */
-  private drawItemCaffeinePillTexture(g: Phaser.GameObjects.Graphics): void {
+  /** Magic Potion — round flask with cork stopper, glowing arcane-blue
+   * liquid, glass shine + halo + sparkle pixels. Distinct from Pixie Dust
+   * (which is a magenta vertical vial) by silhouette + color: round body,
+   * blue liquid, blue halo. */
+  private drawItemMagicPotionTexture(g: Phaser.GameObjects.Graphics): void {
     const w = 14;
     const h = 14;
     g.clear();
 
-    const OUT = 0x1a0408;
-    const RED = 0xd83a3a;
-    const RED_HI = 0xff8888;
-    const WHITE = 0xf0f0f0;
-    const WHITE_HI = 0xffffff;
+    const OUT = 0x1a0414;
+    const GLASS_HI = 0xc4e8ff;
+    const LIQUID = 0x4080ff;
+    const LIQUID_HI = 0xa0d4ff;
+    const CORK = 0x8a5a2a;
+    const CORK_HI = 0xc89758;
+    const SPARK = 0xffffff;
 
-    // Capsule outline (rotated rounded rectangle, rendered as 2 ellipses + bar)
+    // Halo (subtle blue arcane glow behind the bottle)
+    g.fillStyle(0x4080ff, 0.18);
+    g.fillCircle(7, 8, 6);
+    g.fillStyle(0x4080ff, 0.32);
+    g.fillCircle(7, 8, 4);
+
+    // Cork (top)
     g.fillStyle(OUT, 1);
-    g.fillEllipse(4, 7, 7, 6);
-    g.fillEllipse(10, 7, 7, 6);
-    g.fillRect(4, 4, 6, 6);
+    g.fillRect(5, 0, 4, 3);
+    g.fillStyle(CORK, 1);
+    g.fillRect(5, 1, 4, 1);
+    g.fillStyle(CORK_HI, 1);
+    g.fillRect(5, 1, 1, 1);
 
-    // Red half (left)
-    g.fillStyle(RED, 1);
-    g.fillEllipse(4, 7, 5, 4);
-    g.fillRect(4, 5, 3, 4);
-    // White half (right)
-    g.fillStyle(WHITE, 1);
-    g.fillEllipse(10, 7, 5, 4);
-    g.fillRect(7, 5, 3, 4);
+    // Neck outline (narrow, between cork and body)
+    g.fillStyle(OUT, 1);
+    g.fillRect(5, 3, 1, 2);
+    g.fillRect(8, 3, 1, 2);
 
-    // Highlights
-    g.fillStyle(RED_HI, 1);
-    g.fillRect(3, 5, 2, 1);
-    g.fillStyle(WHITE_HI, 1);
-    g.fillRect(8, 5, 3, 1);
-    g.fillRect(11, 6, 1, 1);
+    // Bottle body outline (rounded flask shape)
+    g.fillRect(4, 5, 1, 1); // top-left curve
+    g.fillRect(9, 5, 1, 1); // top-right curve
+    g.fillRect(3, 6, 1, 5); // left side
+    g.fillRect(10, 6, 1, 5); // right side
+    g.fillRect(4, 11, 1, 1); // bottom-left curve
+    g.fillRect(9, 11, 1, 1); // bottom-right curve
+    g.fillRect(5, 12, 4, 1); // bottom
 
-    g.generateTexture(TextureKeys.ItemCaffeinePill, w, h);
+    // Liquid filling neck + body
+    g.fillStyle(LIQUID, 1);
+    g.fillRect(6, 3, 2, 2); // neck interior
+    g.fillRect(5, 5, 4, 1); // top of body
+    g.fillRect(4, 6, 6, 5); // main body
+    g.fillRect(5, 11, 4, 1); // bottom round
+
+    // Liquid surface bubbles + highlights
+    g.fillStyle(LIQUID_HI, 1);
+    g.fillRect(5, 7, 1, 1);
+    g.fillRect(7, 9, 1, 1);
+    g.fillRect(8, 6, 1, 1);
+
+    // Glass shine — subtle vertical streak on the left of the body
+    g.fillStyle(GLASS_HI, 0.4);
+    g.fillRect(4, 7, 1, 3);
+
+    // Sparkle pixels around the bottle for magical aura
+    g.fillStyle(SPARK, 1);
+    g.fillRect(2, 4, 1, 1);
+    g.fillRect(12, 6, 1, 1);
+    g.fillRect(11, 11, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemMagicPotion, w, h);
   }
 
   /** Pixie Dust — magenta vial with sparkle + glow halo. */

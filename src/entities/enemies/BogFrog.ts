@@ -8,6 +8,7 @@ import {
   BOG_FROG_TONGUE_SPEED,
 } from '../../config/GameConfig';
 import { ENEMIES } from '../../data/enemies';
+import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { BaseEnemy } from './BaseEnemy';
 
@@ -69,6 +70,7 @@ export class BogFrog extends BaseEnemy {
   private beginTelegraph(time: number): void {
     this.aiState = 'telegraph';
     this.nextStateChangeAt = time + BOG_FROG_TELEGRAPH_MS;
+    EventBus.emit('enemy:charge');
     // Cheek-puff: scale up slightly so the player sees a wind-up.
     this.scene.tweens.add({
       targets: this,

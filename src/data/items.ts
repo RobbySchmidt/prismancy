@@ -63,11 +63,11 @@ export const ITEMS = {
       { stat: 'missileScale', add: 0.3 },
     ],
   },
-  caffeinePill: {
-    id: 'caffeinePill',
-    displayName: 'Caffeine Pill',
+  magicPotion: {
+    id: 'magicPotion',
+    displayName: 'Magic Potion',
     description: '+0.5 Damage, +10 Move Speed.',
-    textureKey: TextureKeys.ItemCaffeinePill,
+    textureKey: TextureKeys.ItemMagicPotion,
     pools: [ItemPool.Shop],
     effects: [
       { stat: 'damage', add: 0.5 },

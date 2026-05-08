@@ -75,6 +75,7 @@ import {
   floorIdToFloorTrack,
   getMusicManager,
 } from '../systems/MusicManager';
+import { getSfxSynth } from '../systems/SfxSynth';
 import { StatsSystem } from '../systems/StatsSystem';
 import {
   ItemPool,
@@ -201,6 +202,19 @@ export class GameScene extends Phaser.Scene {
   };
   private readonly enemyHitHandler = (payload: { x: number; y: number }): void => {
     this.spawnBloodParticles(payload.x, payload.y);
+    getSfxSynth().playEnemyHit();
+  };
+  private readonly enemyChargeHandler = (): void => {
+    getSfxSynth().playEnemyCharge();
+  };
+  /**
+   * SFX-only listener on `player:tookDamage`. Separate from
+   * `playerTookDamageHandler` because that one is gated on active boss for
+   * no-hit tracking — but the hit sound should always play, regardless of
+   * room kind or boss state.
+   */
+  private readonly playerHitSfxHandler = (): void => {
+    getSfxSynth().playPlayerHit();
   };
   private readonly enemyBurnTickHandler = (payload: { x: number; y: number }): void => {
     this.spawnFlameParticle(payload.x, payload.y);
@@ -294,8 +308,71 @@ export class GameScene extends Phaser.Scene {
     x: number;
     y: number;
   }): void => {
+    // Always play the gem SFX, regardless of whether a seal is in this room
+    // (Floor-1 / Floor-2 gems get picked up before the seal exists, but the
+    // sound should still fire). Seal animation is the conditional part.
+    getSfxSynth().playPickupGem();
     if (!this.gemSeal) return;
     this.gemSeal.addGem(payload.floorId, payload.x, payload.y);
+  };
+
+  /**
+   * SFX router for non-item, non-gem pickups (heart / coin / key). Items + Gems
+   * have dedicated listeners (`item:picked` + `gem:pickedUp`) because both
+   * fire `pickup:collected` AND their own event — handling them here would
+   * double-play. Crates also fire pickup:collected but their open-sound is
+   * deferred to the chest-open SFX batch.
+   */
+  private readonly pickupCollectedHandler = (payload: { kind: PickupKind }): void => {
+    const sfx = getSfxSynth();
+    switch (payload.kind) {
+      case PickupKind.Heart:
+      case PickupKind.HalfHeart:
+        sfx.playPickupHeart();
+        return;
+      case PickupKind.Coin:
+        sfx.playPickupCoin();
+        return;
+      case PickupKind.Key:
+        sfx.playPickupKey();
+        return;
+      case PickupKind.Item:
+      case PickupKind.Gem:
+      case PickupKind.BrownCrate:
+      case PickupKind.GoldCrate:
+        // Handled by dedicated listeners or pending batch.
+        return;
+    }
+  };
+
+  private readonly itemPickedSfxHandler = (): void => {
+    getSfxSynth().playPickupItem();
+  };
+  private readonly crateOpenedSfxHandler = (): void => {
+    getSfxSynth().playChestOpen();
+  };
+  private readonly doorsOpenedSfxHandler = (): void => {
+    // Delay the open SFX so it doesn't pile on top of the last-hit feedback.
+    // `markCurrentRoomCleared` runs on `delayedCall(0)` after the last enemy
+    // dies — basically the same frame as the kill — so without a delay the
+    // door creak overlaps the enemy-hit + (any final) enemy-cast sounds and
+    // gets muddied. 250 ms is enough for the kill audio to decay first.
+    this.time.delayedCall(250, () => getSfxSynth().playDoorOpen());
+  };
+  private readonly doorsClosedSfxHandler = (): void => {
+    getSfxSynth().playDoorClose();
+  };
+  private readonly doorUnlockedSfxHandler = (): void => {
+    getSfxSynth().playDoorUnlock();
+  };
+  private readonly bossKilledSfxHandler = (): void => {
+    getSfxSynth().playBossDeath();
+  };
+  /** Both Prismarch's per-phase prism charge AND the GemSeal 3/3 cinematic
+   * play the same prism-special-cast sound (per the SFX brief — same audio,
+   * different trigger). Hooked on both events so either path fires it. */
+  private readonly prismSpecialCastSfxHandler = (): void => {
+    getSfxSynth().playPrismSpecialCast();
   };
 
   constructor() {
@@ -434,28 +511,50 @@ export class GameScene extends Phaser.Scene {
     EventBus.on('enemy:killed', this.enemyKilledHandler);
     EventBus.on('enemy:droppedCoin', this.enemyDroppedCoinHandler);
     EventBus.on('enemy:hit', this.enemyHitHandler);
+    EventBus.on('enemy:charge', this.enemyChargeHandler);
     EventBus.on('enemy:burnTick', this.enemyBurnTickHandler);
     EventBus.on('map:opened', this.mapOpenedHandler);
     EventBus.on('map:closed', this.mapClosedHandler);
     EventBus.on('map:teleport', this.mapTeleportHandler);
     EventBus.on('player:tookDamage', this.playerTookDamageHandler);
+    EventBus.on('player:tookDamage', this.playerHitSfxHandler);
     EventBus.on('boss:killed', this.bossKilledHandler);
     EventBus.on('seal:activated', this.sealActivatedHandler);
     EventBus.on('gem:pickedUp', this.gemPickedUpHandler);
+    EventBus.on('pickup:collected', this.pickupCollectedHandler);
+    EventBus.on('item:picked', this.itemPickedSfxHandler);
+    EventBus.on('crate:opened', this.crateOpenedSfxHandler);
+    EventBus.on('room:doorsOpened', this.doorsOpenedSfxHandler);
+    EventBus.on('room:doorsClosed', this.doorsClosedSfxHandler);
+    EventBus.on('door:unlocked', this.doorUnlockedSfxHandler);
+    EventBus.on('boss:killed', this.bossKilledSfxHandler);
+    EventBus.on('lordOnyx:specialFired', this.prismSpecialCastSfxHandler);
+    EventBus.on('seal:activated', this.prismSpecialCastSfxHandler);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.dropSystem.detach();
       EventBus.off('player:died', this.playerDiedHandler);
       EventBus.off('enemy:killed', this.enemyKilledHandler);
       EventBus.off('enemy:droppedCoin', this.enemyDroppedCoinHandler);
       EventBus.off('enemy:hit', this.enemyHitHandler);
+      EventBus.off('enemy:charge', this.enemyChargeHandler);
       EventBus.off('enemy:burnTick', this.enemyBurnTickHandler);
       EventBus.off('map:opened', this.mapOpenedHandler);
       EventBus.off('map:closed', this.mapClosedHandler);
       EventBus.off('map:teleport', this.mapTeleportHandler);
       EventBus.off('player:tookDamage', this.playerTookDamageHandler);
+      EventBus.off('player:tookDamage', this.playerHitSfxHandler);
       EventBus.off('boss:killed', this.bossKilledHandler);
       EventBus.off('seal:activated', this.sealActivatedHandler);
       EventBus.off('gem:pickedUp', this.gemPickedUpHandler);
+      EventBus.off('pickup:collected', this.pickupCollectedHandler);
+      EventBus.off('item:picked', this.itemPickedSfxHandler);
+      EventBus.off('crate:opened', this.crateOpenedSfxHandler);
+      EventBus.off('room:doorsOpened', this.doorsOpenedSfxHandler);
+      EventBus.off('room:doorsClosed', this.doorsClosedSfxHandler);
+      EventBus.off('door:unlocked', this.doorUnlockedSfxHandler);
+      EventBus.off('boss:killed', this.bossKilledSfxHandler);
+      EventBus.off('lordOnyx:specialFired', this.prismSpecialCastSfxHandler);
+      EventBus.off('seal:activated', this.prismSpecialCastSfxHandler);
       // Phaser destroys child GameObjects on scene shutdown, but our class
       // fields are still pointing at them. If the scene is restarted (e.g.
       // via `__wiz.gotoFloor`), the next `create()` would see a truthy but
@@ -593,6 +692,33 @@ export class GameScene extends Phaser.Scene {
           // eslint-disable-next-line no-console
           console.log(out.join('\n'));
         },
+        /**
+         * Spawn a crate at the current room's center. `gold=true` spawns a
+         * gold crate (rarer loot pool); default is brown. Walk over it to
+         * open + drop loot. Useful for testing chest-open SFX, crate loot
+         * tables, and the pickup-slot serializer with simultaneous drops.
+         * Usage: `__wiz.spawnCrate()` or `__wiz.spawnCrate(true)`.
+         *
+         * The position is randomly jittered ±48 px from the room center so
+         * each invocation produces different loot. (`crateSeed(x, y)` is
+         * deterministic on integer position — without jitter every spawn at
+         * the same room center would replay the identical drops, defeating
+         * the purpose of a test hook.)
+         */
+        spawnCrate: (gold = false) => {
+          if (!this.currentRoom) {
+            // eslint-disable-next-line no-console
+            console.warn('[__wiz.spawnCrate] No active room.');
+            return;
+          }
+          const center = this.currentRoom.getCenter();
+          const jitterX = (Math.random() - 0.5) * 96;
+          const jitterY = (Math.random() - 0.5) * 96;
+          const kind = gold ? PickupKind.GoldCrate : PickupKind.BrownCrate;
+          this.spawnPickup(kind, center.x + jitterX, center.y + jitterY);
+          // eslint-disable-next-line no-console
+          console.log(`[__wiz.spawnCrate] ${gold ? 'Gold' : 'Brown'} crate spawned (jittered).`);
+        },
       };
     }
   }
@@ -652,6 +778,9 @@ export class GameScene extends Phaser.Scene {
     const nextFloorId = FLOOR_ORDER[currentIdx + 1]!;
     const carryOver = this.snapshotRunCarryOver();
     this.inTransition = true;
+
+    // SFX before fade so the magical-rise sound covers the transition window.
+    getSfxSynth().playFloorTeleport();
 
     // Brief fade so the descent reads as "going somewhere", not a snap-cut.
     this.cameras.main.fadeOut(260, 0, 0, 0);
@@ -2267,7 +2396,11 @@ export class GameScene extends Phaser.Scene {
               pickup.flashRejected(this);
               return;
             }
-            // Key spent — fall through to the normal pay/onCollect path.
+            // Key spent — same unlock SFX as locked doors (door:unlocked
+            // doesn't fire here because the gold crate path bypasses that
+            // event, so we trigger the SFX directly).
+            getSfxSynth().playDoorUnlock();
+            // Fall through to the normal pay/onCollect path.
           }
 
           const purchase = pickup.tryPurchase(this.inventory);

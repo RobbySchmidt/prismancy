@@ -15,6 +15,7 @@ import {
 } from '../config/GameConfig';
 import { DepthLayers } from '../config/DepthLayers';
 import { RoomKind, type Direction, type FloorTheme, type RoomDescriptor } from '../types';
+import { EventBus } from '../utils/EventBus';
 import { RNG } from '../utils/RNG';
 import { Door } from './Door';
 import { RoomAtmosphere } from './RoomAtmosphere';
@@ -64,6 +65,15 @@ export class Room {
     this.buildFloor(rng);
     this.buildWallsWithDoorGaps();
     this.buildDoors(descriptor.cleared);
+    // Audio cue for "room slammed shut behind you" when entering an uncleared
+    // room. Doors are constructed in their closed state by `buildDoors` (no
+    // closeAllDoors transition), so without this emit the player only hears
+    // the close sound on the special boss-spawn / seal-activation paths that
+    // explicitly call closeAllDoors. Defer one frame so the SFX fires after
+    // the camera fade-in / scene swap, not in the middle of it.
+    if (!descriptor.cleared && this.doors.some((d) => d.isClosed())) {
+      scene.time.delayedCall(0, () => EventBus.emit('room:doorsClosed'));
+    }
     // Painterly overlay (radial vignette + patches + light shafts + mist +
     // fireflies + edge vignette). Per-floor palette-driven, applies to all
     // room kinds so treasure / shop / boss rooms also get the atmospheric
@@ -161,14 +171,30 @@ export class Room {
     }
   }
 
-  /** Open all doors. Called when the room is cleared. */
+  /** Open all doors. Called when the room is cleared. Emits a single
+   * `room:doorsOpened` event if any door actually changed state, regardless
+   * of door count, so the SFX listener doesn't stack 4 plays. */
   openAllDoors(): void {
-    for (const door of this.doors) door.open();
+    let anyChanged = false;
+    for (const door of this.doors) {
+      // `door.open()` is a no-op for locked / already-open doors. Detect the
+      // real state change so we don't emit on a stable room (e.g., re-entering
+      // a cleared room calls openAllDoors but nothing actually changes).
+      if (door.isClosed() && !door.isLocked()) anyChanged = true;
+      door.open();
+    }
+    if (anyChanged) EventBus.emit('room:doorsOpened');
   }
 
-  /** Close all doors. Called when the player enters an uncleared room. */
+  /** Close all doors. Called when the player enters an uncleared room.
+   * Same once-per-action emit contract as `openAllDoors`. */
   closeAllDoors(): void {
-    for (const door of this.doors) door.close();
+    let anyChanged = false;
+    for (const door of this.doors) {
+      if (!door.isClosed()) anyChanged = true;
+      door.close();
+    }
+    if (anyChanged) EventBus.emit('room:doorsClosed');
   }
 
   private scatterDecorations(rng: RNG): void {
