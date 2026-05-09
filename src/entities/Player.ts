@@ -138,6 +138,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
     if (!this.active || !this.health.isAlive()) return;
+    // End the dash early if a wall halted the burst — otherwise the
+    // player sits frozen at zero velocity for the remainder of
+    // DASH_DURATION_MS even though there's no momentum left, which
+    // reads as "stuck on the wall". Velocity-based check is direction-
+    // agnostic and covers diagonal dashes against corners.
+    if (time < this.dashUntil) {
+      const body = this.body as Phaser.Physics.Arcade.Body;
+      if (body.velocity.lengthSq() < 1) {
+        this.dashUntil = 0;
+      }
+    }
     // Dash velocity is set at the start of a dash and runs out at
     // `dashUntil`; we just have to skip movement input while in flight so
     // WASD doesn't override the burst velocity. Spellblade-only — wizard's

@@ -113,6 +113,26 @@ export class Door {
       textureKey,
     );
     this.barrier.setDepth(DepthLayers.Wall);
+    // Disable collision on the cross-axis faces of the barrier so the
+    // player's body doesn't catch at the seam where the barrier meets
+    // the wall tiles above/below (vertical door) or left/right
+    // (horizontal door). Phaser's arcade separator can pick the wrong
+    // axis when a dynamic body straddles the seam between two stacked
+    // static AABBs — the snag was most visible sliding along the right
+    // wall past a closed door. Disabling the cross-axis faces means
+    // Phaser only ever separates from the door axis (east/west for
+    // vertical doors, north/south for horizontal), eliminating the
+    // ambiguity. The wall tiles next to the door still cover those
+    // cross-axis sides solidly, so the player can't actually pass
+    // through the barrier — they just slide past cleanly.
+    const body = this.barrier.body as Phaser.Physics.Arcade.StaticBody;
+    if (this.direction === 'left' || this.direction === 'right') {
+      body.checkCollision.up = false;
+      body.checkCollision.down = false;
+    } else {
+      body.checkCollision.left = false;
+      body.checkCollision.right = false;
+    }
   }
 
   /**

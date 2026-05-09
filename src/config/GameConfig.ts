@@ -101,14 +101,14 @@ export const MISSILE_SPAWN_GRACE_MS = 60;
 // everything"). Replaced with a projectile to bring the Spellblade back
 // in line with the wizard's range trade-off curve.
 
-/** Cadence between bolts. Heavy sword-swing feel — 3.6× slower than the
+/** Cadence between bolts. Heavy sword-swing feel — 2× slower than the
  *  wizard's 250 ms — to read as "the spellblade swings a sword, not flicks
- *  a wand". Single-target DPS lands at 1.67/s vs wizard's 4.0/s, so the
- *  wizard is 2.4× faster on isolated targets; pierce + bigger hitbox keep
- *  the Spellblade competitive in mob lines and bullet-hell rooms.
- *  Tuned 400 → 600 → 900 (2026-05-09) — first 600 ms still felt like
- *  a flick, user-flagged "es muss schwerfälliger sein". */
-export const SPELLBLADE_BOLT_FIRE_INTERVAL_MS = 900;
+ *  a wand". Single-target DPS lands at 3.0/s vs wizard's 4.0/s; pierce +
+ *  bigger hitbox keep the Spellblade competitive in mob lines and bullet-
+ *  hell rooms. Tuned 400 → 600 → 900 → 500 (2026-05-09) — 900 ms felt
+ *  unsurvivable on Sapphire (1.5× mob HP × slow cadence), 500 ms keeps
+ *  the heavy-swing identity but closes the floor-2 DPS gap. */
+export const SPELLBLADE_BOLT_FIRE_INTERVAL_MS = 500;
 /** Damage multiplier applied to the player's `damage` stat when firing
  *  a bolt. Base damage 1 × 1.5 = 1.5/shot — Mossy Slime (HP 5) takes 4
  *  hits (vs wizard's 5), Forest Sprite (HP 3) takes 2, Pixie (HP 2) 2.
