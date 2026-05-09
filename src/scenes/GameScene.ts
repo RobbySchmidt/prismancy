@@ -68,6 +68,7 @@ import { Cosmetics } from '../systems/Cosmetics';
 import { MetaProgress } from '../systems/MetaProgress';
 import { DropSystem } from '../systems/DropSystem';
 import { InputManager } from '../systems/InputManager';
+import { ActiveItemSystem } from '../systems/ActiveItemSystem';
 import { Inventory } from '../systems/Inventory';
 import { ItemSystem } from '../systems/ItemSystem';
 import {
@@ -157,6 +158,7 @@ export class GameScene extends Phaser.Scene {
   private stats!: StatsSystem;
   private inventory!: Inventory;
   private itemSystem!: ItemSystem;
+  private activeItemSystem!: ActiveItemSystem;
   private currentRoom!: Room;
   private enemies!: Phaser.Physics.Arcade.Group;
   private pickups!: Phaser.Physics.Arcade.Group;
@@ -254,6 +256,10 @@ export class GameScene extends Phaser.Scene {
   /** Phaser Key for the [E] interact (used for placing gems on the seal).
    * Polled in update(); see `tickGemSealInteract`. */
   private interactKey: Phaser.Input.Keyboard.Key | null = null;
+  /** [Q] active-item activation. JustDown-polled in update so a held key
+   * doesn't double-fire — the activation drops HP and we don't want the
+   * second tick to drop it past zero. */
+  private activeItemKey: Phaser.Input.Keyboard.Key | null = null;
 
   /**
    * Stairs sprite spawned in the boss room after a kill. Held as a field
@@ -456,7 +462,8 @@ export class GameScene extends Phaser.Scene {
     this.inputManager = new InputManager(this);
     this.player = new Player(this, 0, 0, this.inputManager, this.missilePool, this.stats);
 
-    this.itemSystem = new ItemSystem(this.stats, this.player.health);
+    this.activeItemSystem = new ActiveItemSystem();
+    this.itemSystem = new ItemSystem(this.stats, this.player.health, this.activeItemSystem);
 
     // Floor-transition rehydrate: if the previous floor handed us a
     // carry-over snapshot, replay item effects (silently — no item:picked
@@ -477,6 +484,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('stats', this.stats);
     this.registry.set('inventory', this.inventory);
     this.registry.set('itemSystem', this.itemSystem);
+    this.registry.set('activeItemSystem', this.activeItemSystem);
     // Expose player health so UIScene can seed its HealthDisplay with the
     // ACTUAL current/max HP at construction time. Without this the floor-
     // transition launches UIScene AFTER GameScene's `restore()` has emitted
@@ -517,6 +525,10 @@ export class GameScene extends Phaser.Scene {
     // [E] interact for the gem seal on Onyx Mansion. Same JustDown poll
     // pattern as ESC so a held key doesn't repeat-fire activation.
     this.interactKey = this.input.keyboard?.addKey('E') ?? null;
+
+    // [Q] active-item activation (Blood of Marquis et al). JustDown-polled
+    // so a long hold doesn't double-fire across the AOE-wave window.
+    this.activeItemKey = this.input.keyboard?.addKey('Q') ?? null;
 
     this.dropSystem = new DropSystem(
       {
@@ -600,6 +612,7 @@ export class GameScene extends Phaser.Scene {
       this.stairsActionFired = false;
       this.gemSeal = null;
       this.interactKey = null;
+      this.activeItemKey = null;
       this.restartHoldStartedAt = null;
       this.restartKey = null;
       this.pauseKey = null;
@@ -651,15 +664,44 @@ export class GameScene extends Phaser.Scene {
          * Replaces any existing boss. Useful for boss-pattern tuning
          * without grinding through Vampires + 3-gem requirement. */
         spawnLordOnyx: () => this.devSpawnBoss('boss-lord-onyx'),
-        /** Toggle the Prismancy red/gold cosmetic skin unlock state. The
-         * change applies on the NEXT scene start (Player reads Cosmetics
-         * at construction). Restart with `__wiz.gotoFloor(1)` to see it. */
+        /** Unlock the Prismarch-tier rewards (Prismancy red/gold skin AND
+         * the Spellblade character — both gate on the same `boss-lord-onyx`
+         * defeat). The change applies on the NEXT scene start (Player reads
+         * the selection at construction). Restart with `__wiz.gotoFloor(1)`
+         * + cycle to the new option in the main menu. */
         unlockSkin: () => {
           Cosmetics.unlockPrismancySkin();
           // eslint-disable-next-line no-console
           console.log(
-            '[__wiz.unlockSkin] Prismancy skin unlocked. Restart for it to take effect.',
+            '[__wiz.unlockSkin] Prismarch unlocks granted (Prismancy skin + Spellblade character). ' +
+              'Return to main menu, cycle with arrows to preview.',
           );
+        },
+        /** Force-unlock the Spellblade Prismarch-tier (red-helm) skin
+         *  without playing through a Prismarch fight as Spellblade. Adds
+         *  'boss-lord-onyx' to BOTH the shared `bossesDefeated` ledger AND
+         *  the per-character `bossesDefeatedAsSpellblade` ledger so the
+         *  spellblade-side gate (`hasSpellbladePrismarchSkin`) flips to
+         *  true. Skin appears on the next scene start. */
+        unlockSpellbladeSkin: () => {
+          MetaProgress.recordBossDefeated('boss-lord-onyx', 'spellblade');
+          // eslint-disable-next-line no-console
+          console.log(
+            '[__wiz.unlockSpellbladeSkin] Spellblade Prismarch-tier skin granted. ' +
+              'Return to main menu, switch to Spellblade, press [S] to preview.',
+          );
+        },
+        /** Fire a sample `unlock:gained` event so the toast widget can be
+         *  positioned + previewed without rigging up a fresh save. Skin
+         *  texture is used as the icon. Pass an id-suffix arg to bypass
+         *  the per-session de-dup if you call it multiple times. */
+        testUnlockToast: (suffix?: string) => {
+          EventBus.emit('unlock:gained', {
+            id: `dev-test-${suffix ?? Date.now()}`,
+            title: 'Sample Unlock',
+            subtitle: 'This is what a meta-progression toast looks like.',
+            textureKey: TextureKeys.PlayerSpellbladePrismarch,
+          });
         },
         lockSkin: () => {
           Cosmetics.resetAll();
@@ -1718,8 +1760,27 @@ export class GameScene extends Phaser.Scene {
     // Trophy/collection: log this boss as defeated, keyed by stable enemy
     // id so the save survives any future displayName rename pass (e.g.
     // 'Lord Onyx' → 'The Prismarch' renamed only the displayName, the id
-    // is still 'boss-lord-onyx'). Idempotent — repeat kills no-op.
-    MetaProgress.recordBossDefeated(payload.enemyId);
+    // is still 'boss-lord-onyx'). Idempotent — repeat kills no-op. Pass
+    // the active character so the recorder also pops the per-character
+    // ledger (Spellblade Prismarch-tier skin gates on a Prismarch kill
+    // *as Spellblade*, not just any Prismarch kill).
+    //
+    // Snapshot the relevant unlock gates BEFORE the record so we can diff
+    // post-record and emit `unlock:gained` only for transitions
+    // (locked → unlocked). The toast widget in UIScene listens. Idempotent
+    // boss kills won't fire toasts (all gates already met).
+    const wasPrismancySkinUnlocked = MetaProgress.hasPrismancySkin();
+    const wasSpellbladeCharUnlocked = MetaProgress.hasSpellbladeCharacter();
+    const wasSpellbladePrismarchSkinUnlocked = MetaProgress.hasSpellbladePrismarchSkin();
+    const wasBossPreviouslyBeaten = MetaProgress.hasBeatenBoss(payload.enemyId);
+    MetaProgress.recordBossDefeated(payload.enemyId, MetaProgress.getSelectedCharacter());
+    this.emitUnlockToasts({
+      wasPrismancySkinUnlocked,
+      wasSpellbladeCharUnlocked,
+      wasSpellbladePrismarchSkinUnlocked,
+      wasBossPreviouslyBeaten,
+      enemyId: payload.enemyId,
+    });
 
     // The Prismarch is the run finale — no reward pedestal, no exit stairs,
     // no further boss-rooms. Persist the cosmetic unlock and emit the
@@ -1923,6 +1984,126 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Per-frame active-item tick — polls [Q] JustDown and dispatches via
+   * `tryActivateActiveItem`. Skipped during transitions so a stale press
+   * across a fade can't fire on the next room. Cheap when nothing is
+   * equipped (early return after the null check).
+   */
+  private tickActiveItem(): void {
+    if (this.inTransition) return;
+    if (!this.activeItemKey) return;
+    if (!this.activeItemSystem.hasEquipped()) return;
+    if (!Phaser.Input.Keyboard.JustDown(this.activeItemKey)) return;
+    this.tryActivateActiveItem();
+  }
+
+  /**
+   * Validate gates and dispatch to the per-kind execute function. Returns
+   * silently on any failure (HP too low, no active equipped, etc.) — the
+   * HUD slot already shows the greyed-out state for un-usable activations,
+   * so no toast/feedback is needed here. Successful activations emit
+   * `activeItem:activated` (HUD flash + future SFX).
+   */
+  private tryActivateActiveItem(): void {
+    const equipped = this.activeItemSystem.getEquipped();
+    const equippedItem = this.activeItemSystem.getEquippedItem();
+    if (!equipped || !equippedItem) return;
+    // Universal gate: at least 1 full heart of HP. Every active right now
+    // (just Echoes of Blood) costs HP, and dropping below 1 HP would
+    // self-kill via the cost. The HUD slot mirrors this gate visually.
+    if (this.player.health.getCurrent() < 2) return;
+
+    switch (equipped.kind) {
+      case 'echoesOfBlood':
+        this.executeEchoesOfBlood(equipped.bossDamageFraction ?? 0.3);
+        break;
+      default:
+        // Unknown kind — defensive against a future ActiveItemKind being
+        // added to the type without a switch arm here.
+        return;
+    }
+    EventBus.emit('activeItem:activated', { itemId: equippedItem.id });
+  }
+
+  /**
+   * Echoes of Blood — expanding crimson shockwave from the player's
+   * position. Trash mobs instant-kill, bosses take `bossDamageFraction`
+   * of their max HP (Phase-Threshold cross natürlich since BossEnemy.takeDamage
+   * runs the phase-check on its own). Player HP drops to 1 (= 1/2 heart)
+   * as the cost.
+   *
+   * Visual: two stacked Arc graphics (outer ring + inner red core) tween
+   * scale 0 → ~ROOM_RADIUS over 250 ms while alpha fades, plus a screen-
+   * tinted-red flash + camera shake. Damage application happens at
+   * activation time — the wave covers the entire room within the tween
+   * duration anyway, so we don't need per-frame radius checks. Snapshot
+   * the enemy list before applying so a chain of `enemy:killed` events
+   * doesn't reshape `this.enemies.getChildren()` mid-iteration.
+   */
+  private executeEchoesOfBlood(bossDamageFraction: number): void {
+    const cx = this.player.x;
+    const cy = this.player.y;
+
+    // Pay the HP cost first so any defensive logic can't bail out half-way.
+    this.player.health.forceSetCurrent(1);
+
+    // Snapshot enemies so kill-events firing during the loop (which call
+    // `removeFromGroup`) don't reshape the iterator.
+    const enemies = this.enemies.getChildren().slice() as BaseEnemy[];
+    const boss = this.activeBoss;
+    for (const enemy of enemies) {
+      if (!enemy.active) continue;
+      if (enemy === boss && boss !== null) {
+        // Boss: deal `bossDamageFraction` of max HP. Phase-Threshold cross
+        // naturally inside `BossEnemy.takeDamage`. No knockback — bosses
+        // ignore the knockback parameter anyway, but we'd want the shock-
+        // wave to feel like a forced phase-push, not a positional shove.
+        const damage = Math.max(1, Math.round(boss.maxHp * bossDamageFraction));
+        enemy.takeDamage(damage);
+      } else {
+        // Trash mob: overkill amount so it dies regardless of mob HP mult
+        // or burn-in-progress. The `BaseEnemy.takeDamage` body clamps to
+        // its internal `hp`, so 99999 is plenty.
+        enemy.takeDamage(99999);
+      }
+    }
+
+    // Visual: outer crimson ring + inner darker core, both expand outward
+    // from the player. Radius covers the room diagonal so the wave reads
+    // as "everything in the room is hit" even though damage was applied
+    // instantly above.
+    const RADIUS = Math.hypot(ROOM_WIDTH_TILES * TILE_SIZE, ROOM_HEIGHT_TILES * TILE_SIZE);
+    const outerRing = this.add
+      .circle(cx, cy, 8, 0xc8284a, 0.75)
+      .setDepth(DepthLayers.Particle);
+    const innerCore = this.add
+      .circle(cx, cy, 6, 0xff5060, 0.55)
+      .setDepth(DepthLayers.Particle);
+    this.tweens.add({
+      targets: outerRing,
+      radius: RADIUS,
+      alpha: 0,
+      duration: 360,
+      ease: 'Sine.Out',
+      onUpdate: () => outerRing.setScale(1),
+      onComplete: () => outerRing.destroy(),
+    });
+    this.tweens.add({
+      targets: innerCore,
+      radius: RADIUS * 0.7,
+      alpha: 0,
+      duration: 280,
+      ease: 'Sine.Out',
+      onUpdate: () => innerCore.setScale(1),
+      onComplete: () => innerCore.destroy(),
+    });
+
+    // Screen-wide red wash + camera shake to sell the cost.
+    this.cameras.main.flash(220, 200, 30, 50, false);
+    this.cameras.main.shake(280, 0.008);
+  }
+
+  /**
    * Spawn the Gem Seal at the bottom-center of the current (Onyx vampire)
    * room. Reads the player's earned gems at spawn-time so the seal renders
    * the right number of lit sockets. Idempotent — re-spawn destroys any
@@ -1968,6 +2149,70 @@ export class GameScene extends Phaser.Scene {
       // Pass the player's current position so the placement animation
       // springs from the wizard rather than from a hardcoded point.
       seal.tryInteract(this.player.x, this.player.y);
+    }
+  }
+
+  /**
+   * Diff the snapshot of unlock gates taken before `recordBossDefeated`
+   * with the post-record state and emit `unlock:gained` for each gate
+   * that flipped (locked → unlocked) on this kill. Single source-of-truth
+   * for the toast triggers — every meta-progression unlock that's tied to
+   * a boss kill goes through here. New unlock kinds (future cosmetics,
+   * future meta-locked items) just need a snapshot field + a transition
+   * check below; the `UnlockToast` widget is generic.
+   */
+  private emitUnlockToasts(snapshot: {
+    wasPrismancySkinUnlocked: boolean;
+    wasSpellbladeCharUnlocked: boolean;
+    wasSpellbladePrismarchSkinUnlocked: boolean;
+    wasBossPreviouslyBeaten: boolean;
+    enemyId: string;
+  }): void {
+    if (!snapshot.wasPrismancySkinUnlocked && MetaProgress.hasPrismancySkin()) {
+      EventBus.emit('unlock:gained', {
+        id: 'skin-wizard-prismancy',
+        title: 'Prismancy Wizard',
+        subtitle: "Crimson robes, gold trim — the slain lord's colours.",
+        textureKey: TextureKeys.PlayerPrismancy,
+      });
+    }
+    if (!snapshot.wasSpellbladeCharUnlocked && MetaProgress.hasSpellbladeCharacter()) {
+      EventBus.emit('unlock:gained', {
+        id: 'character-spellblade',
+        title: 'Spellblade Character',
+        subtitle: 'Fallen knight of the Prismarch — switch in the main menu.',
+        textureKey: TextureKeys.PlayerSpellblade,
+      });
+    }
+    if (
+      !snapshot.wasSpellbladePrismarchSkinUnlocked &&
+      MetaProgress.hasSpellbladePrismarchSkin()
+    ) {
+      EventBus.emit('unlock:gained', {
+        id: 'skin-spellblade-prismarch',
+        title: 'Spellblade Prismarch',
+        subtitle: 'Crimson cape, black helm — for the knight who finished it.',
+        textureKey: TextureKeys.PlayerSpellbladePrismarch,
+      });
+    }
+    // Items: any item with `metaUnlock === enemyId` that just transitioned
+    // from gated → available. Scanned only when the boss itself wasn't
+    // previously beaten — a re-kill can't surface fresh item unlocks.
+    // Cast widens away the `as const satisfies` narrowing on ITEMS so the
+    // optional `metaUnlock` field is visible across all entries (same
+    // cast pattern the codebase uses elsewhere — see line 477 / 710).
+    if (!snapshot.wasBossPreviouslyBeaten) {
+      const allItems = Object.values(ITEMS as Record<string, ItemDefinition>);
+      for (const item of allItems) {
+        if (item.metaUnlock === snapshot.enemyId) {
+          EventBus.emit('unlock:gained', {
+            id: `item-${item.id}`,
+            title: item.displayName,
+            subtitle: item.description,
+            textureKey: item.textureKey,
+          });
+        }
+      }
     }
   }
 
@@ -2801,6 +3046,7 @@ export class GameScene extends Phaser.Scene {
 
     this.tickGemSealInteract();
     this.tickStairsInteract();
+    this.tickActiveItem();
 
     if (!this.restartKey) return;
 

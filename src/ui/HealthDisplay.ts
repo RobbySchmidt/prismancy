@@ -48,8 +48,10 @@ export class HealthDisplay {
 
   /**
    * Lazily add new heart Image objects when the player's max HP grows beyond
-   * the row's current capacity (Heart Container etc.). Never shrinks; we just
-   * draw the surplus as Empty.
+   * the row's current capacity (Heart Container etc.). Never destroys old
+   * hearts; surplus slots are hidden via `setVisible(false)` in `refresh`
+   * so a max-shrink (e.g. Blood of Marquis cap = 2) actually removes the
+   * extra hearts visually instead of leaving them as misleading empty slots.
    */
   private ensureHeartCount(needed: number): void {
     while (this.hearts.length < needed) {
@@ -72,10 +74,17 @@ export class HealthDisplay {
     this.ensureHeartCount(heartCount);
     let remaining = current;
     for (let i = 0; i < this.hearts.length; i++) {
-      let key: string;
+      // Hearts beyond the current max are hidden (not just textured empty)
+      // so a max-shrink — e.g. Blood of Marquis locking at 2 HP — actually
+      // removes the surplus slots from the row. The previous "empty
+      // texture" rendering left phantom slots that read as recoverable.
       if (i >= heartCount) {
-        key = TextureKeys.HeartEmpty;
-      } else if (remaining >= HP_PER_HEART) {
+        this.hearts[i]!.setVisible(false);
+        continue;
+      }
+      this.hearts[i]!.setVisible(true);
+      let key: string;
+      if (remaining >= HP_PER_HEART) {
         key = TextureKeys.HeartFull;
         remaining -= HP_PER_HEART;
       } else if (remaining === 1) {

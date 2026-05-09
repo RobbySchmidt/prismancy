@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, SceneKeys, TextureKeys } from '../config/GameConfig';
 import { STARTING_FLOOR_ID } from '../data/floors';
-import { Cosmetics, type SkinId } from '../systems/Cosmetics';
+import { Cosmetics } from '../systems/Cosmetics';
+import { MetaProgress, type CharacterId, type SkinId } from '../systems/MetaProgress';
 import { getMusicManager } from '../systems/MusicManager';
 import { getSfxSynth } from '../systems/SfxSynth';
 
@@ -72,12 +73,15 @@ export class MainMenuScene extends Phaser.Scene {
       ease: 'Sine.InOut',
     });
 
-    // 3) Wizard (left side).
+    // 3) Wizard / Spellblade (left side). Texture comes from the current
+    //    character + skin cycle pick (see `setupCharacterCycle`). The aura
+    //    is painted under whichever character is showing — same visual
+    //    glow for both since it reads as "this is the player".
     this.paintWizardAura();
     const wizard = this.add.image(
       240,
       GAME_HEIGHT / 2 + 60,
-      this.skinTextureKey(Cosmetics.getSelectedSkin()),
+      this.currentCycleTextureKey(),
     );
     wizard.setScale(4);
     wizard.setRotation(-0.08);
@@ -91,10 +95,13 @@ export class MainMenuScene extends Phaser.Scene {
     // 6) Vertical menu (left side).
     this.buildVerticalMenu();
 
-    // 7) Skin toggle bottom-of-screen — survives the menu rewrite as a
-    // dedicated [S] keybind plus a small label, since toggling a cosmetic
-    // mid-menu is more useful as a hotkey than a full sub-menu.
-    this.setupSkinToggle(wizard);
+    // 7) Character / skin cycle bottom-of-screen — left/right arrows step
+    //    through every (character, skin) combination the player has
+    //    unlocked. Replaces the old `[S]` skin toggle since unlocking the
+    //    Spellblade introduced more than two preview options. The cycle
+    //    is hidden when only the default wizard is available (no point
+    //    showing arrows the player can't use).
+    this.setupCharacterCycle(wizard);
 
     // Title music plays only on subsequent visits — the first page-load has a
     // locked WebAudio context, and we'd rather have a quick first-press start
@@ -329,27 +336,32 @@ export class MainMenuScene extends Phaser.Scene {
     });
   }
 
-  private skinTextureKey(skin: SkinId): string {
-    return skin === 'prismancy' ? TextureKeys.PlayerPrismancy : TextureKeys.Player;
-  }
 
   /**
-   * If the Prismancy skin is unlocked, paint a small hint above the
-   * controls line and bind the [S] key to swap the wizard texture. The
-   * choice persists via Cosmetics so future runs and the in-game Player
-   * sprite read the same selection.
+   * Build two stacked title-screen widgets:
+   *   1. **Character cycle** (left/right arrow keys) — only for picking the
+   *      character (wizard / spellblade). Hidden if only the wizard is
+   *      unlocked since there's nothing to cycle.
+   *   2. **Skin toggle** (`[S]` key, restored 2026-05-09 after the first
+   *      cycle-rewrite collapsed both into one list and the user wanted
+   *      them split). Toggles available skins for the currently-selected
+   *      character. Hidden if the active character has only one skin
+   *      available (e.g. Spellblade for now — red-helm Prismarch-tier
+   *      skin coming in a later phase).
    *
-   * If the skin isn't unlocked, this is a no-op — the toggle stays
-   * invisible until the player has earned the option.
+   * Both widgets read + write through MetaProgress so a fresh scene reads
+   * the same state. Pressing left/right re-evaluates the [S] visibility
+   * since switching characters can change which skins are available.
    */
-  private setupSkinToggle(wizard: Phaser.GameObjects.Image): void {
-    if (!Cosmetics.hasPrismancySkin()) return;
-
-    let current: SkinId = Cosmetics.getSelectedSkin();
+  private setupCharacterCycle(preview: Phaser.GameObjects.Image): void {
     const cx = GAME_WIDTH / 2;
+    const skinHintY = GAME_HEIGHT - 22;
+    const cycleY = GAME_HEIGHT - 44;
 
-    const label = this.add
-      .text(cx, GAME_HEIGHT - 22, this.skinHintText(current), {
+    // --- Skin toggle (set up first so the cycle can refresh its visibility)
+    let currentSkin: SkinId = MetaProgress.getSelectedSkin();
+    const skinLabel = this.add
+      .text(cx, skinHintY, '', {
         fontSize: '14px',
         color: '#e9d5ff',
         stroke: '#000000',
@@ -358,16 +370,153 @@ export class MainMenuScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setAlpha(0.85);
 
+    const refreshSkinLabel = (): void => {
+      const character = MetaProgress.getSelectedCharacter();
+      const skinsForChar = this.skinsForCharacter(character);
+      if (skinsForChar.length <= 1) {
+        skinLabel.setVisible(false);
+        return;
+      }
+      skinLabel.setVisible(true);
+      skinLabel.setText(this.skinHintText(currentSkin));
+    };
+
     this.input.keyboard?.on('keydown-S', () => {
-      current = current === 'prismancy' ? 'default' : 'prismancy';
-      Cosmetics.setSelectedSkin(current);
-      wizard.setTexture(this.skinTextureKey(current));
-      label.setText(this.skinHintText(current));
+      const character = MetaProgress.getSelectedCharacter();
+      const skinsForChar = this.skinsForCharacter(character);
+      if (skinsForChar.length <= 1) return;
+      const idx = skinsForChar.indexOf(currentSkin);
+      currentSkin = skinsForChar[(idx + 1) % skinsForChar.length]!;
+      MetaProgress.setSelectedSkin(currentSkin);
+      preview.setTexture(this.previewTextureKey(character, currentSkin));
+      refreshSkinLabel();
     });
+
+    // --- Character cycle ----------------------------------------------------
+    const characters = this.unlockedCharacters();
+    if (characters.length <= 1) {
+      // Single character — only the skin toggle matters. Initial label
+      // refresh so [S] hint paints correctly on first frame.
+      refreshSkinLabel();
+      return;
+    }
+
+    let charIndex = characters.indexOf(MetaProgress.getSelectedCharacter());
+    if (charIndex < 0) charIndex = 0;
+
+    const arrowGap = 110;
+    const arrowStyle = {
+      fontSize: '18px',
+      color: '#ffd0a0',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 3,
+    } as const;
+    const labelStyle = {
+      fontSize: '14px',
+      color: '#e9d5ff',
+      stroke: '#000000',
+      strokeThickness: 3,
+    } as const;
+
+    this.add
+      .text(cx - arrowGap, cycleY, '<', arrowStyle)
+      .setOrigin(0.5)
+      .setAlpha(0.85);
+    this.add
+      .text(cx + arrowGap, cycleY, '>', arrowStyle)
+      .setOrigin(0.5)
+      .setAlpha(0.85);
+    const charLabel = this.add
+      .text(cx, cycleY, this.characterLabel(characters[charIndex]!), labelStyle)
+      .setOrigin(0.5)
+      .setAlpha(0.85);
+
+    const applyCharacter = (newIndex: number): void => {
+      charIndex = ((newIndex % characters.length) + characters.length) % characters.length;
+      const character = characters[charIndex]!;
+      MetaProgress.setSelectedCharacter(character);
+      // Re-resolve the skin against the new character's gate. Character-
+      // aware `getSelectedSkin(character)` returns Prismancy only if the
+      // *new* character's gate is met (Wizard: any Prismarch kill;
+      // Spellblade: a Prismarch kill *as Spellblade*). The persisted
+      // selectedSkin preference is preserved — toggling through a
+      // character without the Prismancy unlock displays default for that
+      // pass, but switching back to a character that has it restores
+      // Prismancy automatically. Only the explicit [S] toggle persists.
+      currentSkin = MetaProgress.getSelectedSkin(character);
+      preview.setTexture(this.previewTextureKey(character, currentSkin));
+      charLabel.setText(this.characterLabel(character));
+      refreshSkinLabel();
+    };
+
+    this.input.keyboard?.on('keydown-LEFT', () => applyCharacter(charIndex - 1));
+    this.input.keyboard?.on('keydown-RIGHT', () => applyCharacter(charIndex + 1));
+
+    // Initial paint — label content only renders correctly once both
+    // widgets are constructed.
+    refreshSkinLabel();
+  }
+
+  /**
+   * Characters the player has unlocked, in cycle-display order. Always
+   * starts with `'wizard'` (free); appends `'spellblade'` once the
+   * Prismarch-tier gate is met.
+   */
+  private unlockedCharacters(): CharacterId[] {
+    const list: CharacterId[] = ['wizard'];
+    if (MetaProgress.hasSpellbladeCharacter()) list.push('spellblade');
+    return list;
+  }
+
+  /**
+   * Skin variants available for a given character, in toggle-cycle order.
+   * Wizard: `default`, plus `prismancy` once any Prismarch defeat is on
+   * record. Spellblade: `default`, plus `prismancy` (red-helm) once a
+   * Prismarch has been defeated *while playing as Spellblade* — strictly
+   * stronger gate than the Wizard variant, the trophy of "I conquered him
+   * in his own image".
+   */
+  private skinsForCharacter(character: CharacterId): SkinId[] {
+    const list: SkinId[] = ['default'];
+    if (character === 'spellblade') {
+      if (MetaProgress.hasSpellbladePrismarchSkin()) list.push('prismancy');
+    } else {
+      if (Cosmetics.hasPrismancySkin()) list.push('prismancy');
+    }
+    return list;
+  }
+
+  /**
+   * Resolve the texture key for a (character, skin) pair. Both characters
+   * branch on skin now that Spellblade has its Prismarch-tier variant.
+   */
+  private previewTextureKey(character: CharacterId, skin: SkinId): string {
+    if (character === 'spellblade') {
+      return skin === 'prismancy'
+        ? TextureKeys.PlayerSpellbladePrismarch
+        : TextureKeys.PlayerSpellblade;
+    }
+    return skin === 'prismancy' ? TextureKeys.PlayerPrismancy : TextureKeys.Player;
+  }
+
+  /**
+   * Texture key for whichever (character, skin) is currently persisted.
+   * Used for the very first paint before `setupCharacterCycle` runs.
+   */
+  private currentCycleTextureKey(): string {
+    return this.previewTextureKey(
+      MetaProgress.getSelectedCharacter(),
+      MetaProgress.getSelectedSkin(),
+    );
+  }
+
+  private characterLabel(character: CharacterId): string {
+    return character === 'spellblade' ? 'SPELLBLADE' : 'WIZARD';
   }
 
   private skinHintText(skin: SkinId): string {
-    const name = skin === 'prismancy' ? 'PRISMANCY' : 'WIZARD';
+    const name = skin === 'prismancy' ? 'PRISMANCY' : 'DEFAULT';
     return `[S] SKIN: ${name}`;
   }
 

@@ -27,11 +27,24 @@ const LEGACY_KEY_LORD_ONYX = 'prismancy.unlocks.lordOnyxBeaten';
 const LEGACY_KEY_SELECTED_SKIN = 'prismancy.cosmetics.selectedSkin';
 
 export type SkinId = 'default' | 'prismancy';
+/** Playable characters. `wizard` is the original twin-stick magic-missile
+ *  caster. `spellblade` is the melee Tattered-Knight unlocked after the
+ *  first Prismarch defeat (lore: fallen knight of the Prismarch turning on
+ *  his old master). `wizard` is always available; `spellblade` gates on
+ *  `bossesDefeated.includes('boss-lord-onyx')`. */
+export type CharacterId = 'wizard' | 'spellblade';
 
 export interface MetaSave {
   version: typeof SCHEMA_VERSION;
   /** Stable enemy ids of bosses defeated at least once. */
   bossesDefeated: string[];
+  /** Subset of `bossesDefeated` recorded specifically while playing as the
+   *  Spellblade. Drives the Spellblade Prismarch-tier skin gate (kill the
+   *  Prismarch *as Spellblade* unlocks the red-helm variant; killing him
+   *  as Wizard only unlocks the character + the Wizard Prismancy skin).
+   *  Added 2026-05-09. Backwards-compat: missing field on older v1 saves
+   *  defaults to `[]` in `parseSave`. */
+  bossesDefeatedAsSpellblade: string[];
   /** Item ids picked up at least once. */
   itemsDiscovered: string[];
   runs: {
@@ -44,23 +57,32 @@ export interface MetaSave {
   };
   /** Shortest full-victory duration in ms, or null if none yet. */
   bestRunMs: number | null;
-  /** Player's wizard-skin preference. `null` means "no explicit pick yet"
-   * — the auto-apply rule in `getSelectedSkin` then chooses based on
-   * unlock state (preserves the trophy-reveal moment on first win). The
-   * `prismancy` skin is gated on a Prismarch defeat; if it's selected
-   * but not earned, queries fall back to `default` (defense-in-depth
-   * against manual save edits). */
+  /** Player's skin preference (shared across characters — last explicit
+   * pick wins). `null` means "no explicit pick yet" — the auto-apply rule
+   * in `getSelectedSkin` then chooses based on unlock state (preserves
+   * the trophy-reveal moment on first win). The `prismancy` skin is gated
+   * per-character: Wizard Prismancy on any Prismarch defeat, Spellblade
+   * Prismancy on a Prismarch defeat *as Spellblade*. If `prismancy` is
+   * selected but the active character's gate isn't met, queries fall back
+   * to `default` (defense-in-depth against manual save edits). */
   selectedSkin: SkinId | null;
+  /** Player's character preference. `null` = no explicit pick (defaults to
+   * `wizard`). `spellblade` is gated on a Prismarch defeat; if selected
+   * but not earned, `getSelectedCharacter` falls back to `wizard` (same
+   * defense-in-depth as the skin field). Added 2026-05-09. */
+  selectedCharacter: CharacterId | null;
 }
 
 function emptySave(): MetaSave {
   return {
     version: SCHEMA_VERSION,
     bossesDefeated: [],
+    bossesDefeatedAsSpellblade: [],
     itemsDiscovered: [],
     runs: { started: 0, died: 0, wonFull: 0, wonIncomplete: 0 },
     bestRunMs: null,
     selectedSkin: null,
+    selectedCharacter: null,
   };
 }
 
@@ -133,9 +155,29 @@ function parseSave(raw: unknown): MetaSave | null {
   ) {
     return null;
   }
+  // selectedCharacter was added 2026-05-09 — older saves (still v1, the
+  // schema-version stays the same since the field is forward-compatible
+  // via fallback to null) won't have it. Accept missing/null/known values.
+  let selectedCharacter: CharacterId | null = null;
+  if (r.selectedCharacter === 'wizard' || r.selectedCharacter === 'spellblade') {
+    selectedCharacter = r.selectedCharacter;
+  } else if (r.selectedCharacter !== undefined && r.selectedCharacter !== null) {
+    return null;
+  }
+  // bossesDefeatedAsSpellblade was added 2026-05-09 — older v1 saves
+  // default to []. Wrong-typed (non-array) field invalidates the blob.
+  let bossesDefeatedAsSpellblade: string[] = [];
+  if (Array.isArray(r.bossesDefeatedAsSpellblade)) {
+    bossesDefeatedAsSpellblade = r.bossesDefeatedAsSpellblade.filter(
+      (x): x is string => typeof x === 'string',
+    );
+  } else if (r.bossesDefeatedAsSpellblade !== undefined) {
+    return null;
+  }
   return {
     version: SCHEMA_VERSION,
     bossesDefeated: r.bossesDefeated.filter((x): x is string => typeof x === 'string'),
+    bossesDefeatedAsSpellblade,
     itemsDiscovered: r.itemsDiscovered.filter((x): x is string => typeof x === 'string'),
     runs: {
       started: runs.started,
@@ -145,6 +187,7 @@ function parseSave(raw: unknown): MetaSave | null {
     },
     bestRunMs: r.bestRunMs as number | null,
     selectedSkin: r.selectedSkin as SkinId | null,
+    selectedCharacter,
   };
 }
 
@@ -195,15 +238,33 @@ export const MetaProgress = {
 
   // --- Discovery / kill log ------------------------------------------------
 
-  recordBossDefeated(enemyId: string): void {
+  /** Record a boss defeat. If `character` is supplied and is `'spellblade'`,
+   *  the kill is *also* recorded against the per-character ledger that
+   *  drives the Spellblade Prismarch-tier skin gate. Idempotent on both
+   *  ledgers — repeat kills no-op. Wizard kills only touch the shared
+   *  ledger. */
+  recordBossDefeated(enemyId: string, character?: CharacterId): void {
     const s = load();
-    if (s.bossesDefeated.includes(enemyId)) return;
-    s.bossesDefeated.push(enemyId);
-    persist();
+    let dirty = false;
+    if (!s.bossesDefeated.includes(enemyId)) {
+      s.bossesDefeated.push(enemyId);
+      dirty = true;
+    }
+    if (character === 'spellblade' && !s.bossesDefeatedAsSpellblade.includes(enemyId)) {
+      s.bossesDefeatedAsSpellblade.push(enemyId);
+      dirty = true;
+    }
+    if (dirty) persist();
   },
 
   hasBeatenBoss(enemyId: string): boolean {
     return load().bossesDefeated.includes(enemyId);
+  },
+
+  /** True iff the player has defeated the named boss while playing as the
+   *  Spellblade. Used for the Spellblade Prismarch-tier skin gate. */
+  hasBeatenBossAsSpellblade(enemyId: string): boolean {
+    return load().bossesDefeatedAsSpellblade.includes(enemyId);
   },
 
   recordItemDiscovered(itemId: string): void {
@@ -255,23 +316,40 @@ export const MetaProgress = {
   // --- Cosmetic / skin -----------------------------------------------------
 
   /** True iff the player has ever defeated the Prismarch (Lord Onyx) — the
-   * Prismancy red/gold skin unlock flag, computed from `bossesDefeated`
-   * for rename-safety. The internal enemy id stays `boss-lord-onyx`
-   * (the file/class are still pending a rename pass per CLAUDE.md). */
+   * Wizard Prismancy red/gold skin unlock flag, computed from
+   * `bossesDefeated` for rename-safety. The internal enemy id stays
+   * `boss-lord-onyx` (the file/class are still pending a rename pass per
+   * CLAUDE.md). */
   hasPrismancySkin(): boolean {
     return load().bossesDefeated.includes('boss-lord-onyx');
   },
 
-  /** The skin the player has chosen for the wizard. Mirrors the prior
-   * Cosmetics.ts behaviour: explicit choice sticks (`'default'` or
-   * `'prismancy'`); `null` means no explicit pick yet, in which case the
-   * unlock state decides — fresh Prismarch unlock auto-applies (trophy-
-   * reveal moment), everyone else gets the default purple wizard. If
-   * `'prismancy'` is stored but not earned (legitimate post-reset state,
-   * or manual storage edit), fall back to default. */
-  getSelectedSkin(): SkinId {
+  /** True iff the player has defeated the Prismarch *while playing as the
+   * Spellblade* — the Spellblade Prismarch-tier (red-helm) skin unlock
+   * flag. Strictly stronger than `hasPrismancySkin` (it implies a
+   * Spellblade run, which already requires the character unlock, which
+   * already requires a prior Prismarch kill). */
+  hasSpellbladePrismarchSkin(): boolean {
+    return load().bossesDefeatedAsSpellblade.includes('boss-lord-onyx');
+  },
+
+  /** The skin the player has chosen, resolved for `character` (defaults to
+   * the active character if omitted). Explicit choice sticks (`'default'`
+   * or `'prismancy'`); `null` means no explicit pick yet, in which case
+   * the unlock state decides — fresh Prismarch unlock auto-applies
+   * (trophy-reveal moment), everyone else gets the default skin. If
+   * `'prismancy'` is stored but the active character's gate isn't met
+   * (legit post-reset state or manual save edit), fall back to default.
+   *
+   * The `character` parameter lets the menu preview a specific (char,
+   * skin) pair without persisting a setSelectedCharacter call first. */
+  getSelectedSkin(character?: CharacterId): SkinId {
     const s = load();
-    const unlocked = s.bossesDefeated.includes('boss-lord-onyx');
+    const targetChar = character ?? this.getSelectedCharacter();
+    const unlocked =
+      targetChar === 'spellblade'
+        ? s.bossesDefeatedAsSpellblade.includes('boss-lord-onyx')
+        : s.bossesDefeated.includes('boss-lord-onyx');
     if (s.selectedSkin === 'prismancy') return unlocked ? 'prismancy' : 'default';
     if (s.selectedSkin === 'default') return 'default';
     return unlocked ? 'prismancy' : 'default';
@@ -281,6 +359,33 @@ export const MetaProgress = {
   setSelectedSkin(skin: SkinId): void {
     const s = load();
     s.selectedSkin = skin;
+    persist();
+  },
+
+  // --- Character ----------------------------------------------------------
+
+  /** True iff the player has unlocked the Spellblade character — gated on
+   * a Prismarch defeat (= Lord Onyx kill, same gate as the Prismancy skin
+   * since both are Prismarch-tier rewards). */
+  hasSpellbladeCharacter(): boolean {
+    return load().bossesDefeated.includes('boss-lord-onyx');
+  },
+
+  /** The character the player has chosen. Mirrors `getSelectedSkin`'s
+   * resolution rules: explicit 'spellblade' sticks if unlocked, falls back
+   * to 'wizard' if not earned (defense-in-depth). 'wizard' always
+   * resolves. `null` (no explicit pick yet) → 'wizard'. */
+  getSelectedCharacter(): CharacterId {
+    const s = load();
+    const unlocked = s.bossesDefeated.includes('boss-lord-onyx');
+    if (s.selectedCharacter === 'spellblade') return unlocked ? 'spellblade' : 'wizard';
+    return 'wizard';
+  },
+
+  /** Persist the player's character choice. Main-menu cycle calls this. */
+  setSelectedCharacter(character: CharacterId): void {
+    const s = load();
+    s.selectedCharacter = character;
     persist();
   },
 
@@ -297,8 +402,10 @@ export const MetaProgress = {
 
   /** Aliased recorder so the old `Cosmetics.unlockPrismancySkin` callsite
    * (Lord-Onyx death handler in GameScene) keeps working. Equivalent to
-   * `recordBossDefeated('boss-lord-onyx')`. */
+   * `recordBossDefeated('boss-lord-onyx', activeCharacter)` — the
+   * character-aware variant ensures a Prismarch kill *as Spellblade* also
+   * pops the Spellblade Prismarch-tier skin gate. */
   unlockPrismancySkin(): void {
-    this.recordBossDefeated('boss-lord-onyx');
+    this.recordBossDefeated('boss-lord-onyx', this.getSelectedCharacter());
   },
 };

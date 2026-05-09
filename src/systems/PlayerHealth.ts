@@ -13,6 +13,12 @@ export class PlayerHealth {
   private readonly invincibilityMs: number;
   private nextVulnerableAt = 0;
   /**
+   * Glass-cannon items (currently only Blood of Marquis) lock max HP at
+   * this absolute value for the rest of the run — `addMaxHealth` no-ops
+   * when set, so HP-up items become wasted picks. `null` = no cap.
+   */
+  private maxCap: number | null = null;
+  /**
    * Why the current i-frame window is active. Lets the Player visual layer
    * pick a different feedback for "you just took a hit" (alpha-blink) vs
    * "you just walked into a new room and have a grace window" (no blink —
@@ -89,13 +95,35 @@ export class PlayerHealth {
   /**
    * Raise max HP by `amount` and heal the same amount, so the freshly added
    * heart spawns already filled. Used by HP-up items (Heart Container, etc.).
-   * No-op for non-positive `amount` or on a dead player.
+   * No-op for non-positive `amount` or on a dead player. Also no-op when a
+   * glass-cannon `maxCap` is active — Blood of Marquis trades all future
+   * HP-up value for the +stats burst.
    */
   addMaxHealth(amount: number): void {
     if (amount <= 0 || !this.isAlive()) return;
+    if (this.maxCap !== null) return;
     this.max += amount;
     this.current = Math.min(this.max, this.current + amount);
     EventBus.emit('player:healthChanged', { current: this.current, max: this.max });
+  }
+
+  /**
+   * Lock max HP at `cap` for the rest of the run and clamp current/max to
+   * that value. Used by glass-cannon items (Blood of Marquis) that trade
+   * all HP-up potential for a stat burst. Idempotent — a second call with
+   * the same cap is a no-op. A different cap value is allowed (the new
+   * one wins), but in practice we only have one such item.
+   */
+  setMaxHealthCap(cap: number): void {
+    if (cap <= 0) return;
+    this.maxCap = cap;
+    this.max = cap;
+    this.current = Math.min(this.current, cap);
+    EventBus.emit('player:healthChanged', { current: this.current, max: this.max });
+  }
+
+  getMaxHealthCap(): number | null {
+    return this.maxCap;
   }
 
   /**
@@ -129,13 +157,31 @@ export class PlayerHealth {
    * Restore health state from a snapshot (floor-transition carry-over).
    * `max` may exceed the constructor default if the player picked up HP-up
    * items on previous floors. `current` is clamped to `[0, max]`. Emits
-   * `player:healthChanged` so the HUD repaints.
+   * `player:healthChanged` so the HUD repaints. If a glass-cannon cap is
+   * active (e.g. Blood of Marquis hydrated before this call), the restored
+   * max is additionally clamped to the cap — defensive against a future
+   * snapshot path that forgets the cap.
    */
   restore(current: number, max: number): void {
     if (max <= 0) throw new Error(`PlayerHealth.restore: max must be > 0 (got ${max})`);
-    this.max = max;
-    this.current = Math.max(0, Math.min(current, max));
+    const effectiveMax = this.maxCap !== null ? Math.min(max, this.maxCap) : max;
+    this.max = effectiveMax;
+    this.current = Math.max(0, Math.min(current, effectiveMax));
     this.nextVulnerableAt = 0;
+    EventBus.emit('player:healthChanged', { current: this.current, max: this.max });
+  }
+
+  /**
+   * Force-set current HP without firing the `tookDamage` event. Used by
+   * self-sacrifice costs (Blood of Marquis [Q] activation) where the HP
+   * loss is a chosen cost, not a hit. Clamps to `[0, max]` and emits
+   * `healthChanged`. Does NOT grant i-frames (the player IS supposed to
+   * be vulnerable after spending blood) or fire `died` (caller checks
+   * `isAlive` after — the active gate prevents activation that would
+   * kill, so this should never reach 0 in practice).
+   */
+  forceSetCurrent(value: number): void {
+    this.current = Math.max(0, Math.min(value, this.max));
     EventBus.emit('player:healthChanged', { current: this.current, max: this.max });
   }
 }

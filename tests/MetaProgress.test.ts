@@ -183,4 +183,54 @@ describe('MetaProgress', () => {
     expect(storage.getItem(LEGACY_KEY_LORD_ONYX)).toBeNull();
     expect(storage.getItem(LEGACY_KEY_SELECTED_SKIN)).toBeNull();
   });
+
+  it('hasSpellbladePrismarchSkin only flips on a Prismarch kill *as Spellblade*', () => {
+    expect(MetaProgress.hasSpellbladePrismarchSkin()).toBe(false);
+    // Wizard-context kill — pops the shared ledger and the Wizard
+    // Prismancy gate, but NOT the Spellblade variant.
+    MetaProgress.recordBossDefeated('boss-lord-onyx', 'wizard');
+    expect(MetaProgress.hasPrismancySkin()).toBe(true);
+    expect(MetaProgress.hasSpellbladePrismarchSkin()).toBe(false);
+    // Spellblade-context kill — now the per-character ledger flips.
+    MetaProgress.recordBossDefeated('boss-lord-onyx', 'spellblade');
+    expect(MetaProgress.hasSpellbladePrismarchSkin()).toBe(true);
+  });
+
+  it('character-aware getSelectedSkin honours per-character gate', () => {
+    MetaProgress.recordBossDefeated('boss-lord-onyx', 'wizard');
+    MetaProgress.setSelectedSkin('prismancy');
+    // Wizard gate met → prismancy resolves.
+    expect(MetaProgress.getSelectedSkin('wizard')).toBe('prismancy');
+    // Spellblade gate NOT met → falls back to default even though the
+    // shared selectedSkin field stores 'prismancy'.
+    expect(MetaProgress.getSelectedSkin('spellblade')).toBe('default');
+    // Pop the spellblade gate too.
+    MetaProgress.recordBossDefeated('boss-lord-onyx', 'spellblade');
+    expect(MetaProgress.getSelectedSkin('spellblade')).toBe('prismancy');
+  });
+
+  it('recordBossDefeated without character only touches the shared ledger', () => {
+    MetaProgress.recordBossDefeated('boss-lord-onyx');
+    expect(MetaProgress.hasPrismancySkin()).toBe(true);
+    expect(MetaProgress.hasSpellbladePrismarchSkin()).toBe(false);
+  });
+
+  it('parseSave defaults missing bossesDefeatedAsSpellblade to []', () => {
+    // Synthesize a v1 save without the new field (pre-2026-05-09 shape).
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        bossesDefeated: ['boss-lord-onyx'],
+        itemsDiscovered: [],
+        runs: { started: 0, died: 0, wonFull: 0, wonIncomplete: 0 },
+        bestRunMs: null,
+        selectedSkin: null,
+        selectedCharacter: null,
+      }),
+    );
+    MetaProgress.forceReload();
+    expect(MetaProgress.hasPrismancySkin()).toBe(true);
+    expect(MetaProgress.hasSpellbladePrismarchSkin()).toBe(false);
+  });
 });

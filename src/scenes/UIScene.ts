@@ -10,6 +10,7 @@ import { DepthLayers } from '../config/DepthLayers';
 import { FLOORS, STARTING_FLOOR_ID, type FloorId } from '../data/floors';
 import { type FloorLayout } from '../dungeon/DungeonGenerator';
 import { type Direction, type RoomDescriptor } from '../types';
+import { ActiveItemSlot } from '../ui/ActiveItemSlot';
 import { BossHealthBar } from '../ui/BossHealthBar';
 import { CurrencyDisplay } from '../ui/CurrencyDisplay';
 import { ExpandedMap } from '../ui/ExpandedMap';
@@ -17,6 +18,7 @@ import { HealthDisplay } from '../ui/HealthDisplay';
 import { ItemToast } from '../ui/ItemToast';
 import { Minimap } from '../ui/Minimap';
 import { PickedItemsList } from '../ui/PickedItemsList';
+import { UnlockToast } from '../ui/UnlockToast';
 import { EventBus } from '../utils/EventBus';
 
 const NEIGHBOR_OFFSET: Record<Direction, { dx: number; dy: number }> = {
@@ -83,6 +85,12 @@ export class UIScene extends Phaser.Scene {
     // Pickup announcement toast (item name + effect).
     new ItemToast(this);
 
+    // Meta-progression unlock toast (skin / character / item-pool gate).
+    // Sits top-right, click-to-dismiss, queue-based for back-to-back
+    // unlocks (e.g. Prismarch kill flips Wizard Prismancy AND Spellblade
+    // character at once).
+    new UnlockToast(this);
+
     this.add
       .text(8, GAME_HEIGHT - 22, 'WASD move · arrows cast · TAB map', {
         fontSize: '13px',
@@ -103,6 +111,11 @@ export class UIScene extends Phaser.Scene {
     }
 
     this.pickedItemsList = new PickedItemsList(this);
+
+    // Active-item slot in the bottom-left corner — hidden when nothing's
+    // equipped. Reads `activeItemSystem` + `playerHealth` from the registry
+    // for its initial state, then keeps in sync via EventBus events.
+    new ActiveItemSlot(this);
 
     new BossHealthBar(this);
 

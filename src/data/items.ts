@@ -1,5 +1,6 @@
-import { ItemPool, type ItemDefinition } from '../types';
+import { ActiveItemKind, ItemPool, type ItemDefinition } from '../types';
 import { TextureKeys } from '../config/GameConfig';
+import { MetaProgress } from '../systems/MetaProgress';
 import { type RNG } from '../utils/RNG';
 
 /**
@@ -252,6 +253,41 @@ export const ITEMS = {
     effects: [{ stat: 'burnDamageFactor', add: 0.3 }],
     missileTint: 0xff7030,
   },
+  // --- Active-Item — Blood of Marquis ---------------------------------------
+  bloodOfMarquis: {
+    id: 'bloodOfMarquis',
+    displayName: 'Blood of Marquis',
+    description: 'Max HP locked at 2 hearts. +30% all stats. [Q] sacrifices blood for an AOE.',
+    textureKey: TextureKeys.ItemBloodOfMarquis,
+    /** Active-slot HUD swaps to the empty-vial variant when HP < 2 (player
+     *  just spent the active or can't afford it yet). Re-pickup of a heart
+     *  refills HP → slot swaps back to the full vial. */
+    activeEmptyTextureKey: TextureKeys.ItemBloodOfMarquisEmpty,
+    pools: [ItemPool.Boss],
+    effects: [
+      { stat: 'damage', mult: 1.3 },
+      { stat: 'fireRate', mult: 1.3 },
+      { stat: 'moveSpeed', mult: 1.3 },
+      { stat: 'missileSpeed', mult: 1.3 },
+    ],
+    missileTint: 0xc8284a,
+    /** 4 HP = exactly two full hearts (HP_PER_HEART × 2). [Q] drops to 1 HP
+     *  (= 1/2 heart), so a 2-heart cap leaves the player one full heart of
+     *  buffer between uses — heals from a heart pickup (+2 HP) bring them
+     *  back into the activate-able range without need to chain pickups. */
+    maxHealthCap: 4,
+    active: {
+      kind: ActiveItemKind.EchoesOfBlood,
+      bossDamageFraction: 0.3,
+    },
+    /** Onyx-pool gem — drops on the Onyx boss-pool roll. */
+    floor: 'onyx-mansion',
+    /** Meta-locked behind a Marquis-of-Mirages defeat: only appears in the
+     *  pool after the player has beaten Marquis at least once across all
+     *  runs. Until then the Onyx pool sees Bloodbound / Signet / Obsidian
+     *  Heart only. Same gating pattern the Prismancy skin uses. */
+    metaUnlock: 'boss-marquis-of-mirages',
+  },
 } as const satisfies Record<string, ItemDefinition>;
 
 export type ItemId = keyof typeof ITEMS;
@@ -287,6 +323,12 @@ export function pickItemFromPool(
       (item) => item.floor === undefined || item.floor === currentFloor,
     );
   }
+  // Meta-progression gate — items with `metaUnlock` only roll once the
+  // player has beaten the named boss at least once. Currently used by
+  // Blood of Marquis (gated on `boss-marquis-of-mirages`).
+  eligible = eligible.filter(
+    (item) => item.metaUnlock === undefined || MetaProgress.hasBeatenBoss(item.metaUnlock),
+  );
   if (eligible.length === 0) return null;
   return rng.pickWeighted(eligible, (item) => item.weight ?? 1);
 }

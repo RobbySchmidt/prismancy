@@ -35,6 +35,14 @@ export interface GameEvents {
   'map:teleport': { roomId: string };
   'inventory:changed': { coins: number; keys: number };
   'item:picked': { itemId: string };
+  /** An active item was equipped or cleared. `itemId === null` = slot empty
+   * (unequip path, only fires on SHUTDOWN currently). HUD slot widget
+   * listens to render the icon. */
+  'activeItem:equipped': { itemId: string | null };
+  /** Active item was successfully fired by the player ([Q] press, gates
+   * passed, costs paid). Distinct from `equipped` so the HUD slot can
+   * play a flash + the SFX system can hook up per-kind sounds. */
+  'activeItem:activated': { itemId: string };
   'pickup:collected': { kind: PickupKind };
   'door:unlocked': { roomId: string; direction: Direction };
   'shop:purchased': { kind: PickupKind; price: number };
@@ -78,6 +86,19 @@ export interface GameEvents {
    * altar socket into the prism during the charge window. After the gem
    * lands, the seal clears the socket. */
   'lordOnyx:specialFired': { phase: 1 | 2 | 3; x: number; y: number };
+  /** A meta-progression unlock just flipped from locked → unlocked for the
+   * first time (skin / character / item-pool gate). UnlockToast in the
+   * UIScene listens and surfaces a click-to-dismiss toast top-right.
+   * Generic by design — any future unlock just emits this event with a
+   * fresh `id` (used for de-duping if the same unlock somehow fires
+   * twice in one session). `textureKey` is optional; when present the
+   * toast renders the icon to the left of the text. */
+  'unlock:gained': {
+    id: string;
+    title: string;
+    subtitle?: string;
+    textureKey?: string;
+  };
 }
 
 class TypedEventBus {

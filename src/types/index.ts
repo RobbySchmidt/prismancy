@@ -243,6 +243,27 @@ export const ItemPool = {
 export type ItemPool = (typeof ItemPool)[keyof typeof ItemPool];
 
 /**
+ * Discriminator for the active-item subsystem. Each kind maps to one
+ * `executeActiveItem` branch in GameScene. Adding a new active item =
+ * one new entry here + one new branch + one entry in `ITEMS` with
+ * `active: { kind: '...' }`.
+ */
+export const ActiveItemKind = {
+  /** Blood of Marquis [Q] — expanding red shockwave from the player.
+   * Trash mobs instant-kill, bosses take `bossDamageFraction` of their
+   * max HP (Phase-Threshold cross natürlich). Player drops to 1/2 heart. */
+  EchoesOfBlood: 'echoesOfBlood',
+} as const;
+export type ActiveItemKind = (typeof ActiveItemKind)[keyof typeof ActiveItemKind];
+
+export interface ActiveItemSpec {
+  kind: ActiveItemKind;
+  /** For `echoesOfBlood`: fraction of boss's max HP dealt as damage on use.
+   * Trash mobs are instant-killed regardless. Defaults handled per-kind. */
+  bossDamageFraction?: number;
+}
+
+/**
  * Static definition of an item, lives in `data/items.ts`. Effects are
  * applied to the player's `StatsSystem` via `ItemSystem.pickUp`. Optional
  * `missileTint` overrides the missile colour (latest-wins via StatsSystem).
@@ -273,6 +294,36 @@ export interface ItemDefinition {
    * `string` to avoid a circular import with `data/floors.ts`.
    */
   floor?: string;
+  /**
+   * When set, picking up this item also installs an active special the
+   * player can trigger with the [Q] key. Activation gating (HP costs,
+   * cooldowns) lives per-kind in GameScene's `executeActiveItem` switch.
+   * Only one active is equipped at a time — picking a second active
+   * replaces the first.
+   */
+  active?: ActiveItemSpec;
+  /**
+   * Optional alternative texture rendered in the [Q] active-item slot
+   * when the active is currently un-usable (HP gate not met, on cooldown,
+   * etc.). Lets an item show a "spent" or "empty" state visually instead
+   * of just relying on the slot's tint+alpha greyed-out fallback. Used by
+   * Blood of Marquis to swap to an empty-vial sprite after [Q] activation.
+   */
+  activeEmptyTextureKey?: string;
+  /**
+   * When set, picking the item locks the player's max HP at this absolute
+   * value for the rest of the run. Subsequent `maxHealthBonus` grants are
+   * silently capped (Heart Container etc. become wasted picks — bewusster
+   * Trade-off des Glass-Cannon-Themes).
+   */
+  maxHealthCap?: number;
+  /**
+   * Optional meta-progression gate — item is filtered out of all pools
+   * unless `MetaProgress.hasBeatenBoss(metaUnlock)` returns true. Uses
+   * stable enemy ids (e.g. `'boss-marquis-of-mirages'`) so display-name
+   * renames don't break the gate.
+   */
+  metaUnlock?: string;
 }
 
 export interface DropTableEntry {

@@ -93,6 +93,8 @@ export class PreloadScene extends Phaser.Scene {
 
     this.drawWizardTexture(g, this.DEFAULT_WIZARD_PALETTE, TextureKeys.Player);
     this.drawWizardTexture(g, this.PRISMANCY_WIZARD_PALETTE, TextureKeys.PlayerPrismancy);
+    this.drawSpellbladeTexture(g, this.DEFAULT_SPELLBLADE_PALETTE, TextureKeys.PlayerSpellblade);
+    this.drawSpellbladeTexture(g, this.PRISMARCH_SPELLBLADE_PALETTE, TextureKeys.PlayerSpellbladePrismarch);
     this.drawMagicMissileTexture(g);
     this.drawForestSpriteTexture(g);
     this.drawMossySlimeTexture(g);
@@ -155,6 +157,8 @@ export class PreloadScene extends Phaser.Scene {
     this.drawItemMagicShardTexture(g);
     this.drawItemWizardGlassesTexture(g);
     this.drawItemFireOrbTexture(g);
+    this.drawItemBloodOfMarquisTexture(g);
+    this.drawItemBloodOfMarquisEmptyTexture(g);
     this.drawStairsTexture(g);
 
     for (const theme of Object.values(FLOORS)) {
@@ -540,6 +544,383 @@ export class PreloadScene extends Phaser.Scene {
     EYE: 0x300008,
     TIP_SPARKLE: 0xffffff,
   } as const;
+
+  /**
+   * Spellblade — Tattered Knight palette. Lore: fallen knight of the
+   * Prismarch, now turning on his old master. Shares the Prismarch's
+   * tattered-cult visual DNA (windblown hem-streamers, dark cape, gold
+   * accents) but with a silver knight helm + onyx longsword instead of
+   * the cultist hood-void + chain-bound prism. Unlocked after the first
+   * Prismarch defeat. Earned in the same beat as the Prismancy skin.
+   */
+  private readonly DEFAULT_SPELLBLADE_PALETTE = {
+    OUT: 0x080a14,
+    HELM: 0x9098a8,
+    HELM_HI: 0xd8e0e8,
+    HELM_SHADOW: 0x4a5060,
+    HELM_TRIM: 0x7a5018,
+    HELM_TRIM_HI: 0xffc850,
+    VISOR_GLOW: 0xc864ff,
+    BODY: 0x3a4050,
+    BODY_HI: 0x6a7080,
+    BODY_SHADOW: 0x1a1c28,
+    CAPE_OUT: 0x0a0814,
+    CAPE: 0x261438,
+    CAPE_HI: 0x4a2a44,
+    CAPE_SHADOW: 0x1a0a20,
+    BLADE_OUT: 0x080010,
+    BLADE: 0x2a1438,
+    BLADE_HI: 0x6a4080,
+    BLADE_GLOW: 0xc864ff,
+    POMMEL_DARK: 0x7a5018,
+    POMMEL: 0xffc850,
+    POMMEL_HI: 0xfff0a8,
+    BOOT: 0x1a1c28,
+    BOOT_HI: 0x4a5060,
+    SHADOW: 0x080a14,
+  } as const;
+
+  /**
+   * Spellblade Prismarch-tier palette — black helm + crimson cape + gold
+   * trim + crimson visor/blade glow. Earned by defeating the Prismarch
+   * WHILE playing the Spellblade. Lore: the fallen knight reforges his
+   * gear in the Prismarch's blood after the kill, claiming the throne's
+   * regalia. Same painterly silhouette as the default skin (re-uses
+   * `drawSpellbladeTexture`), only colours swap.
+   */
+  private readonly PRISMARCH_SPELLBLADE_PALETTE = {
+    OUT: 0x0a0408,
+    // Helm — true black with subtle gunmetal sheen on the polished side.
+    HELM: 0x18181e,
+    HELM_HI: 0x4a4a58,
+    HELM_SHADOW: 0x080a0e,
+    // Trim — gold to match the wizard's Prismancy band.
+    HELM_TRIM: 0x7a5018,
+    HELM_TRIM_HI: 0xffd84a,
+    // Visor — crimson eye-channel instead of amethyst.
+    VISOR_GLOW: 0xff4060,
+    // Body — dark armor with a faint crimson cast so it reads as a
+    // matching piece with the cape rather than disconnected steel.
+    BODY: 0x2a1820,
+    BODY_HI: 0x4a3038,
+    BODY_SHADOW: 0x10080c,
+    // Cape — deep crimson swap of the wizard Prismancy robe.
+    CAPE_OUT: 0x1a0408,
+    CAPE: 0xb8202c,
+    CAPE_HI: 0xff5060,
+    CAPE_SHADOW: 0x6a0a14,
+    // Blade — onyx core bleeds crimson now (Prismarch-corrupted).
+    BLADE_OUT: 0x100408,
+    BLADE: 0x2a1018,
+    BLADE_HI: 0x8a2030,
+    BLADE_GLOW: 0xff4060,
+    // Pommel — gold matches the helm trim.
+    POMMEL_DARK: 0x7a5018,
+    POMMEL: 0xffd84a,
+    POMMEL_HI: 0xfff0a8,
+    BOOT: 0x1a0a10,
+    BOOT_HI: 0x4a2028,
+    SHADOW: 0x180408,
+  } as const;
+
+  /**
+   * Render the Spellblade (Tattered Knight) sprite at the player size. Uses
+   * the same painterly silhouette vocabulary as the Wizard re-paint —
+   * fillPoints + fillEllipse + fillTriangle — so both characters share
+   * visual DNA. Figure spans y=10 (helm dome) to y=53 (boots), `cx=32`
+   * matching the wizard's bounds.
+   */
+  private drawSpellbladeTexture(
+    g: Phaser.GameObjects.Graphics,
+    palette: {
+      OUT: number;
+      HELM: number;
+      HELM_HI: number;
+      HELM_SHADOW: number;
+      HELM_TRIM: number;
+      HELM_TRIM_HI: number;
+      VISOR_GLOW: number;
+      BODY: number;
+      BODY_HI: number;
+      BODY_SHADOW: number;
+      CAPE_OUT: number;
+      CAPE: number;
+      CAPE_HI: number;
+      CAPE_SHADOW: number;
+      BLADE_OUT: number;
+      BLADE: number;
+      BLADE_HI: number;
+      BLADE_GLOW: number;
+      POMMEL_DARK: number;
+      POMMEL: number;
+      POMMEL_HI: number;
+      BOOT: number;
+      BOOT_HI: number;
+      SHADOW: number;
+    },
+    textureKey: string,
+  ): void {
+    const size = TILE_SIZE;
+    g.clear();
+    const {
+      OUT,
+      HELM,
+      HELM_HI,
+      HELM_SHADOW,
+      HELM_TRIM,
+      HELM_TRIM_HI,
+      VISOR_GLOW,
+      BODY,
+      BODY_HI,
+      BODY_SHADOW,
+      CAPE_OUT,
+      CAPE,
+      CAPE_HI,
+      CAPE_SHADOW,
+      BLADE_OUT,
+      BLADE,
+      BLADE_HI,
+      BLADE_GLOW,
+      POMMEL_DARK,
+      POMMEL,
+      POMMEL_HI,
+      BOOT,
+      BOOT_HI,
+      SHADOW,
+    } = palette;
+    void HELM_SHADOW;
+    void CAPE_SHADOW;
+    void BODY_SHADOW;
+
+    const cx = size / 2;
+    const top = 10;
+    const figBot = 53;
+
+    // 1) CAPE — tattered, draped behind the body. Asymmetric so it reads
+    //    as windblown rather than a stiff sheet. Outline first, then mid
+    //    fill, then highlight rim on the player-facing edge.
+    const cape: Array<{ x: number; y: number }> = [
+      { x: cx - 7, y: top + 16 },     // L shoulder anchor
+      { x: cx + 7, y: top + 16 },     // R shoulder anchor
+      { x: cx + 11, y: top + 24 },    // R bulge
+      { x: cx + 13, y: top + 32 },    // R hem max
+      { x: cx + 9, y: top + 38 },     // R hem corner
+      { x: cx, y: top + 36 },         // hem center
+      { x: cx - 9, y: top + 38 },     // L hem corner
+      { x: cx - 13, y: top + 32 },    // L hem max
+      { x: cx - 10, y: top + 24 },    // L bulge
+    ];
+    g.fillStyle(CAPE_OUT, 1);
+    g.fillPoints(cape, true);
+    g.fillStyle(CAPE, 1);
+    g.fillPoints(
+      cape.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    g.fillStyle(CAPE_HI, 0.55);
+    g.fillEllipse(cx - 4, top + 22, 4, 12);
+
+    // 2) HEM-STREAMERS — windblown short triangles past the cape hem,
+    //    callback to the Prismarch's tattered look. Three on each side at
+    //    asymmetric angles.
+    g.fillStyle(CAPE_OUT, 1);
+    g.fillTriangle(cx - 13, top + 32, cx - 10, top + 38, cx - 14, top + 41);
+    g.fillTriangle(cx + 13, top + 32, cx + 10, top + 38, cx + 12, top + 42);
+    g.fillTriangle(cx - 8, top + 36, cx - 6, top + 41, cx - 9, top + 43);
+    g.fillTriangle(cx + 8, top + 36, cx + 6, top + 41, cx + 7, top + 43);
+
+    // 3) BODY — steel breastplate with pauldrons. Bell silhouette echoes
+    //    the wizard so the player reads as the same scale.
+    const body: Array<{ x: number; y: number }> = [
+      { x: cx - 5, y: top + 18 },     // L pauldron top
+      { x: cx + 5, y: top + 18 },     // R pauldron top
+      { x: cx + 7, y: top + 22 },     // R pauldron edge
+      { x: cx + 6, y: top + 30 },     // R waist
+      { x: cx + 7, y: top + 36 },     // R hip flare
+      { x: cx, y: top + 38 },         // skirt center
+      { x: cx - 7, y: top + 36 },     // L hip flare
+      { x: cx - 6, y: top + 30 },     // L waist
+      { x: cx - 7, y: top + 22 },     // L pauldron edge
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(body, true);
+    g.fillStyle(BODY, 1);
+    g.fillPoints(
+      body.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    // Vertical seam down the centre — gives the breastplate a forge-line.
+    g.fillStyle(BODY_SHADOW, 0.7);
+    g.fillRect(cx, top + 20, 1, 14);
+    // Pauldron highlights — bright top arc on each shoulder cup.
+    g.fillStyle(BODY_HI, 1);
+    g.fillEllipse(cx - 5, top + 19, 4, 2);
+    g.fillEllipse(cx + 5, top + 19, 4, 2);
+    // Chest plate highlight — single bright slash on the left side.
+    g.fillStyle(BODY_HI, 0.65);
+    g.fillEllipse(cx - 2, top + 24, 2, 6);
+
+    // 4) BELT with tarnished gold buckle.
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 7, top + 30, 14, 3);
+    g.fillStyle(BOOT, 1);
+    g.fillRect(cx - 6, top + 31, 12, 1);
+    g.fillStyle(POMMEL_DARK, 1);
+    g.fillRect(cx - 2, top + 31, 4, 2);
+    g.fillStyle(POMMEL, 1);
+    g.fillRect(cx - 1, top + 31, 2, 1);
+
+    // 5) BOOTS / GREAVES.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx - 3, top + 42, 5, 3);
+    g.fillEllipse(cx + 3, top + 42, 5, 3);
+    g.fillStyle(BOOT, 1);
+    g.fillEllipse(cx - 3, top + 42, 3.5, 2);
+    g.fillEllipse(cx + 3, top + 42, 3.5, 2);
+    g.fillStyle(BOOT_HI, 1);
+    g.fillRect(cx - 4, top + 41, 1, 1);
+    g.fillRect(cx + 2, top + 41, 1, 1);
+
+    // 6) HELM — angular knight's helm. Flat top + straight sides + beveled
+    //    corners + slight chin taper. Reads boxier and more knightly than
+    //    the rounded dome the v1 sketch used (user-flagged "rund passt
+    //    nicht"). Three-tone shading + trim band + visor slit.
+    const helm: Array<{ x: number; y: number }> = [
+      { x: cx - 6, y: top + 0 },      // top-left corner (flat top)
+      { x: cx + 6, y: top + 0 },      // top-right corner
+      { x: cx + 7, y: top + 2 },      // bevel R
+      { x: cx + 7, y: top + 13 },     // straight side R
+      { x: cx + 5, y: top + 15 },     // chin taper R
+      { x: cx + 4, y: top + 17 },     // chin bottom R
+      { x: cx - 4, y: top + 17 },     // chin bottom L
+      { x: cx - 5, y: top + 15 },     // chin taper L
+      { x: cx - 7, y: top + 13 },     // straight side L
+      { x: cx - 7, y: top + 2 },      // bevel L
+    ];
+    g.fillStyle(OUT, 1);
+    g.fillPoints(helm, true);
+    g.fillStyle(HELM, 1);
+    g.fillPoints(
+      helm.map((p) => ({ x: p.x, y: p.y + 1 })),
+      true,
+    );
+    // Crown ridge — a thin raised line down the centre of the helm top,
+    // sells "this is a forged plate, not a smooth bowl". Two-tone for a
+    // bit of dimension.
+    g.fillStyle(HELM_SHADOW, 1);
+    g.fillRect(cx - 1, top + 0, 2, 4);
+    g.fillStyle(HELM_HI, 1);
+    g.fillRect(cx, top + 1, 1, 3);
+    // Top-left highlight band — polished steel catches light here.
+    g.fillStyle(HELM_HI, 1);
+    g.fillRect(cx - 5, top + 1, 3, 1);
+    g.fillRect(cx - 6, top + 2, 1, 4);
+    g.fillStyle(HELM_HI, 0.55);
+    g.fillRect(cx - 6, top + 6, 1, 6);
+    // Right-side darker shading — depth on the shadowed cheek.
+    g.fillStyle(HELM_SHADOW, 0.7);
+    g.fillRect(cx + 5, top + 4, 2, 9);
+
+    // Visor slit — horizontal dark band with subtle violet glow inside,
+    // echoing the Prismarch's amethyst eye-channel. Sits low on the face
+    // so the angular crown reads as the dominant feature.
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 5, top + 9, 10, 2);
+    g.fillStyle(VISOR_GLOW, 0.7);
+    g.fillRect(cx - 4, top + 10, 8, 1);
+    // Two pinpoint eye-glows inside the slit.
+    g.fillStyle(VISOR_GLOW, 1);
+    g.fillRect(cx - 3, top + 10, 1, 1);
+    g.fillRect(cx + 2, top + 10, 1, 1);
+
+    // Helm trim band — tarnished gold strip at the chin / gorget seam.
+    g.fillStyle(HELM_TRIM, 1);
+    g.fillRect(cx - 6, top + 14, 13, 1);
+    g.fillStyle(HELM_TRIM_HI, 0.85);
+    g.fillRect(cx - 5, top + 14, 1, 1);
+    g.fillRect(cx + 4, top + 14, 1, 1);
+    // Cheek-rivet pixels for armor detail.
+    g.fillStyle(HELM_TRIM, 1);
+    g.fillRect(cx - 6, top + 6, 1, 1);
+    g.fillRect(cx + 5, top + 6, 1, 1);
+    g.fillRect(cx - 6, top + 12, 1, 1);
+    g.fillRect(cx + 5, top + 12, 1, 1);
+
+    // 7) ANGLED ONYX LONGSWORD — held diagonally up-right at the same
+    //    tilt as the wizard's wand for visual rhyme between the two
+    //    playable characters. Pommel tucked near the right hip, blade
+    //    points up-right past the shoulder. Replaces the previous
+    //    vertical "knight at rest" silhouette per user feedback
+    //    (2026-05-09 — "können wir das schwert noch anwinkeln, so wie
+    //    beim zauberstab vom wizard?").
+    //
+    //    Sword axis matches the wand axis (cx+2,top+30 → cx+11,top+16),
+    //    extended to longsword length. Crossguard sits perpendicular to
+    //    that axis at the grip-blade junction; pommel + grip extend
+    //    down-left, blade extends up-right.
+
+    // Pommel — small dark disc with gold accent at the back end of the
+    // grip, tucked near the right hip.
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx + 2, top + 30, 1.8);
+    g.fillStyle(POMMEL, 1);
+    g.fillCircle(cx + 2, top + 30, 1.3);
+    g.fillStyle(POMMEL_HI, 1);
+    g.fillRect(cx + 1, top + 30, 1, 1);
+
+    // Grip (leather wrap) — angled quad from pommel up-right toward the
+    // crossguard. Built as two triangles since fillPoints would alpha-
+    // blend the seam.
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx + 1, top + 29, cx + 3, top + 30, cx + 5, top + 25);
+    g.fillTriangle(cx + 5, top + 25, cx + 3, top + 30, cx + 6, top + 26);
+    g.fillStyle(BOOT, 1);
+    g.fillTriangle(cx + 1.6, top + 29.1, cx + 2.7, top + 29.7, cx + 4.8, top + 25.4);
+    g.fillTriangle(cx + 4.8, top + 25.4, cx + 2.7, top + 29.7, cx + 5.5, top + 26.1);
+
+    // Crossguard — perpendicular gold bar at the grip-blade junction,
+    // ~7 px diagonal length. Two-triangle quad with the same outline /
+    // mid / highlight stack as the original horizontal version.
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(cx + 2, top + 22, cx + 4, top + 21, cx + 8, top + 27);
+    g.fillTriangle(cx + 2, top + 22, cx + 8, top + 27, cx + 6, top + 28);
+    g.fillStyle(POMMEL_DARK, 1);
+    g.fillTriangle(cx + 2.6, top + 22.4, cx + 3.6, top + 21.7, cx + 7.4, top + 26.7);
+    g.fillTriangle(cx + 2.6, top + 22.4, cx + 7.4, top + 26.7, cx + 6.1, top + 27.5);
+    g.fillStyle(POMMEL, 1);
+    g.fillTriangle(cx + 3, top + 22.6, cx + 3.8, top + 22.1, cx + 7, top + 26.5);
+
+    // Blade — long tapered triangle from base to tip along the wand
+    // axis. Outline + onyx mid + bright forge edge + soft amethyst glow.
+    // Mirrors the wand's two-triangle outline+fill technique: inner
+    // vertices nudged ~0.5 px along the axis to leave a hairline outline
+    // rim on the lower-right edge.
+    g.fillStyle(BLADE_OUT, 1);
+    g.fillTriangle(cx + 4, top + 21, cx + 8, top + 26, cx + 19, top + 6);
+    g.fillStyle(BLADE, 1);
+    g.fillTriangle(cx + 4.5, top + 21.5, cx + 7, top + 25.5, cx + 18, top + 7);
+    // Forge-edge highlight on the upper-left side of the blade — thin
+    // triangle running the full length of the upper edge.
+    g.fillStyle(BLADE_HI, 1);
+    g.fillTriangle(cx + 4, top + 20.5, cx + 5.3, top + 21.5, cx + 18, top + 6.5);
+    // Subtle amethyst shine on the upper third — onyx-magic shimmer
+    // near the tip without a wand-orb-style halo.
+    g.fillStyle(BLADE_GLOW, 0.32);
+    g.fillTriangle(cx + 11, top + 14, cx + 13, top + 17, cx + 18, top + 7);
+
+    // Hand (gauntlet) on the grip — drawn AFTER blade & crossguard so
+    // the armored hand sits on top of the grip-crossguard seam.
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx + 4, top + 27, 1.9);
+    g.fillStyle(BODY, 1);
+    g.fillCircle(cx + 4, top + 27, 1.4);
+
+    // 8) Ground shadow under the boots.
+    g.fillStyle(SHADOW, 0.45);
+    g.fillEllipse(cx, figBot, 14, 2);
+
+    g.generateTexture(textureKey, size, size);
+  }
 
   // ---------------------------------------------------------------------------
   // Magic Missile
@@ -4859,6 +5240,166 @@ export class PreloadScene extends Phaser.Scene {
     g.fillTriangle(cx + 1, 6, cx + 3, 6, cx + 2, 4);
 
     g.generateTexture(TextureKeys.ItemFireOrb, w, h);
+  }
+
+  /**
+   * Blood of Marquis — vial with crimson liquid, gold-trimmed wax cork,
+   * crimson halo. Shape borrows the Magic Potion silhouette (rounded
+   * flask) but the palette is much darker + the cork has a gold band so
+   * it reads as the Marquis's signature item, not a generic potion.
+   */
+  private drawItemBloodOfMarquisTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    g.clear();
+
+    const OUT = 0x180408;
+    const GLASS_HI = 0xffd0d8;
+    const BLOOD_DARK = 0x500810;
+    const BLOOD = 0xa01828;
+    const BLOOD_HI = 0xe04050;
+    const WAX = 0x300810;
+    const WAX_HI = 0x5a1018;
+    const GOLD_DARK = 0x7a5018;
+    const GOLD = 0xffc850;
+    const SPARK = 0xffa0a8;
+
+    // Crimson halo — ominous glow, more intense than Magic Potion's blue
+    g.fillStyle(0xa01828, 0.22);
+    g.fillCircle(7, 8, 6);
+    g.fillStyle(0xa01828, 0.36);
+    g.fillCircle(7, 8, 4);
+
+    // Wax-sealed cork (top) with gold trim band
+    g.fillStyle(OUT, 1);
+    g.fillRect(5, 0, 4, 3);
+    g.fillStyle(WAX, 1);
+    g.fillRect(5, 1, 4, 1);
+    g.fillStyle(WAX_HI, 1);
+    g.fillRect(5, 1, 1, 1);
+    // Gold band wrapping the cork base
+    g.fillStyle(GOLD_DARK, 1);
+    g.fillRect(5, 2, 4, 1);
+    g.fillStyle(GOLD, 1);
+    g.fillRect(5, 2, 1, 1);
+
+    // Neck outline (between cork and body)
+    g.fillStyle(OUT, 1);
+    g.fillRect(5, 3, 1, 2);
+    g.fillRect(8, 3, 1, 2);
+
+    // Bottle body outline (rounded flask)
+    g.fillRect(4, 5, 1, 1);
+    g.fillRect(9, 5, 1, 1);
+    g.fillRect(3, 6, 1, 5);
+    g.fillRect(10, 6, 1, 5);
+    g.fillRect(4, 11, 1, 1);
+    g.fillRect(9, 11, 1, 1);
+    g.fillRect(5, 12, 4, 1);
+
+    // Blood filling neck + body — darker base, brighter mid, brightest highlight
+    g.fillStyle(BLOOD_DARK, 1);
+    g.fillRect(6, 3, 2, 2);
+    g.fillRect(5, 5, 4, 1);
+    g.fillRect(4, 6, 6, 5);
+    g.fillRect(5, 11, 4, 1);
+    // Mid-tone surface band — sloshing meniscus
+    g.fillStyle(BLOOD, 1);
+    g.fillRect(5, 6, 4, 2);
+    g.fillRect(4, 8, 6, 2);
+    // Highlight droplets — small clots floating in the liquid
+    g.fillStyle(BLOOD_HI, 1);
+    g.fillRect(5, 7, 1, 1);
+    g.fillRect(7, 9, 1, 1);
+    g.fillRect(8, 6, 1, 1);
+
+    // Glass shine — vertical streak on the left of the body
+    g.fillStyle(GLASS_HI, 0.35);
+    g.fillRect(4, 7, 1, 3);
+
+    // Sparkle pixels around the bottle for ominous aura
+    g.fillStyle(SPARK, 1);
+    g.fillRect(2, 4, 1, 1);
+    g.fillRect(12, 6, 1, 1);
+    g.fillRect(11, 11, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemBloodOfMarquis, w, h);
+  }
+
+  /**
+   * Empty-vial variant of Blood of Marquis. Same silhouette, cork, gold
+   * trim band, glass shine — no liquid inside + dimmer halo. The active-
+   * item slot swaps to this texture when the active is un-usable (HP < 2)
+   * so the "spent" state reads visually, not just via greyed-out alpha.
+   */
+  private drawItemBloodOfMarquisEmptyTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    g.clear();
+
+    const OUT = 0x180408;
+    const GLASS_HI = 0xffd0d8;
+    const GLASS_DARK = 0x2a0810;
+    const WAX = 0x300810;
+    const WAX_HI = 0x5a1018;
+    const GOLD_DARK = 0x7a5018;
+    const GOLD = 0xffc850;
+    const RESIDUE = 0x500810;
+
+    // Dim crimson halo — much subtler than the full vial's, signals "spent"
+    g.fillStyle(0xa01828, 0.1);
+    g.fillCircle(7, 8, 6);
+    g.fillStyle(0xa01828, 0.16);
+    g.fillCircle(7, 8, 4);
+
+    // Cork (top) — same as full vial
+    g.fillStyle(OUT, 1);
+    g.fillRect(5, 0, 4, 3);
+    g.fillStyle(WAX, 1);
+    g.fillRect(5, 1, 4, 1);
+    g.fillStyle(WAX_HI, 1);
+    g.fillRect(5, 1, 1, 1);
+    // Gold band wrapping the cork base
+    g.fillStyle(GOLD_DARK, 1);
+    g.fillRect(5, 2, 4, 1);
+    g.fillStyle(GOLD, 1);
+    g.fillRect(5, 2, 1, 1);
+
+    // Neck outline (between cork and body)
+    g.fillStyle(OUT, 1);
+    g.fillRect(5, 3, 1, 2);
+    g.fillRect(8, 3, 1, 2);
+
+    // Bottle body outline (rounded flask) — same as full vial
+    g.fillRect(4, 5, 1, 1);
+    g.fillRect(9, 5, 1, 1);
+    g.fillRect(3, 6, 1, 5);
+    g.fillRect(10, 6, 1, 5);
+    g.fillRect(4, 11, 1, 1);
+    g.fillRect(9, 11, 1, 1);
+    g.fillRect(5, 12, 4, 1);
+
+    // EMPTY interior — fill with the dark glass-back tint (no liquid).
+    // Reads as a translucent glass void rather than blood.
+    g.fillStyle(GLASS_DARK, 1);
+    g.fillRect(6, 3, 2, 2);
+    g.fillRect(5, 5, 4, 1);
+    g.fillRect(4, 6, 6, 5);
+    g.fillRect(5, 11, 4, 1);
+
+    // Tiny residue droplet at the bottom — sells "this WAS blood"
+    g.fillStyle(RESIDUE, 1);
+    g.fillRect(6, 11, 2, 1);
+    g.fillRect(7, 10, 1, 1);
+
+    // Glass shine — vertical streak on the left (more pronounced now since
+    // the empty vial reads as cleaner glass)
+    g.fillStyle(GLASS_HI, 0.55);
+    g.fillRect(4, 7, 1, 4);
+    g.fillStyle(GLASS_HI, 0.3);
+    g.fillRect(9, 7, 1, 3);
+
+    g.generateTexture(TextureKeys.ItemBloodOfMarquisEmpty, w, h);
   }
 
   /**

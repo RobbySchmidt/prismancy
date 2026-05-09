@@ -80,6 +80,10 @@ export class StatsScene extends Phaser.Scene {
         'Prismancy skin',
         MetaProgress.hasPrismancySkin() ? 'unlocked' : 'locked',
       ],
+      [
+        'Spellblade Prismarch skin',
+        MetaProgress.hasSpellbladePrismarchSkin() ? 'unlocked' : 'locked',
+      ],
     ];
 
     const startY = 130;

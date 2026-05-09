@@ -1,4 +1,5 @@
 import { type ItemDefinition, type ItemModifier } from '../types';
+import { type ActiveItemSystem } from './ActiveItemSystem';
 import { MetaProgress } from './MetaProgress';
 import { type PlayerHealth } from './PlayerHealth';
 import { type StatsSystem } from './StatsSystem';
@@ -20,6 +21,7 @@ export class ItemSystem {
   constructor(
     private readonly stats: StatsSystem,
     private readonly playerHealth: PlayerHealth | null = null,
+    private readonly activeItemSystem: ActiveItemSystem | null = null,
   ) {}
 
   /**
@@ -36,8 +38,16 @@ export class ItemSystem {
       ...(item.missileTint !== undefined ? { missileTint: item.missileTint } : {}),
     };
     this.stats.applyModifier(modifier);
+    // Apply max-HP-cap BEFORE bonus so that a (theoretical) item that
+    // grants both fields would lock at the cap, not the cap+bonus.
+    if (item.maxHealthCap !== undefined && item.maxHealthCap > 0) {
+      this.playerHealth?.setMaxHealthCap(item.maxHealthCap);
+    }
     if (item.maxHealthBonus !== undefined && item.maxHealthBonus > 0) {
       this.playerHealth?.addMaxHealth(item.maxHealthBonus);
+    }
+    if (item.active !== undefined) {
+      this.activeItemSystem?.equip(item);
     }
     this.picked.add(item.id);
     // Trophy/collection: log the discovery in MetaProgress. Idempotent —
@@ -81,8 +91,14 @@ export class ItemSystem {
         ...(item.missileTint !== undefined ? { missileTint: item.missileTint } : {}),
       };
       this.stats.applyModifier(modifier);
+      if (item.maxHealthCap !== undefined && item.maxHealthCap > 0) {
+        this.playerHealth?.setMaxHealthCap(item.maxHealthCap);
+      }
       if (item.maxHealthBonus !== undefined && item.maxHealthBonus > 0) {
         this.playerHealth?.addMaxHealth(item.maxHealthBonus);
+      }
+      if (item.active !== undefined) {
+        this.activeItemSystem?.equip(item);
       }
       this.picked.add(item.id);
     }

@@ -14,12 +14,39 @@ import {
 } from '../config/GameConfig';
 import { DepthLayers } from '../config/DepthLayers';
 import { type Direction, type Vector2 } from '../types';
-import { Cosmetics } from '../systems/Cosmetics';
 import { type InputManager } from '../systems/InputManager';
+import { MetaProgress } from '../systems/MetaProgress';
 import { PlayerHealth } from '../systems/PlayerHealth';
 import { getSfxSynth } from '../systems/SfxSynth';
 import { type StatsSystem } from '../systems/StatsSystem';
 import { type MagicMissilePool } from './projectiles/MagicMissilePool';
+
+/**
+ * Resolve the texture key for the player based on the persisted character
+ * + skin selection. Defaults: wizard / default = TextureKeys.Player.
+ *   wizard + prismancy    → TextureKeys.PlayerPrismancy
+ *   spellblade + default  → TextureKeys.PlayerSpellblade
+ *   spellblade + prismancy→ TextureKeys.PlayerSpellbladePrismarch (gated
+ *                            on a Prismarch kill *as Spellblade*; falls
+ *                            back to default if not earned)
+ *
+ * Lives at module scope so the MainMenu's preview render can call the
+ * exact same resolver without duplicating the lookup table. Both call
+ * sites are read-only of MetaProgress.
+ */
+export function resolvePlayerTextureKey(): string {
+  const character = MetaProgress.getSelectedCharacter();
+  // Skin resolution is character-aware — `getSelectedSkin(char)` checks
+  // the per-character gate (Wizard Prismancy on any Prismarch kill,
+  // Spellblade Prismancy on a Prismarch kill *as Spellblade*).
+  const skin = MetaProgress.getSelectedSkin(character);
+  if (character === 'spellblade') {
+    return skin === 'prismancy'
+      ? TextureKeys.PlayerSpellbladePrismarch
+      : TextureKeys.PlayerSpellblade;
+  }
+  return skin === 'prismancy' ? TextureKeys.PlayerPrismancy : TextureKeys.Player;
+}
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   readonly health: PlayerHealth;
@@ -38,20 +65,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     missilePool: MagicMissilePool,
     stats: StatsSystem,
   ) {
-    // Cosmetic skin lookup is one localStorage read at construction. The
-    // Prismancy red/gold palette swaps in once Lord Onyx is dead; PreloadScene
-    // generates both texture variants up front so the swap is just a key
-    // change with no runtime regeneration cost. Players can toggle back to
-    // the default skin from the main menu — `getSelectedSkin` resolves that
-    // preference (and gracefully falls back if the unlock was reset).
-    super(
-      scene,
-      x,
-      y,
-      Cosmetics.getSelectedSkin() === 'prismancy'
-        ? TextureKeys.PlayerPrismancy
-        : TextureKeys.Player,
-    );
+    // Character + cosmetic skin lookup is one localStorage read at
+    // construction. PreloadScene generates all variants up front (default
+    // wizard, prismancy wizard, spellblade) so the swap is just a key
+    // change with no runtime regeneration cost. Players cycle in the main
+    // menu via left/right arrows; `resolvePlayerTextureKey` mirrors the
+    // exact same resolution logic the MainMenu preview uses.
+    super(scene, x, y, resolvePlayerTextureKey());
     scene.add.existing(this);
     scene.physics.add.existing(this);
 

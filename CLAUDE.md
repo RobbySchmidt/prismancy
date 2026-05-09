@@ -315,7 +315,8 @@ Vorgängerdesign **Vampire Twins** (Crimson Lord melee + Sapphire Marquis mage, 
 - [x] **`src/systems/Cosmetics.ts`** — localStorage-backed mit try/catch fallback (private browsing). Zwei Storage-Keys: `'prismancy.unlocks.lordOnyxBeaten'` (Unlock-Flag) + `'prismancy.cosmetics.selectedSkin'` (Spieler-Wahl). API: `hasPrismancySkin()`, `unlockPrismancySkin()`, `getSelectedSkin()`, `setSelectedSkin(skin)`, `resetAll()`. `SkinId = 'default' | 'prismancy'`.
 - [x] **Prismancy Wizard-Skin**: Roter+goldener Skin als Trophy für Lord-Onyx-Kill. Same pixel-layout wie Default, refactored `drawWizardTexture` in PreloadScene nimmt jetzt `palette` + `textureKey` Parameter. Beide Texturen werden bei Preload generiert: `tex-player` (default purple/white) + `tex-player-prismancy` (deep crimson robe + gold trim + black hat mit gold band).
 - [x] **Auto-Apply on first unlock + manual toggle**: `getSelectedSkin()` ist die einzige source of truth für die aktive Textur. Default-Auflösung: kein expliziter Storage + skin unlocked → `'prismancy'` (preserves trophy-reveal moment). Kein Storage + nicht unlocked → `'default'`. Explizit `'prismancy'` aber nicht unlocked → Fallback `'default'` (defense-in-depth wenn jemand localStorage manuell editiert oder Unlocks resettet). Player-Constructor + MainMenuScene-Wizard-Render lesen beide `getSelectedSkin()`.
-- [x] **Main-Menu Skin-Toggle**: `setupSkinToggle(wizard)` in MainMenuScene zeichnet `[S] SKIN: WIZARD/PRISMANCY` Hint unten + bindet `S`-Key der zwischen `'default'` und `'prismancy'` toggled. Live-Update: `wizard.setTexture(...)` swap + Label re-text + `setSelectedSkin` persist. **Sichtbarkeit gated auf `hasPrismancySkin()`** — Toggle existiert nur wenn der Skin geearned wurde. Nicht-unlockte Spieler sehen das UI gar nicht erst.
+- [x] **Main-Menu Character-Cycle + Skin-Toggle (final 2026-05-09)**: zwei separate Widgets statt eines Combined-Cycles. **Cycle** (Pfeiltasten links/rechts) wechselt nur zwischen Charakteren (Wizard / Spellblade), unsichtbar wenn nur Wizard unlocked. **`[S]`-Toggle** wechselt Skins für den aktuell ausgewählten Charakter — Wizard: default ↔ prismancy (wenn unlocked), Spellblade: nur default verfügbar (red-helm-Variante ist Future-TODO, siehe unten). Toggle-Hint unsichtbar wenn current character nur 1 Skin hat. Skin-Field wird auf den gültigen Wert geclamped wenn man zu einem Charakter wechselt der die persistente Skin-Wahl nicht supported (z.B. Wizard:Prismancy → Spellblade settled auf Spellblade:default). Player liest dieselbe Resolution via `resolvePlayerTextureKey()` Helper in [Player.ts](src/entities/Player.ts) (module-level, source of truth für beide call-sites).
+- [x] **Spellblade Prismarch-Skin** (DONE 2026-05-09) — red cape + black helm + gold trim + crimson visor/blade glow als Prismarch-Equivalent für Spellblade. Re-uses dieselbe `SkinId = 'default' | 'prismancy'` als Wizard (kein zweites Set, das selectedSkin-Field bleibt geteilt) — `previewTextureKey` + `resolvePlayerTextureKey` branchen auf `(character, skin)` und mappen Spellblade+Prismancy → `TextureKeys.PlayerSpellbladePrismarch`. **Gate ist asymmetrisch zu Wizard**: `MetaProgress.hasSpellbladePrismarchSkin()` liest `bossesDefeatedAsSpellblade.includes('boss-lord-onyx')` — Prismarch-Kill **als Spellblade**, nicht jeder Prismarch-Kill. `recordBossDefeated(enemyId, character?)` pflegt zwei Ledger: shared (`bossesDefeated`) plus per-character (`bossesDefeatedAsSpellblade`); `unlockPrismancySkin()`-Alias passes `getSelectedCharacter()` durch. **`getSelectedSkin(character?)`** ist character-aware: explicit `'prismancy'` resolves nur wenn der Character-Gate metcht (Wizard: `bossesDefeated`, Spellblade: `bossesDefeatedAsSpellblade`); `null` (no explicit pick) auto-applied prismancy auf erstem Unlock pro-Character. MainMenu `applyCharacter` re-evaluiert `getSelectedSkin(character)` beim Switch — Wizard:Prismancy-Präferenz survived ein Toggle durch ein noch-nicht-Spellblade-Prismancy-Run zurück nach Wizard. Dev-Hook `__wiz.unlockSpellbladeSkin()` für Test ohne grind. StatsScene zeigt beide Skin-Status separat. Schema-bump: `MetaSave.bossesDefeatedAsSpellblade: string[]` — backward-compat default `[]` in `parseSave` für ältere v1-saves.
 
 *Onyx Boss-Pool-Items (DONE — droppt vom Marquis-of-Mirages-Kill, NICHT The Prismarch):*
 - [x] **Bloodbound Chalice** (`bloodboundChalice`): +1 max HP, +20 % damage (mult), Crimson missile tint (0xc8284a). Texture: gold goblet mit blood + side drip.
@@ -344,9 +345,11 @@ Vorgängerdesign **Vampire Twins** (Crimson Lord melee + Sapphire Marquis mage, 
 - [x] **Missile-Modifikatoren (Homing, Piercing, Burn-DoT)** — Phase-6-Einstieg 2026-05-07. Splitting bewusst weggelassen. Drei Items: **Magic Shard** (Shop, 15 Coins, +piercingCount 2 → 100/75/50% damage über 3 Hits), **Wizard Glasses** (Boss-Pool floor-agnostic, +homingTurnRate 80°/s, +10% missileSpeed — Speed-Bump statt Range-Stat-Reintroduce), **Fire Orb** (Treasure, +burnDamageFactor 0.30 → 30% des Hit-Damages über 2 Ticks à 600 ms). Synergien (Pierce × Burn → jeder Pierce-Hit ignites; Pierce × Homing → Missile sucht nach Pierce neues Target) sind explizit erlaubt. Missile-Modifier sind reguläre StatsSystem-Stats (`piercingCount`, `homingTurnRate`, `burnDamageFactor`); Missile liest sie pro `fire()` aus, alle pro-Frame-Mechanik (Homing-Turning, Pierce-Tracking via `hitEnemies` Set) lebt auf der Missile-Instanz.
 - [ ] Run-Stats-Tracking (Tode, Kills, Items gefunden)
 - [x] Save/Load für Meta-Progression (Localstorage): Trophy/Collection-System (passiv, kein Gameplay-Gating). Tracked: bossesDefeated[], itemsDiscovered[], runs counters (started/died/wonFull/wonIncomplete), bestRunMs, selectedSkin. Single-slot versionierter JSON-Blob in `'prismancy.save.v1'`. Migration aus alten Cosmetics-Keys. StatsScene Overlay vom MainMenu via `[T]`-Key. Hold-`R` für reset (1s).
+- [x] **Unlock-Toast** (DONE 2026-05-09) — top-right click-to-dismiss Toast für meta-progression unlocks. `EventBus`-event `unlock:gained` mit Payload `{ id, title, subtitle?, textureKey? }`; `UnlockToast`-widget in UIScene queue't sequentielle Unlocks (ein Prismarch-Kill kann gleichzeitig Wizard-Prismancy + Spellblade-Charakter triggern → 2 Toasts nacheinander). Auto-fade nach 8s, click anywhere on card dismisst sofort. Per-session `shown`-Set verhindert Doppel-Trigger. **Detection lebt in `GameScene.handleBossKilled`**: snapshot `wasPrismancySkinUnlocked` / `wasSpellbladeCharUnlocked` / `wasSpellbladePrismarchSkinUnlocked` / `wasBossPreviouslyBeaten` BEFORE `recordBossDefeated`, dann diff post-record und emit für jede locked→unlocked Transition. Items werden via `Object.values(ITEMS).filter(item.metaUnlock === enemyId)` gescannt wenn der Boss zum ersten Mal beaten wurde. Currently active Triggers: Prismarch-Kill (wizard prismancy / spellblade-char / spellblade-prismarch je nach Gate-State) + Marquis-of-Mirages-Kill (Blood of Marquis Item). Future Unlocks brauchen nur einen Snapshot-Field + Transition-Check in `emitUnlockToasts`. Dev-Hook `__wiz.testUnlockToast()` für Layout-Preview.
 - [ ] Seeded-Run-Funktion (Seed eingeben für reproduzierbare Runs)
 - [ ] Performance-Pass (Object-Pooling für Missiles/Projektile/Partikel)
-- ~~Active Items mit Cooldown/Space~~ — out of scope (User-Entscheidung 2026-05-07)
+- [x] **Active Items mit [Q]** — Scope-Pivot 2026-05-09. War vorher out-of-scope (Entscheidung 2026-05-07), jetzt reaktiviert mit minimaler Infrastruktur (`ItemDefinition.active`, `ActiveItemSystem`-Slot-Owner, `ActiveItemSlot`-HUD-Widget bottom-left, [Q]-Key-Polling in `tickActiveItem`). Erstes Active-Item: **Blood of Marquis** — Glass-Cannon-Trade, +30% all stats permanent, max HP locked auf 2 Hearts, [Q] feuert "Echoes of Blood" AOE die Trash-Mobs instant-killt + Bossen 30% max-HP-Damage zufügt (Phase-Threshold cross natürlich). Drop-Gate via `ItemDefinition.metaUnlock = 'boss-marquis-of-mirages'`. Siehe Active-Item-System-Block unten.
+- [~] **Spellblade-Charakter (in progress, 2026-05-09)** — zweiter spielbarer Charakter, Tattered-Knight-Optik (silver helm + onyx blade, gefallener Ritter des Prismarch). Unlock-gated auf Prismarch-Kill (`MetaProgress.hasSpellbladeCharacter()`, gleicher Gate wie Prismancy-Skin). **Phase A DONE** — Sprite (`drawSpellbladeTexture` in PreloadScene), `MetaProgress.selectedCharacter` ('wizard' | 'spellblade'), MainMenu-Cycle mit Pfeiltasten links/rechts (replaces alten `[S]`-Skin-Toggle), Player liest selection via `resolvePlayerTextureKey()`. Aktuell kämpft der Spellblade noch identisch zum Wizard (gleiche Magic-Missile-Mechanik) — Phase B (Sword-Slash) + Phase C (Dash) folgen.
 - ~~Bombs als Pickup-Type~~ — out of scope (User-Entscheidung 2026-05-07: kein nicht-offensiver Use-Case)
 
 **DoD:** Spiel fühlt sich rund an, ist deploybar.
@@ -498,7 +501,58 @@ Drawn in `PreloadScene` per Floor-Theme. `drawLockBadge` ist shared zwischen Tre
 
 **Particle-Effekte (Phase 6 Einstieg):** `spawnBloodParticles(x, y)` aus `enemy:hit` event — 5 rote 2-3px Drops (`0xb83020`), gravity-arc-Tween (outward + slight down) über 240-320ms. `spawnFlameParticle(x, y)` aus `enemy:burnTick` — 3 Drops (1 gold-core + 2 orange) drift upward, 360ms. Beide self-cleaning via Tween-onComplete.
 
-**Dev-Hooks für Modifier-Testing:** `__wiz.give(itemId)` appliziert direkt auf ItemSystem (skip pedestal+toast). `__wiz.spawnItem(itemId)` spawned ein Pedestal im current-room-center (= triggert pickup-Flow + Toast). `__wiz.listItems()` printed alle Item-Ids + Display-Namen. Beispiel: `__wiz.give('magicShard'); __wiz.give('wizardGlasses'); __wiz.give('fireOrb')` für Maximum-Stack-Synergy-Test.
+**Dev-Hooks für Modifier-Testing:** `__wiz.give(itemId)` appliziert direkt auf ItemSystem (skip pedestal+toast). `__wiz.spawnItem(itemId)` spawned ein Pedestal im current-room-center (= triggert pickup-Flow + Toast). `__wiz.listItems()` printed alle Item-Ids + Display-Namen. Beispiel: `__wiz.give('magicShard'); __wiz.give('wizardGlasses'); __wiz.give('fireOrb')` für Maximum-Stack-Synergy-Test. Für Active-Item-Test: `__wiz.give('bloodOfMarquis')` — equipped sofort den [Q]-Slot, locked max HP auf 2, applied +30% all-stats. Bypasst den `metaUnlock`-Gate (give zieht direkt aus `ITEMS`, nicht aus dem Pool).
+
+---
+
+## Active-Item-System (Phase 6 — 2026-05-09)
+
+**Stack:** Single-Slot-System (eine Active gleichzeitig equipped, wie Isaac's Spacebar-Item). Trigger via [Q]-Key. Scope-Pivot: war 2026-05-07 als out-of-scope markiert; reaktiviert 2026-05-09 für Blood of Marquis, mit dem Vorbehalt dass die Infrastruktur generisch genug bleibt für künftige Active-Items + Charakter-Specials (Spellblade-Plan).
+
+**Daten-Modell:**
+- `ActiveItemKind` discriminator (aktuell nur `'echoesOfBlood'`). Neue Active = ein Eintrag hier + ein switch-arm in `GameScene.tryActivateActiveItem` + ein `active: { kind: '...' }` Field auf einer ItemDefinition.
+- `ActiveItemSpec`-Interface trägt kind-spezifische Params (z.B. `bossDamageFraction` für Echoes).
+- `ItemDefinition.active?: ActiveItemSpec` — picking the item equipped automatisch den Slot (siehe ItemSystem-Wiring unten).
+
+**`ItemDefinition.maxHealthCap`:** Glass-Cannon-Field. Wenn gesetzt, `PlayerHealth.setMaxHealthCap(cap)` wird beim Pickup gerufen → max HP wird auf cap clamped + alle künftigen `addMaxHealth`-Calls werden zu no-ops. Heart Container / Pixie Dust / Lily Diadem etc. sind dadurch zu wertlosen Picks geworden — bewusster Trade-off des Glass-Cannon-Themes (User-Entscheidung).
+
+**`ItemDefinition.metaUnlock`:** Optional. Wenn gesetzt (= stable enemy id wie `'boss-marquis-of-mirages'`), filtert `pickItemFromPool` das Item aus dem Pool aus solange `MetaProgress.hasBeatenBoss(metaUnlock) === false` ist. Nach erstem Marquis-Kill in irgendeinem Run wird Blood of Marquis ab dem nächsten Run im Onyx-Boss-Pool sichtbar. Existing items (Bloodbound Chalice etc.) haben kein metaUnlock → sind von Anfang an verfügbar.
+
+**Systems-Wiring:**
+- `src/systems/ActiveItemSystem.ts` — owner of equipped state. API: `equip(item)`, `clear()`, `getEquipped()`, `getEquippedItem()`, `hasEquipped()`. Emit `activeItem:equipped { itemId | null }` bei state-change.
+- `src/systems/ItemSystem.ts` — Constructor nimmt jetzt zusätzlich `activeItemSystem: ActiveItemSystem | null`. `pickUp(item)` ruft `activeItemSystem.equip(item)` wenn `item.active !== undefined`, plus `playerHealth.setMaxHealthCap(cap)` wenn `item.maxHealthCap` gesetzt ist. **`hydrate(...)` macht beides synchron** damit ein Floor-Transition-Replay den Slot + Cap restored ohne Toast/SFX-Spam.
+- `src/systems/PlayerHealth.ts` — neuer `maxCap: number | null` Field. `setMaxHealthCap(cap)`, `getMaxHealthCap()`. `addMaxHealth(amount)` no-op'd wenn `maxCap !== null`. `restore(current, max)` clampt max defensiv gegen den cap (paranoid gegen ein hypothetisches Carry-Over das den Cap nicht snapshotted). Plus `forceSetCurrent(value)` für self-sacrifice-Costs (skipt `tookDamage`-Event, emittet nur `healthChanged`).
+
+**HUD-Slot (`src/ui/ActiveItemSlot.ts`):** Bottom-left, 22-px-radius Stone-Circle-Backdrop mit Gold-Trim-Ring + Item-Icon (1.6× scale) im Center + "[Q]"-Label drunter. State-Branches:
+- Nichts equipped → Slot komplett unsichtbar
+- Equipped + usable (HP ≥ 2) → full color, Trim-Ring 0.85 Alpha
+- Equipped + un-usable (HP < 2) → Icon tinted `0x404048` + alpha 0.55, Label alpha 0.4, Trim 0.35 Alpha
+- `activateItem:activated` event triggert kurzes Trim-Ring-Punch-Up (4-px Stroke + alpha-tween, 280ms)
+
+Slot listened auf `activeItem:equipped` (rebuild Icon), `player:healthChanged` (refresh greyed-out), `activeItem:activated` (flash). Constructor primed from `registry.get('activeItemSystem')` + `registry.get('playerHealth')` damit floor-transition-rebuilds sofort den korrekten State zeigen ohne auf erste Hit-/Equip-Event zu warten.
+
+**[Q] Wiring (GameScene):** `activeItemKey = input.keyboard.addKey('Q')`, polled in `tickActiveItem` (called every frame from `update()`). `Phaser.Input.Keyboard.JustDown` damit gehaltenes Q nicht doppelfeuert. Skipped wenn `inTransition`. Validierung in `tryActivateActiveItem`:
+- `activeItemSystem.hasEquipped()` muss true sein
+- `playerHealth.getCurrent() >= 2` muss true sein (universal HP-gate, alle aktuellen Specials kosten HP)
+- Switch on `equipped.kind` → execute-method
+- Bei Erfolg: `EventBus.emit('activeItem:activated', { itemId })`
+
+**Echoes of Blood Implementation (`GameScene.executeEchoesOfBlood(bossDamageFraction)`):**
+1. `forceSetCurrent(1)` — pay HP cost first (drops to 1 HP = 1/2 heart)
+2. Snapshot `enemies.getChildren().slice()` weil chain-`enemy:killed`-Events das Group während Iteration mutieren würden
+3. Pro enemy:
+   - Wenn `enemy === activeBoss` → `enemy.takeDamage(round(boss.maxHp * 0.30))` — Phase-Threshold cross natürlich via `BossEnemy.takeDamage`
+   - Sonst → `enemy.takeDamage(99999)` — overkill, killt jeden Trash-Mob (boss-room adds wie Slimes/Wraiths/Pixies werden so auch instant-killed, User-bestätigt)
+4. Visual: 2 expandierende Phaser-Arc-Circles (outer ring crimson `0xc8284a`, inner core `0xff5060`) tween scale + alpha 0 → ROOM_DIAGONAL über 280-360ms. **Damage wird NICHT per-frame radius-checked** — applied instantly, weil der Wave eh den ganzen Raum trifft binnen der Tween-Duration. Plus `cameras.main.flash(220, 200, 30, 50)` red-wash + `shake(280, 0.008)`.
+
+**SFX:** noch keiner gewired — kann via `playPrismExplosion()` oder eigenem Recipe gemapped werden falls gewünscht.
+
+**Edge Cases:**
+- Empty room + [Q] → costs HP für nichts (User-Footgun, akzeptiert — keine "must have enemies"-Gate damit UX nicht durch hidden gates verwirrt wird)
+- HP cap + Heart-Pickup → Heart heilt von 1 auf 2 (cap), füllt das eine Heart wieder auf. Die `heal()`-clamp läuft gegen `max`, das vom cap gleichgesetzt ist
+- Carry-Over: `co.healthMax = 2` wird snapshotted weil cap aktiv war, `restore(current, max)` clamp via `effectiveMax = min(max, maxCap)` defensiv
+- Hydrate-Order: `setMaxHealthCap(2)` läuft VOR `addMaxHealth(...)` wenn beide an einem Item wären — Cap wins, weitere Bonus-Calls werden gegated
+- Active in non-Onyx-Pool: Blood of Marquis hat `floor: 'onyx-mansion'` Tag, droppt nur auf Onyx-Boss-Pool-Roll. Marquis selbst kann es daher droppen (sofern in Run beat → unlock fired), aber Emerald/Sapphire-Bosse nicht
 
 **Meta-Progression (Phase 6 — 2026-05-07):** Trophy/Collection-System mit single-slot versioniertem JSON-Blob in localStorage (`'prismancy.save.v1'`). Schema:
 ```ts

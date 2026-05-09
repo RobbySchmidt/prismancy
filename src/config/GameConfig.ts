@@ -824,6 +824,12 @@ export const TextureKeys = {
   ItemMagicShard: 'tex-item-magic-shard',
   ItemWizardGlasses: 'tex-item-wizard-glasses',
   ItemFireOrb: 'tex-item-fire-orb',
+  ItemBloodOfMarquis: 'tex-item-blood-of-marquis',
+  /** Empty-vial variant of Blood of Marquis — shown in the [Q] active-item
+   *  slot when HP < 2 (player just spent the active or can't afford it).
+   *  Same silhouette / glass / cork as the full vial, just no liquid +
+   *  dimmer halo so the spent state reads visually. */
+  ItemBloodOfMarquisEmpty: 'tex-item-blood-of-marquis-empty',
   BossMossyBehemoth: 'tex-boss-mossy-behemoth',
   BossPixieQueen: 'tex-boss-pixie-queen',
   BossForestHeart: 'tex-boss-forest-heart',
@@ -847,6 +853,15 @@ export const TextureKeys = {
   /** Prismancy unlock — red/gold wizard skin awarded by defeating Lord
    * Onyx. Auto-applied at Player construction if unlocked. */
   PlayerPrismancy: 'tex-player-prismancy',
+  /** Spellblade — fallen knight of the Prismarch (silver helm + onyx
+   *  blade + tattered cloak). Unlocked via a Prismarch defeat, selectable
+   *  in the main-menu character cycle. */
+  PlayerSpellblade: 'tex-player-spellblade',
+  /** Spellblade Prismarch-tier skin — black helm + crimson cape + gold
+   *  trim + crimson visor/blade glow. Earned by defeating the Prismarch
+   *  WHILE playing the Spellblade (separate gate from the character
+   *  unlock; the Spellblade itself unlocks on any Prismarch kill). */
+  PlayerSpellbladePrismarch: 'tex-player-spellblade-prismarch',
 } as const;
 
 export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];
