@@ -8,6 +8,7 @@ import {
   GAME_WIDTH,
   KNOCKBACK_FORCE_ENEMY,
   KNOCKBACK_FORCE_PLAYER,
+  MISSILE_SPAWN_GRACE_MS,
   PIERCING_DAMAGE_FACTORS,
   RESTART_HOLD_DURATION_MS,
   ROOM_ENTRY_GRACE_MS,
@@ -170,6 +171,14 @@ export class GameScene extends Phaser.Scene {
    * different game object). Cleared in `tearDownActiveRoom`.
    */
   private currentShopPriceLabels: Phaser.GameObjects.Container[] = [];
+  /** Floating "[E] BUY ..." prompt shown above the shop slot the player
+   * is currently overlapping. Single shared label — moves + retexts as
+   * the player walks between slots. Null when not in a shop / not over
+   * a slot. Owned by `tickShopInteract`. */
+  private shopPrompt: Phaser.GameObjects.Text | null = null;
+  /** Pickup currently driving the prompt. Null if no overlap. Stable
+   * across frames so the prompt only re-renders on slot change. */
+  private shopPromptSlot: BasePickup | null = null;
 
   private layout!: FloorLayout;
   private currentFloorId: FloorId = STARTING_FLOOR_ID;
@@ -604,6 +613,8 @@ export class GameScene extends Phaser.Scene {
       this.registry.set('bossNoHitInProgress', false);
       this.inTransition = false;
       this.currentShopPriceLabels = [];
+      this.shopPrompt = null;
+      this.shopPromptSlot = null;
       this.stairsSprite = null;
       this.stairsOverlap = null;
       this.stairsPrompt = null;
@@ -1486,6 +1497,14 @@ export class GameScene extends Phaser.Scene {
     for (const label of this.currentShopPriceLabels) label.destroy();
     this.currentShopPriceLabels = [];
 
+    // Shop [E]-prompt is room-scoped — destroy on teardown so the next
+    // room doesn't inherit a stale label hanging in space. Reset the
+    // tracking ref too so tickShopInteract rebuilds it cleanly when the
+    // player walks onto a fresh shop slot.
+    this.shopPrompt?.destroy();
+    this.shopPrompt = null;
+    this.shopPromptSlot = null;
+
     this.currentRoom.destroy();
   }
 
@@ -1945,6 +1964,119 @@ export class GameScene extends Phaser.Scene {
       .setAlpha(0);
 
     this.stairsAction = onConfirm ?? (() => this.advanceToNextFloor());
+  }
+
+  /**
+   * Per-frame shop interaction tick — finds the first shop slot the
+   * player is currently overlapping, paints / repositions the floating
+   * "[E] BUY …" prompt above it, and fires the purchase pipeline on a
+   * JustDown(E) press. Same `Phaser.Input.Keyboard.JustDown` pattern as
+   * `tickStairsInteract` / `tickGemSealInteract` so a held [E] doesn't
+   * spam-buy. Walking off a slot hides the prompt; walking onto a
+   * different slot retexts it.
+   *
+   * Single shared `shopPrompt` Text — only one slot can be the focus at
+   * a time anyway. Position floats above the pickup so it doesn't sit
+   * over the price label below.
+   */
+  private tickShopInteract(): void {
+    if (this.inTransition) return;
+
+    // Find the first active pickup the player overlaps that's a shop slot.
+    // `let` + closure mutation confuses TS's flow analysis (it narrows the
+    // outer variable to `null` after the callback), so we collect into a
+    // box the closure can write to and unwrap after.
+    const slotBox: { value: BasePickup | null } = { value: null };
+    this.pickups.children.iterate((child) => {
+      const pickup = child as BasePickup;
+      if (!pickup.active) return true;
+      if (pickup.shopSlotIndex === undefined) return true;
+      if (this.physics.overlap(this.player, pickup)) {
+        slotBox.value = pickup;
+        return false; // first hit wins, stop iteration
+      }
+      return true;
+    });
+    const activeSlot = slotBox.value;
+
+    if (activeSlot !== this.shopPromptSlot) {
+      this.shopPromptSlot = activeSlot;
+      if (activeSlot === null) {
+        this.hideShopPrompt();
+      } else {
+        this.showShopPrompt(activeSlot);
+      }
+    } else if (activeSlot !== null && this.shopPrompt) {
+      // Same slot, but the slot might have moved (it doesn't currently —
+      // shop pickups are static — but defensively keep the prompt
+      // anchored). Cheap guard.
+      this.shopPrompt.setPosition(activeSlot.x, activeSlot.y - 56);
+    }
+
+    if (
+      activeSlot !== null &&
+      this.interactKey &&
+      Phaser.Input.Keyboard.JustDown(this.interactKey)
+    ) {
+      this.tryCollectPickup(activeSlot, this.player);
+    }
+  }
+
+  /** Build / retext the shop prompt for the given slot. Style mirrors the
+   *  stairs + gem-seal `[E] …` prompts (gold tint, monospace, drop shadow). */
+  private showShopPrompt(slot: BasePickup): void {
+    const label = this.buildShopPromptLabel(slot);
+    if (!this.shopPrompt) {
+      this.shopPrompt = this.add
+        .text(slot.x, slot.y - 56, label, {
+          fontFamily: 'monospace',
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: '#fff8c0',
+          stroke: '#1a0828',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5)
+        .setDepth(DepthLayers.HUD - 1);
+    } else {
+      this.shopPrompt.setText(label);
+      this.shopPrompt.setPosition(slot.x, slot.y - 56);
+      this.shopPrompt.setVisible(true);
+      this.shopPrompt.setAlpha(0);
+    }
+    this.tweens.killTweensOf(this.shopPrompt);
+    this.tweens.add({
+      targets: this.shopPrompt,
+      alpha: 1,
+      duration: 140,
+      ease: 'Sine.Out',
+    });
+  }
+
+  /** Hide the floating shop prompt (tween-fade then hide). */
+  private hideShopPrompt(): void {
+    if (!this.shopPrompt) return;
+    this.tweens.killTweensOf(this.shopPrompt);
+    const target = this.shopPrompt;
+    this.tweens.add({
+      targets: target,
+      alpha: 0,
+      duration: 140,
+      ease: 'Sine.Out',
+      onComplete: () => target.setVisible(false),
+    });
+  }
+
+  /** Build the prompt text for a shop slot — depends on the pickup kind. */
+  private buildShopPromptLabel(slot: BasePickup): string {
+    if (slot.kind === PickupKind.Heart) return '[E]  BUY  HEART';
+    if (slot.kind === PickupKind.Key) return '[E]  BUY  KEY';
+    if (slot.kind === PickupKind.Item) {
+      // ItemPickup-typed access via the displayName getter we exposed.
+      const name = (slot as ItemPickup).displayName?.toUpperCase() ?? 'ITEM';
+      return `[E]  BUY  ${name}`;
+    }
+    return '[E]  BUY';
   }
 
   /**
@@ -2413,6 +2545,28 @@ export class GameScene extends Phaser.Scene {
     return pickup;
   }
 
+  /**
+   * processCallback for player-missile vs wall / door-barrier colliders.
+   * Returns false (= skip the deactivate callback) during the brief
+   * MISSILE_SPAWN_GRACE_MS window after a missile fires. Without this the
+   * Spellblade-bolt's 1.5×-scaled body overlaps the top/bottom wall when
+   * the player is up against it, and the wall collider deactivates the
+   * bolt on the spawn frame — User-flagged 2026-05-09: "spellblade kann
+   * nicht schießen wenn man komplett am rand des raumes steht". After the
+   * grace expires, the collider works as before — bolts shot AT a wall
+   * still deactivate on contact.
+   *
+   * Defined as an arrow-property so all three collider-registration paths
+   * (`setupCollidersForActiveRoom`, `markCurrentRoomCleared`,
+   * `refreshBarrierColliders`) reference the same function without re-
+   * inlining the logic.
+   */
+  private playerMissileWallProcess = (missileObj: unknown): boolean => {
+    const m = missileObj as MagicMissile;
+    if (typeof m.isInSpawnGrace !== 'function') return true;
+    return !m.isInSpawnGrace(this.time.now, MISSILE_SPAWN_GRACE_MS);
+  };
+
   private setupCollidersForActiveRoom(): void {
     const deactivateMissile = (missileObj: unknown): void => {
       const missile = missileObj as Phaser.Physics.Arcade.Sprite & {
@@ -2429,13 +2583,13 @@ export class GameScene extends Phaser.Scene {
       const p = proj as { passThroughWalls?: boolean };
       return !p.passThroughWalls;
     };
-
     this.playerWallCollider = this.physics.add.collider(this.player, this.currentRoom.walls);
     this.enemyWallCollider = this.physics.add.collider(this.enemies, this.currentRoom.walls);
     this.missileWallCollider = this.physics.add.collider(
       this.missilePool.getGroup(),
       this.currentRoom.walls,
       deactivateMissile,
+      this.playerMissileWallProcess,
     );
 
     // Enemy projectiles share the same wall kill behaviour. Crimson-Web
@@ -2468,7 +2622,12 @@ export class GameScene extends Phaser.Scene {
       if (!barrier) continue;
       this.playerBarrierColliders.push(this.physics.add.collider(this.player, barrier));
       this.missileBarrierColliders.push(
-        this.physics.add.collider(this.missilePool.getGroup(), barrier, deactivateMissile),
+        this.physics.add.collider(
+          this.missilePool.getGroup(),
+          barrier,
+          deactivateMissile,
+          this.playerMissileWallProcess,
+        ),
       );
       this.enemyProjectileBarrierColliders.push(
         this.physics.add.collider(
@@ -2694,15 +2853,11 @@ export class GameScene extends Phaser.Scene {
       this.doorTriggerOverlaps.push(c);
     }
 
-    // Player ↔ pickups: walk-over collection. Three short-circuits before
-    // the actual `onCollect`:
-    //   1. `canCollect` — refuses no-op pickups (heart at full HP). Free
-    //      drops just stay on the floor; shop slots additionally flash red.
-    //   2. `tryPurchase` — for shop slots, charges coins. `'too-poor'`
-    //      flashes the slot and emits `shop:rejected` so the HUD can react.
-    //   3. `onCollect` — applies the actual pickup effect; `false` keeps
-    //      the pickup on the floor (currently unused since `canCollect`
-    //      already covers the full-HP heart case).
+    // Player ↔ pickups: walk-over collection for non-shop pickups (drops,
+    // pedestals, crates). Shop slots intentionally skip this and use the
+    // [E]-press gated path in `tickShopInteract` instead — the auto-buy
+    // flow felt unintentional (walk-into = bought, no chance to read the
+    // price + item before paying).
     this.playerPickupOverlap = this.physics.add.overlap(
       this.player,
       this.pickups,
@@ -2711,86 +2866,95 @@ export class GameScene extends Phaser.Scene {
           const pickup = (a instanceof BasePickup ? a : b) as BasePickup;
           const player = (a instanceof Player ? a : b) as Player;
           if (!pickup.active) return;
-
-          if (!pickup.canCollect(player)) {
-            // Shop slot at full HP / similar, or a locked crate — tell the
-            // player. Free drops (no price + no key gate) just stay silent
-            // like before.
-            if (pickup.price !== undefined || pickup.requiresKey) {
-              pickup.flashRejected(this);
-            }
-            return;
-          }
-
-          // Key-gated pickup (gold crate). Walking up without a key in the
-          // inventory wackels the crate but doesn't open it.
-          if (pickup.requiresKey) {
-            if (!this.inventory.spendKey()) {
-              pickup.flashRejected(this);
-              return;
-            }
-            // Key spent — same unlock SFX as locked doors (door:unlocked
-            // doesn't fire here because the gold crate path bypasses that
-            // event, so we trigger the SFX directly).
-            getSfxSynth().playDoorUnlock();
-            // Fall through to the normal pay/onCollect path.
-          }
-
-          const purchase = pickup.tryPurchase(this.inventory);
-          if (purchase === 'too-poor') {
-            pickup.flashRejected(this);
-            EventBus.emit('shop:rejected', { price: pickup.price ?? 0 });
-            return;
-          }
-
-          const absorbed = pickup.onCollect(this, this.inventory, player);
-          if (!absorbed) return;
-
-          EventBus.emit('pickup:collected', { kind: pickup.kind });
-
-          // Pedestal items mark the room looted so re-entry doesn't respawn
-          // them (we don't snapshot Items into pendingPickups). Shop-slot
-          // items are EXCLUDED here — they're tracked per-slot via
-          // `purchasedShopSlots`, and flipping `looted` would make the
-          // ShopRoomBuilder skip the entire shop on re-entry instead of
-          // just the bought slot.
-          if (pickup.kind === PickupKind.Item && pickup.shopSlotIndex === undefined) {
-            const desc = this.layout.rooms.get(this.currentRoomId);
-            if (desc) desc.looted = true;
-          }
-
-          // Shop slot purchase: persist the slot index + tear down the
-          // matching price label, and flip `looted` once every slot is bought.
-          if (purchase === 'paid' && pickup.shopSlotIndex !== undefined) {
-            const desc = this.layout.rooms.get(this.currentRoomId);
-            if (desc) {
-              const purchased = desc.purchasedShopSlots ?? [];
-              if (!purchased.includes(pickup.shopSlotIndex)) {
-                desc.purchasedShopSlots = [...purchased, pickup.shopSlotIndex];
-              }
-              if ((desc.purchasedShopSlots ?? []).length >= SHOP_SLOT_COUNT) {
-                desc.looted = true;
-              }
-            }
-            const labelIndex = this.currentShopPriceLabels.findIndex(
-              (l) => Math.abs(l.x - pickup.x) < 1,
-            );
-            if (labelIndex >= 0) {
-              this.currentShopPriceLabels[labelIndex]?.destroy();
-              this.currentShopPriceLabels.splice(labelIndex, 1);
-            }
-            EventBus.emit('shop:purchased', {
-              kind: pickup.kind,
-              price: pickup.price ?? 0,
-            });
-          }
-
-          pickup.destroy();
+          // Shop slots: handled by `tickShopInteract` (E-press gated).
+          if (pickup.shopSlotIndex !== undefined) return;
+          this.tryCollectPickup(pickup, player);
         } catch (err) {
           console.error('[player↔pickup overlap] error:', err);
         }
       },
     );
+  }
+
+  /**
+   * Run the pickup collection pipeline against a single pickup. Returns
+   * silently — caller doesn't need the result. Shared between the auto-
+   * collect overlap path (drops, pedestals, crates) and the shop's
+   * [E]-press path so the gating + bookkeeping is in one place.
+   *
+   * Pipeline:
+   *   1. `canCollect` — refuses no-op pickups (heart at full HP). Shop
+   *      slots + locked crates flash rejected; free drops stay silent.
+   *   2. Key-gate (gold crate) — spends a key, plays the unlock SFX, or
+   *      flashes rejected if the inventory is empty.
+   *   3. `tryPurchase` — for shop slots, charges coins. `'too-poor'`
+   *      flashes + emits `shop:rejected`.
+   *   4. `onCollect` — applies the pickup effect.
+   *   5. Bookkeeping — `looted` flag, `purchasedShopSlots` tracking,
+   *      `pickup:collected` / `shop:purchased` events, label cleanup.
+   */
+  private tryCollectPickup(pickup: BasePickup, player: Player): void {
+    if (!pickup.canCollect(player)) {
+      if (pickup.price !== undefined || pickup.requiresKey) {
+        pickup.flashRejected(this);
+      }
+      return;
+    }
+
+    if (pickup.requiresKey) {
+      if (!this.inventory.spendKey()) {
+        pickup.flashRejected(this);
+        return;
+      }
+      getSfxSynth().playDoorUnlock();
+    }
+
+    const purchase = pickup.tryPurchase(this.inventory);
+    if (purchase === 'too-poor') {
+      pickup.flashRejected(this);
+      EventBus.emit('shop:rejected', { price: pickup.price ?? 0 });
+      return;
+    }
+
+    const absorbed = pickup.onCollect(this, this.inventory, player);
+    if (!absorbed) return;
+
+    EventBus.emit('pickup:collected', { kind: pickup.kind });
+
+    if (pickup.kind === PickupKind.Item && pickup.shopSlotIndex === undefined) {
+      const desc = this.layout.rooms.get(this.currentRoomId);
+      if (desc) desc.looted = true;
+    }
+
+    if (purchase === 'paid' && pickup.shopSlotIndex !== undefined) {
+      const desc = this.layout.rooms.get(this.currentRoomId);
+      if (desc) {
+        const purchased = desc.purchasedShopSlots ?? [];
+        if (!purchased.includes(pickup.shopSlotIndex)) {
+          desc.purchasedShopSlots = [...purchased, pickup.shopSlotIndex];
+        }
+        if ((desc.purchasedShopSlots ?? []).length >= SHOP_SLOT_COUNT) {
+          desc.looted = true;
+        }
+      }
+      const labelIndex = this.currentShopPriceLabels.findIndex(
+        (l) => Math.abs(l.x - pickup.x) < 1,
+      );
+      if (labelIndex >= 0) {
+        this.currentShopPriceLabels[labelIndex]?.destroy();
+        this.currentShopPriceLabels.splice(labelIndex, 1);
+      }
+      EventBus.emit('shop:purchased', {
+        kind: pickup.kind,
+        price: pickup.price ?? 0,
+      });
+      // Hide the floating shop prompt on successful purchase — tickShopInteract
+      // will re-show it next frame if the player is still overlapping
+      // another shop slot.
+      this.hideShopPrompt();
+    }
+
+    pickup.destroy();
   }
 
   /**
@@ -2915,7 +3079,12 @@ export class GameScene extends Phaser.Scene {
       if (!barrier) continue;
       this.playerBarrierColliders.push(this.physics.add.collider(this.player, barrier));
       this.missileBarrierColliders.push(
-        this.physics.add.collider(this.missilePool.getGroup(), barrier, deactivateMissile),
+        this.physics.add.collider(
+          this.missilePool.getGroup(),
+          barrier,
+          deactivateMissile,
+          this.playerMissileWallProcess,
+        ),
       );
       this.enemyProjectileBarrierColliders.push(
         this.physics.add.collider(
@@ -2985,7 +3154,12 @@ export class GameScene extends Phaser.Scene {
       if (!barrier) continue;
       this.playerBarrierColliders.push(this.physics.add.collider(this.player, barrier));
       this.missileBarrierColliders.push(
-        this.physics.add.collider(this.missilePool.getGroup(), barrier, deactivateMissile),
+        this.physics.add.collider(
+          this.missilePool.getGroup(),
+          barrier,
+          deactivateMissile,
+          this.playerMissileWallProcess,
+        ),
       );
       this.enemyProjectileBarrierColliders.push(
         this.physics.add.collider(
@@ -3046,6 +3220,7 @@ export class GameScene extends Phaser.Scene {
 
     this.tickGemSealInteract();
     this.tickStairsInteract();
+    this.tickShopInteract();
     this.tickActiveItem();
 
     if (!this.restartKey) return;

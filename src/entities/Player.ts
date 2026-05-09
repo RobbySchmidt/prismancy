@@ -9,6 +9,7 @@ import {
   KNOCKBACK_DURATION_MS,
   MISSILE_FIRE_INTERVAL_MS,
   MISSILE_LIFETIME_MS,
+  MISSILE_RADIUS,
   PLAYER_HITBOX_OFFSET_Y,
   PLAYER_HITBOX_RADIUS,
   PLAYER_INVINCIBILITY_MS,
@@ -17,6 +18,7 @@ import {
   SPELLBLADE_BOLT_DAMAGE_MULT,
   SPELLBLADE_BOLT_FIRE_INTERVAL_MS,
   SPELLBLADE_BOLT_VISUAL_SCALE,
+  SPELLBLADE_MAX_HEALTH,
   TextureKeys,
   WORLD_SPRITE_SCALE,
 } from '../config/GameConfig';
@@ -100,7 +102,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.inputManager = input;
     this.missilePool = missilePool;
     this.stats = stats;
-    this.health = new PlayerHealth(PLAYER_MAX_HEALTH, PLAYER_INVINCIBILITY_MS);
+    // Spellblade is a glass cannon — 2 hearts baseline forces the dash
+    // to be used defensively instead of as a free dodge. Wizard keeps
+    // the original 3 hearts as the safer ranged-caster baseline.
+    const startingMaxHp = this.character === 'spellblade'
+      ? SPELLBLADE_MAX_HEALTH
+      : PLAYER_MAX_HEALTH;
+    this.health = new PlayerHealth(startingMaxHp, PLAYER_INVINCIBILITY_MS);
 
     this.setDepth(DepthLayers.Player);
     this.setScale(WORLD_SPRITE_SCALE);
@@ -190,6 +198,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       piercing: this.stats.getEffective('piercingCount'),
       homingTurnRate: this.stats.getEffective('homingTurnRate'),
       burnDamageFactor: this.stats.getEffective('burnDamageFactor'),
+      // Wizard intentionally does NOT inherit player velocity — pure
+      // cardinal. The orb is sniper-precise; only the heavy Spellblade
+      // bolt carries movement momentum (asymmetric feel chosen
+      // 2026-05-09 after a brief shared-inheritance iteration was
+      // user-flagged as "wizard schießt jetzt anders"). Omitting
+      // inheritVx/inheritVy → MagicMissile.fire defaults them to 0.
     });
     this.nextFireAt = time + interval;
     this.spawnWandSparkle();
@@ -221,6 +235,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       burnDamageFactor: this.stats.getEffective('burnDamageFactor'),
       textureKey: TextureKeys.SpellbladeBolt,
       rotateToDirection: true,
+      inheritVx: body.velocity.x,
+      inheritVy: body.velocity.y,
+      // Body stays at MISSILE_RADIUS even though visual scales 1.5×.
+      // Without this, the body extends past the player's hitbox at top/
+      // bottom-wall edges and the bolt spawns mid-overlap with the wall
+      // (deactivated immediately or stuck after the spawn-grace window).
+      bodyRadiusOverride: MISSILE_RADIUS,
     });
     this.nextFireAt = time + interval;
     this.spawnWandSparkle();
@@ -229,9 +250,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   /**
    * Spellblade dash on [Shift]. Sets a burst velocity along the current
-   * WASD direction (or last shoot direction as a fallback so still-aiming
-   * players can dash backward / sideways from their cast), grants i-frames
-   * for the dash window, and starts the cooldown clock.
+   * WASD movement vector (8-way, including diagonals — already normalised
+   * by InputManager.getMovement so a NW-dash covers the same total
+   * distance as a pure-N dash). Falls back to the aim direction (4-way
+   * arrow keys) if no WASD is held, so still-aiming players can dash
+   * straight from a cast. Grants i-frames + starts the cooldown clock.
    *
    * Wizard never reaches this method (`tickDashInput` is gated on
    * character).
@@ -240,16 +263,32 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (!this.inputManager.wasDashJustPressed()) return;
     if (time < this.dashCooldownUntil) return;
     if (time < this.dashUntil) return; // already dashing
-    // Direction priority: current move input > current aim > skip.
-    // No "last cardinal" memory — keeps it deterministic and easy to read.
-    const dir = this.inputManager.getMoveDirection() ?? this.inputManager.getShootDirection();
-    if (!dir) return;
-    this.startDash(dir, time);
+    // Prefer the normalised movement vector so the dash respects the
+    // exact WASD heading (incl. diagonals). Without this the dash
+    // collapses to a cardinal — counter-intuitive when the player's
+    // running NE and presses shift expecting an NE dash.
+    const move = this.inputManager.getMovement();
+    let vx: number;
+    let vy: number;
+    if (move.x !== 0 || move.y !== 0) {
+      vx = move.x;
+      vy = move.y;
+    } else {
+      const aimDir = this.inputManager.getShootDirection();
+      if (!aimDir) return;
+      const aimVec = DIRECTION_VECTORS[aimDir];
+      vx = aimVec.x;
+      vy = aimVec.y;
+    }
+    this.startDash(vx, vy, time);
   }
 
-  private startDash(dir: Direction, time: number): void {
-    const v = DIRECTION_VECTORS[dir];
-    this.setVelocity(v.x * DASH_SPEED, v.y * DASH_SPEED);
+  private startDash(vx: number, vy: number, time: number): void {
+    // vx, vy are already a unit vector (getMovement normalises diagonals
+    // to 1/√2 each, DIRECTION_VECTORS values are pure cardinals), so
+    // multiplying by DASH_SPEED gives the same total burst speed for
+    // any of the 8 dash directions.
+    this.setVelocity(vx * DASH_SPEED, vy * DASH_SPEED);
     this.dashUntil = time + DASH_DURATION_MS;
     this.dashCooldownUntil = this.dashUntil + DASH_COOLDOWN_MS;
     // Knockback lock would otherwise swallow the dash velocity on a hit-

@@ -349,8 +349,175 @@ Vorgängerdesign **Vampire Twins** (Crimson Lord melee + Sapphire Marquis mage, 
 - [ ] Seeded-Run-Funktion (Seed eingeben für reproduzierbare Runs)
 - [ ] Performance-Pass (Object-Pooling für Missiles/Projektile/Partikel)
 - [x] **Active Items mit [Q]** — Scope-Pivot 2026-05-09. War vorher out-of-scope (Entscheidung 2026-05-07), jetzt reaktiviert mit minimaler Infrastruktur (`ItemDefinition.active`, `ActiveItemSystem`-Slot-Owner, `ActiveItemSlot`-HUD-Widget bottom-left, [Q]-Key-Polling in `tickActiveItem`). Erstes Active-Item: **Blood of Marquis** — Glass-Cannon-Trade, +30% all stats permanent, max HP locked auf 2 Hearts, [Q] feuert "Echoes of Blood" AOE die Trash-Mobs instant-killt + Bossen 30% max-HP-Damage zufügt (Phase-Threshold cross natürlich). Drop-Gate via `ItemDefinition.metaUnlock = 'boss-marquis-of-mirages'`. Siehe Active-Item-System-Block unten.
-- [~] **Spellblade-Charakter (in progress, 2026-05-09)** — zweiter spielbarer Charakter, Tattered-Knight-Optik (silver helm + onyx blade, gefallener Ritter des Prismarch). Unlock-gated auf Prismarch-Kill (`MetaProgress.hasSpellbladeCharacter()`, gleicher Gate wie Prismancy-Skin). **Phase A DONE** — Sprite (`drawSpellbladeTexture` in PreloadScene), `MetaProgress.selectedCharacter` ('wizard' | 'spellblade'), MainMenu-Cycle mit Pfeiltasten links/rechts (replaces alten `[S]`-Skin-Toggle), Player liest selection via `resolvePlayerTextureKey()`. Aktuell kämpft der Spellblade noch identisch zum Wizard (gleiche Magic-Missile-Mechanik) — Phase B (Sword-Slash) + Phase C (Dash) folgen.
+- [x] **Spellblade-Charakter (DONE 2026-05-09)** — zweiter spielbarer Charakter als Glass-Cannon-Swordmage-Variante des Wizards. Unlock-gated auf Prismarch-Kill (`MetaProgress.hasSpellbladeCharacter()`, gleicher Gate wie Prismancy-Skin). Vollständige Combat-Identität via Spell-Sword-Bolt + 8-way Dash. Siehe Spellblade-Combat-Block unten für Details.
 - ~~Bombs als Pickup-Type~~ — out of scope (User-Entscheidung 2026-05-07: kein nicht-offensiver Use-Case)
+
+---
+
+## Spellblade-Combat (Phase 6 — 2026-05-09)
+
+**Stack:** Zweiter spielbarer Charakter via Tattered-Knight-Sprite (silver helm + onyx blade, fallen knight of the Prismarch). Unlock-gated auf Prismarch-Kill. Kämpft mit einem **Spell-Sword-Projektil** (re-uses MagicMissile-Pool mit anderer Texture + slow cadence + chunky damage + baseline pierce) plus einem **8-way Dash** mit i-frames. Glass-cannon-Identity (2 Herzen baseline statt Wizard's 3).
+
+**Pivot-History:** Phase B war ursprünglich als 180° Melee-Slash designed (SwordSlash + SwordSlashPool entities, parry-Mechanik, 80→120 px Range, ×3 Damage-Mult, +1 Heart). User-Playtest 2026-05-09: "das komplette game war eben free, basically alle ge-one-hitted". Komplett gelöscht (SwordSlash.ts + SwordSlashPool.ts + parry overlap + alle SLASH_*-Konstanten + DEFAULT_SLASH_TINT) und durch Projectile-basierte Spell-Sword-Variante ersetzt. Nur der Dash + die Texture (`drawSpellbladeTexture` in PreloadScene) + `MetaProgress.selectedCharacter` survived den Pivot.
+
+### Spellblade-Bolt (replaces Magic-Missile)
+
+Re-uses `MagicMissilePool` — kein eigener Pool. **`MagicMissile.fire`** nimmt jetzt vier optionale Parameter:
+- `textureKey?: string` — wenn gesetzt, swappt die Pool-Sprite-Texture (Spellblade nutzt `TextureKeys.SpellbladeBolt`, Wizard ohne den Param fällt auf `TextureKeys.MagicMissile` zurück)
+- `rotateToDirection?: boolean` — wenn true, rotiert das Sprite via `setRotation(atan2(finalVy, finalVx))` zum Flugvektor (Spell-Sword zeigt entlang seiner Trajektorie, Wizard-Orb bleibt rotation-free). Wichtig: rotiert auf den **finalen** Velocity-Vektor (nach Inherit-Add), nicht die reine Cardinal-Direction
+- `inheritVx?` / `inheritVy?: number` — Player's body velocity at fire time, multiplied by `MISSILE_VELOCITY_INHERIT_FACTOR` und additiv zur Cardinal-Velocity. Siehe Movement-Velocity-Inheritance-Block unten
+- `bodyRadiusOverride?: number` — wenn gesetzt, force-pinned der Body nach `setScale` auf einen absoluten World-Space-Radius via Inv-Scale-Compensation. Siehe Wall-Stuck-Bug-Block unten
+
+Alle Werte werden bei jedem `fire()` gesetzt/zurückgesetzt damit ein recycled Pool-Member nicht den vorigen State trägt. Player branched zwischen `fireWizardMissile` (default opts) und `fireSpellbladeBolt` (bolt-specific opts) je nach `this.character`.
+
+**Bolt-Stats** (aktuelles Tuning, mehrfach iteriert):
+- **`SPELLBLADE_BOLT_FIRE_INTERVAL_MS = 900`** — 3.6× langsamer als Wizard's 250ms. Tuning-Verlauf 400→600→900: User-flagged "es muss schwerfälliger sein, es schwingt ja ein schwert". Heavy-sword-swing feel; jeder Cast ist ein commit.
+- **`SPELLBLADE_BOLT_DAMAGE_MULT = 1.5`** — applied auf `damage`-Stat. Base 1.0 dmg × 1.5 = 1.5/shot. Mossy Slime (HP 5) → 4 hits, Forest Sprite (HP 3) → 2 hits, Pixie (HP 2) → 2 hits. +damage-Items skalieren linear. War zwischenzeitlich ×3 in der Slash-Version (1-shotted alles, gerejected).
+- **`SPELLBLADE_BOLT_BASELINE_PIERCE = 1`** — addiert auf den `piercingCount`-Stat **nur** beim Spellblade-Fire (Wizard kriegt keinen Bonus). Fresh-run pierces 1 enemy baseline; Magic Shard (+2) stackt auf 3 total. Damage-Taper folgt der Standard-`PIERCING_DAMAGE_FACTORS = [1.0, 0.75, 0.5]` Sequence — base bolt macht 1.5 → 1.125 dmg auf den zweiten Hit.
+- **`SPELLBLADE_BOLT_VISUAL_SCALE = 1.5`** — multiplied auf den `missileScale`-Stat. Sprite-Frame ist dasselbe 24×24 wie Magic-Missile, aber `setScale(1.5)` skaliert das Visual auf 1.5×. **Body bleibt aber bei `MISSILE_RADIUS = 8`** via `bodyRadiusOverride` (siehe Wall-Stuck-Block unten) — also Spellblade-Bolt ist visuell 1.5× größer als Wizard-Orb, hat aber **identische** Hitbox-Größe (8 px). Side-Effect: `missileScale`-Items growen auf Spellblade nur das Visual, nicht den Body — auf Wizard skaliert der Body weiter mit (default Phaser auto-scale).
+
+**DPS-Vergleich:**
+- Wizard single-target: 1.0 / 0.25s = 4.0 dmg/s
+- Spellblade single-target: 1.5 / 0.9s ≈ 1.67 dmg/s (2.4× langsamer)
+- Spellblade group-of-2 (lined up, beide pierced): (1.5 + 1.125) / 0.9 ≈ 2.92 dmg/s — immer noch unter Wizard's single-target
+- Wizard ist klar Sustained-DPS-King; Spellblade hat besseres Group-Clear durch Pierce + bigger Hitbox + Damage-Burst pro Cast.
+
+**Bolt-Texture** (`drawSpellbladeBoltTexture` in PreloadScene, 24×24): elongated diamond pointing along +x axis, drei Layer (mid-violet body → bright lavender core → white-hot leading-edge highlight) plus Pommel-orb am trailing-end. Authored pure white sodass `missileTint` (Items wie Pixie Dust → magenta, Mire Pearl → blue) das Blade-Glow direkt färbt.
+
+### Movement-Velocity-Inheritance (asymmetric, Spellblade-only)
+
+`MISSILE_VELOCITY_INHERIT_FACTOR = 0.25` definiert wie stark der Player's Body-Velocity an die finale Cardinal-Velocity gemultiplied + add'd wird. **`MagicMissile.fire`** wendet das auf jeden Bolt der `inheritVx`/`inheritVy` mitbringt.
+
+**Asymmetrische Application** — nur `Player.fireSpellbladeBolt` passt `inheritVx: body.velocity.x` + `inheritVy: body.velocity.y` durch. **`Player.fireWizardMissile` lässt die Felder weg** sodass MagicMissile.fire sie auf 0 defaultet → Wizard schießt **pure cardinal**, Spellblade-Bolt winkelt mit Movement.
+
+Effekt at base PLAYER_SPEED 220 px/s, perpendikulär:
+- Inherit = 220 × 0.25 = 55
+- Cardinal = 420 (MISSILE_SPEED)
+- Angle = atan2(55, 420) ≈ 7.5° off-axis — subtil aber sichtbar
+- Bei Dash (720 px/s) noch ~23° angle
+
+Thematisch: Wand-Orb ist sniper-präzise, Spell-Sword-Bolt trägt Momentum. Tuning-History 0.5 → 0.25 (User-flag "der winkel ist zu stark", dash-cancel-bolt war bei 0.5 ~40° → fühlte sich unintentional an).
+
+**Wichtig:** `setRotation` für `rotateToDirection: true` Bolts nutzt den **finalen** Velocity-Vektor (`Math.atan2(finalVy, finalVx)`), nicht die Cardinal-Direction. Ohne das würde der Bolt-Sprite cardinal zeigen aber angled fliegen — Disconnect zwischen Visual und Trajektorie.
+
+### Wall-Stuck-Bug-Fix (bodyRadiusOverride)
+
+User-Bug 2026-05-09: "spellblade kann nicht schießen wenn man komplett am rand des raumes steht". Bolt blieb in der Wand kleben oder wurde sofort beim Spawn deaktiviert.
+
+**Root-Cause:** Spellblade-Bolt hatte initial Body 12 px (MISSILE_RADIUS × SPELLBLADE_BOLT_VISUAL_SCALE = 8 × 1.5). Player-Body ist 11 px. Wenn Spieler an die Top-Wall gepresst war, Player-Body-Center bei `top_wall_y + 11`. Bolt-Body-Top-Edge = body.center.y - 12 = `top_wall_y - 1` → 1 px **in** der Wand. Bei Sideways-Shoot (Cardinal-X-Velocity) bewegt sich der Bolt horizontal aus der Spawn-Position weg, vertikal **bleibt** er aber 1px in der Wand → Wall-Collider-Trigger → Bolt deaktiviert.
+
+**Fehl-Versuch (entfernt-implizit):** Spawn-Grace via `MISSILE_SPAWN_GRACE_MS = 60` + `MagicMissile.isInSpawnGrace` + `playerMissileWallProcess` Process-Callback. Dachte das Problem sei eine 1-frame-Spawn-Overlap. War aber nicht — die vertikale Overlap **persistierte** über Sideways-Movement, und nach 60ms hat der Wall-Collider trotzdem deaktiviert. Der Code ist noch da als Defense-in-Depth (kostenlose 60ms grace für die seltene Case wo ein Bolt bei Spawn überlappt aber sich SCHNELL aus der Overlap heraus bewegt) — aber der echte Fix ist:
+
+**Echter Fix — `bodyRadiusOverride`:** `MagicMissile.fire` nimmt jetzt einen optionalen `bodyRadiusOverride: number` Parameter. Wenn gesetzt, wird **nach** `setScale(opts.scale)` ein neues `setCircle(r, halfW - r, halfH - r)` mit `r = bodyRadiusOverride / opts.scale` ausgeführt — Inv-Scale-Compensation, weil Phaser's Auto-Scale den Body sonst wieder hochzieht. Resultat: Body-Radius im World-Space = absolute `bodyRadiusOverride`, unabhängig vom Visual-Scale.
+
+`Player.fireSpellbladeBolt` passt `bodyRadiusOverride: MISSILE_RADIUS` (= 8) durch. Spellblade-Bolt-Body ist damit immer 8 px im World-Space — fits inside Player-Body (11 px) → spawnt nie überlappend mit der Wall. Visual bleibt 1.5× groß (Phaser's setScale handlet das Sprite-Rendering separat, nicht den Body).
+
+Wizard fire-path lässt `bodyRadiusOverride` weg → Wizard-Body skaliert weiter mit `setScale` (= MISSILE_RADIUS × scale). missileScale-Items affecten Wizard-Hitbox wie früher.
+
+### Item-Carry-Over
+
+Alle existing Items wirken auf beiden Charakteren ohne Branch:
+- **Damage-Items** (Telescopic Wand, Magic Potion, etc.) — skalieren linear in beide DPS-Curves
+- **Fire-Rate-Items** (Hot Tea) — modulieren `SPELLBLADE_BOLT_FIRE_INTERVAL_MS / fireRate` analog zu `MISSILE_FIRE_INTERVAL_MS / fireRate`
+- **Magic Shard (+2 Pierce)** — addiert auf die +1 Baseline → 3 total für Spellblade
+- **Wizard Glasses (Homing 80°/s)** — funktioniert auch auf der Spellblade-Bolt (gleicher Pool)
+- **Fire Orb (Burn-DoT 0.30)** — Burn appliziert per Hit, durchpiercend
+- **`missileTint`-Items** (Pixie Dust, Mire Pearl, Bloodbound Chalice, etc.) — färben den Bolt
+- **`missileScale`-Items** — multipliziert sich mit dem Bolt's eigenen 1.5× Visual-Scale-Faktor → Visual wächst (z.B. Magic Tome +0.15 → 1.5 × 1.15 = 1.725× Sprite). **Hitbox** wächst aber NICHT mit `missileScale` für den Spellblade (bodyRadiusOverride pinned ihn auf MISSILE_RADIUS). Wizard-Behavior unverändert: setScale auto-skaliert seine Hitbox.
+- **HP-Up-Items** (Heart Container, Pixie Dust, Spyglass, Lily Diadem, Ancient Heart) — addieren über den Spellblade's 2-Heart-Baseline; max HP wächst dynamisch
+
+### Spellblade-Dash ([Shift])
+
+8-way directional. Re-uses `InputManager.getMovement()` (already-normalized 8-way Vektor mit √2-Diagonale-Normalization) statt einem cardinal-only `Direction`. NW-Dash deckt dieselbe Distanz wie N-Dash. Wenn kein WASD gehalten, fallback auf `getShootDirection()` (4-way arrow keys) damit Still-Aiming-Spieler trotzdem dashen können.
+
+**Dash-Konstanten:**
+- **`DASH_DURATION_MS = 160`** — Burst-Window
+- **`DASH_SPEED = 720`** px/s — total ~115 px Distanz (~1.3 Tiles)
+- **`DASH_COOLDOWN_MS = 1500`** — gemessen vom Dash-Ende, nicht vom Dash-Start
+- **`DASH_INVINCIBILITY_MS = 220`** — slightly longer als Duration sodass der back-edge auch grace hat (Isaac-Style)
+
+**Implementation in [Player.ts](src/entities/Player.ts):**
+- `tickDashInput(time)` polled jeden Frame, gated auf `character === 'spellblade'` (Wizard skipped die Method komplett)
+- `Phaser.Input.Keyboard.JustDown` auf Shift verhindert Auto-Repeat bei Held-Shift
+- `startDash(vx, vy, time)` setzt Velocity (vx/vy sind unit-Vektor → × DASH_SPEED gibt selben total-burst-speed in jeder Richtung), `dashUntil` lock, cooldown-clock, `grantInvincibility(220)`, clears `knockbackUntil` damit Hit-mid-Dash den Burst nicht swallowed
+- `preUpdate` skipped `handleMovement` während `time < dashUntil` damit WASD die Burst-Velocity nicht clobbed
+
+`InputManager.wasDashJustPressed()` ist die einzige neue Public-API (`getMoveDirection` wurde während des 8-way-Refactors gestrichen — war nur cardinal und wird nicht mehr gebraucht).
+
+### Spellblade-Max-HP
+
+**`SPELLBLADE_MAX_HEALTH = 4`** (= 2 Herzen, vs Wizard's `PLAYER_MAX_HEALTH = 6` = 3 Herzen). Glass-cannon trade — Spellblade hat +50% damage, baseline pierce-1, bigger hitbox UND dash i-frames; die niedrigere starting HP zwingt den Spieler den Dash defensiv zu nutzen statt als free dodge. Player-Constructor branched: `character === 'spellblade' ? SPELLBLADE_MAX_HEALTH : PLAYER_MAX_HEALTH`. HP-Up-Items skalieren on top.
+
+### MainMenu Character Profile Card ([I]-Toggle)
+
+`buildCharacterStatsPanel()` paintet ein zentriertes 232×252-Profil-Panel zwischen Wizard- und Pixie-Queen-Sprite. **Default hidden** — Title-Screen-Art darf nicht ständig verdeckt sein. **[I]**-Keybind togglt Sichtbarkeit; Hint-Label am Bottom (`y = GAME_HEIGHT - 22`) wechselt zwischen `[I] CHARACTER INFO` und `[I] HIDE INFO`.
+
+Bottom-Hint-Stack-Reihenfolge (top→bottom): Char-Cycle (`< SPELLBLADE >` bei `y - 66`) → Skin-Toggle (`[S] SKIN: …` bei `y - 44`) → Info-Toggle (`[I] CHARACTER INFO` bei `y - 22`).
+
+Panel-Inhalt: Char-Name (gold) + Flavor-Subtitle (italic dim) + 6 Stat-Rows (HP / CAST RATE / DAMAGE / PIERCE / PROJECTILE / DASH). Werte sind hardcoded (`PROFILES`-Map) statt live-computed weil wir ein klares Marketing-Read wollen statt der echten Stats-System-Numbers — Items werden nicht eingerechnet, das ist die *base profile* vor dem Run-Start.
+
+`setupCharacterCycle` ruft `statsPanel.update(character)` in `applyCharacter` auf sodass Pfeiltasten-Cycle das Panel live aktualisiert. Container auf `setDepth(15)` damit das Panel über den Action-Effects (depth 10) liegt. Visibility-State persistiert über Overlay-Pause/Resume (Sound Settings, Stats, Controls), wird aber bei jedem Scene-Restart resettet (default hidden bei jedem MainMenu-Visit).
+
+### Controls-Overlay
+
+[ControlsScene.ts](src/scenes/ControlsScene.ts) listet jetzt zusätzlich:
+- `Cast Magic` — Arrow Keys (gleicher Slot für Wizard-Missile + Spellblade-Bolt)
+- `Active Item` — Q
+- `Dash (Spellblade)` — Shift + WASD
+
+### Files-Touched-Liste
+
+- [Player.ts](src/entities/Player.ts) — `character`-Field, `fireWizardMissile` / `fireSpellbladeBolt` branch (Spellblade passt `inheritVx/Vy` + `bodyRadiusOverride` durch, Wizard nicht), `tickDashInput` / `startDash` (Spellblade-only)
+- [MagicMissile.ts](src/entities/projectiles/MagicMissile.ts) — `MagicMissileFireOptions` mit `textureKey?` + `rotateToDirection?` + `inheritVx?` + `inheritVy?` + `bodyRadiusOverride?`. fire() setzt Texture, rotiert auf finale-Velocity-Vektor, addiert Inherit-Velocity, force-pinned Body wenn override gesetzt. Plus `isInSpawnGrace` Defense-in-Depth-Method.
+- [InputManager.ts](src/systems/InputManager.ts) — `keyShift` + `wasDashJustPressed()` (`getMoveDirection` removed)
+- [MainMenuScene.ts](src/scenes/MainMenuScene.ts) — `buildCharacterStatsPanel()` + [I]-Toggle + Bottom-Hint-Reorder
+- [PreloadScene.ts](src/scenes/PreloadScene.ts) — `drawSpellbladeBoltTexture` (replaces drawSwordSlashTexture)
+- [GameConfig.ts](src/config/GameConfig.ts) — `SPELLBLADE_BOLT_*` + `DASH_*` + `SPELLBLADE_MAX_HEALTH` + `MISSILE_VELOCITY_INHERIT_FACTOR` + `MISSILE_SPAWN_GRACE_MS` Konstanten + `TextureKeys.SpellbladeBolt`
+- [GameScene.ts](src/scenes/GameScene.ts) — `playerMissileWallProcess` Process-Callback auf den 3 Missile-Wall-/Barrier-Collider-Registrierungs-Pfaden (`setupCollidersForActiveRoom`, `markCurrentRoomCleared`, `refreshBarrierColliders`). Plus Shop-[E]-Pattern (siehe unten).
+- [ControlsScene.ts](src/scenes/ControlsScene.ts) — Cast/Active/Dash entries
+
+### Future Polish (nicht priorisiert)
+
+- Eigene SFX-Recipes für Spellblade-Bolt-Cast (aktuell re-uses `playPlayerCast`) — heavier "thwoom" mit lower pitch fits the heavy-sword-swing feel
+- Eigene Dash-SFX (woosh + brief tonal whoosh) statt re-used cast-SFX
+- Dash-Trail-Visual (afterimage sprite + alpha-fade) für mehr juice
+- Possible: dedicated "Spellblade Bolt Empty"-Wand-Tip-Effekt sodass der Cast nicht wand-Flash sondern Sword-Flash zeigt
+- Spawn-Grace-Cleanup: `MISSILE_SPAWN_GRACE_MS` + `isInSpawnGrace` + `playerMissileWallProcess` sind heute redundant (bodyRadiusOverride löst das Problem strukturell). Belt-and-suspenders aber 60ms grace könnte für künftige large-body-Edge-Cases (z.B. wenn Wizard mit max-stack missileScale eine Body-Größe > 11 px erreicht) noch hilfreich sein. Wenn Cleanup-Lust besteht: 4 Files (GameConfig, MagicMissile, GameScene, dazu Imports) — kein Risiko, der Hauptfix bleibt.
+
+---
+
+## Shop [E]-Press-Purchase-Pattern (2026-05-09)
+
+User-Bug: in Shop-Räumen genügte das Hineinlaufen in einen Pickup um ihn zu kaufen — keine Confirmation, accidental Buys häufig. Pivot zum gleichen `[E]`-Confirm-Pattern wie GemSeal + Stairs.
+
+**Implementation in [GameScene.ts](src/scenes/GameScene.ts):**
+
+- **`tryCollectPickup(pickup, player)`** — extrahierte Method aus dem alten `playerPickupOverlap` Callback. Beinhaltet die komplette Pickup-Pipeline: `canCollect` → key-gate (gold crate) → `tryPurchase` → `onCollect` → bookkeeping (looted, purchasedShopSlots, EventBus, label cleanup, destroy). Wird jetzt von **zwei** Pfaden gerufen:
+  1. `playerPickupOverlap` für **non-shop** Pickups (drops, pedestals, crates) — auto-collect bleibt
+  2. `tickShopInteract` für **shop slots** — gegated auf [E]-Press
+- **`playerPickupOverlap`** macht jetzt nur eine early-return wenn `pickup.shopSlotIndex !== undefined` (= shop slot). Sonst → tryCollectPickup.
+- **`tickShopInteract()`** — pro-frame in `update()`. Iteriert `this.pickups.children`, findet ersten aktiven Pickup mit `shopSlotIndex !== undefined` der mit dem Player overlaps (`physics.overlap`). Wenn der "active slot" sich vom letzten Frame unterscheidet, retext + repositioniert den shared `shopPrompt` Text-Element (oder hidet ihn). Auf JustDown(E) → `tryCollectPickup(activeSlot, this.player)`.
+
+**State:**
+- `shopPrompt: Phaser.GameObjects.Text | null` — single shared Text-Element, recycled across slots
+- `shopPromptSlot: BasePickup | null` — tracking ref damit der Prompt nur bei Slot-Change re-rendered wird (cheap)
+
+**Prompt-Label-Format** (`buildShopPromptLabel`):
+- Heart-Slot → `[E]  BUY  HEART`
+- Key-Slot → `[E]  BUY  KEY`
+- Item-Slot → `[E]  BUY  <ITEM_NAME_UPPERCASE>` via neuem `ItemPickup.displayName` Getter (returnt `itemDef.displayName`)
+
+**Visual:** Floating 56 px über dem Slot, Gold-Tint (`#fff8c0`) + 4-px-Stroke (`#1a0828`), Monospace 13 px bold. Tween-fade 140 ms in/out auf Slot-Change.
+
+**Cleanup:** `shopPrompt?.destroy()` + Refs nullen in `tearDownActiveRoom` UND im SHUTDOWN-Reset (per-run-Felder bug-Pattern aus dem CLAUDE.md SHUTDOWN-Block).
+
+**TS-Quirk:** `let activeSlot: BasePickup | null = null` mit closure-write in `pickups.children.iterate` → TS narrowte den outer-var auf `null` after closure. Workaround: `slotBox: { value: ... }` als mutable container, unwrappen nach iteration.
+
+**Files-Touched:**
+- [GameScene.ts](src/scenes/GameScene.ts) — `tryCollectPickup` extrahiert, `playerPickupOverlap` skipped shop slots, neue `tickShopInteract` + `showShopPrompt` + `hideShopPrompt` + `buildShopPromptLabel` + `shopPrompt` / `shopPromptSlot` State, update()-Hook
+- [ItemPickup.ts](src/entities/pickups/ItemPickup.ts) — `displayName` getter
+
+---
 
 **DoD:** Spiel fühlt sich rund an, ist deploybar.
 

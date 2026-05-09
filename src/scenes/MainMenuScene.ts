@@ -89,19 +89,26 @@ export class MainMenuScene extends Phaser.Scene {
     // 4) Action effects between them.
     this.paintActionEffects();
 
-    // 5) Title (just the big text — the bottom prompts moved into the menu).
+    // 5) Character profile / stats card — sits in the gap between the
+    //    wizard preview and the Pixie Queen. Updates when the player
+    //    cycles characters so the stat trade-offs are visible at a
+    //    glance (HP / cadence / damage / pierce / dash etc.).
+    const statsPanel = this.buildCharacterStatsPanel();
+    statsPanel.update(MetaProgress.getSelectedCharacter());
+
+    // 6) Title (just the big text — the bottom prompts moved into the menu).
     this.paintTitle(cx);
 
-    // 6) Vertical menu (left side).
+    // 7) Vertical menu (left side).
     this.buildVerticalMenu();
 
-    // 7) Character / skin cycle bottom-of-screen — left/right arrows step
+    // 8) Character / skin cycle bottom-of-screen — left/right arrows step
     //    through every (character, skin) combination the player has
     //    unlocked. Replaces the old `[S]` skin toggle since unlocking the
     //    Spellblade introduced more than two preview options. The cycle
     //    is hidden when only the default wizard is available (no point
     //    showing arrows the player can't use).
-    this.setupCharacterCycle(wizard);
+    this.setupCharacterCycle(wizard, statsPanel);
 
     // Title music plays only on subsequent visits — the first page-load has a
     // locked WebAudio context, and we'd rather have a quick first-press start
@@ -353,10 +360,19 @@ export class MainMenuScene extends Phaser.Scene {
    * the same state. Pressing left/right re-evaluates the [S] visibility
    * since switching characters can change which skins are available.
    */
-  private setupCharacterCycle(preview: Phaser.GameObjects.Image): void {
+  private setupCharacterCycle(
+    preview: Phaser.GameObjects.Image,
+    statsPanel: { update: (character: CharacterId) => void },
+  ): void {
     const cx = GAME_WIDTH / 2;
-    const skinHintY = GAME_HEIGHT - 22;
-    const cycleY = GAME_HEIGHT - 44;
+    // Bottom hint stack — cycle on top, then [S] skin toggle, then the
+    // [I] info hint (rendered separately in `buildCharacterStatsPanel`
+    // at GAME_HEIGHT - 22). Reading order top → bottom: pick character →
+    // toggle skin → reveal stats. User-flagged 2026-05-09: previous
+    // ordering had [I] at the top of the stack, which read as "info is
+    // the primary action" rather than "info is an optional reveal".
+    const cycleY = GAME_HEIGHT - 66;
+    const skinHintY = GAME_HEIGHT - 44;
 
     // --- Skin toggle (set up first so the cycle can refresh its visibility)
     let currentSkin: SkinId = MetaProgress.getSelectedSkin();
@@ -447,6 +463,7 @@ export class MainMenuScene extends Phaser.Scene {
       currentSkin = MetaProgress.getSelectedSkin(character);
       preview.setTexture(this.previewTextureKey(character, currentSkin));
       charLabel.setText(this.characterLabel(character));
+      statsPanel.update(character);
       refreshSkinLabel();
     };
 
@@ -518,6 +535,163 @@ export class MainMenuScene extends Phaser.Scene {
   private skinHintText(skin: SkinId): string {
     const name = skin === 'prismancy' ? 'PRISMANCY' : 'DEFAULT';
     return `[S] SKIN: ${name}`;
+  }
+
+  /**
+   * Character profile card painted in the gap between the wizard preview
+   * and the Pixie Queen. Lists the trade-off-relevant stats for the
+   * currently-cycled character so the player can compare Wizard vs
+   * Spellblade at a glance instead of hunting them down via Controls.
+   *
+   * Returns an `update(character)` callback so the cycle handler can
+   * refresh the panel without rebuilding it. Container groups everything
+   * under a single depth + makes future repositioning easy.
+   *
+   * Stats shown: HP, cast rate (1/s), damage/shot, pierce baseline,
+   * projectile size, dash availability. Items / picked-up modifiers are
+   * NOT shown — this is the *base profile* before the run starts.
+   */
+  private buildCharacterStatsPanel(): { update: (character: CharacterId) => void } {
+    const panelW = 232;
+    const panelH = 252;
+    // Centered horizontally — sits over the action effects but is hidden
+    // by default so the title-screen art reads cleanly. Player toggles
+    // it with [I] (see the [I] hint at the bottom of the menu).
+    const panelX = Math.round((GAME_WIDTH - panelW) / 2);
+    const panelY = 178;
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x0a0418, 0.86);
+    bg.fillRoundedRect(panelX, panelY, panelW, panelH, 8);
+    bg.lineStyle(1, 0xfff8c0, 0.32);
+    bg.strokeRoundedRect(panelX, panelY, panelW, panelH, 8);
+
+    const titleText = this.add
+      .text(panelX + panelW / 2, panelY + 18, '', {
+        fontFamily: 'monospace',
+        fontSize: '20px',
+        fontStyle: 'bold',
+        color: '#fff8c0',
+        stroke: '#1a0828',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 0);
+
+    const subtitleText = this.add
+      .text(panelX + panelW / 2, panelY + 46, '', {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#aab8c0',
+        fontStyle: 'italic',
+      })
+      .setOrigin(0.5, 0);
+
+    // Gold accent under the title.
+    const accent = this.add.graphics();
+    accent.fillStyle(0xfff8c0, 0.35);
+    accent.fillRect(panelX + 24, panelY + 70, panelW - 48, 1);
+
+    // Stat rows — label left, value right. Order matches the trade-off
+    // narrative: defensive → offensive → utility.
+    const ROW_LABELS = ['HP', 'CAST RATE', 'DAMAGE', 'PIERCE', 'PROJECTILE', 'DASH'] as const;
+    const rowsY = panelY + 86;
+    const rowGap = 24;
+
+    const labelTexts: Phaser.GameObjects.Text[] = [];
+    const valueTexts: Phaser.GameObjects.Text[] = [];
+
+    for (let i = 0; i < ROW_LABELS.length; i++) {
+      const y = rowsY + i * rowGap;
+      labelTexts.push(
+        this.add
+          .text(panelX + 16, y, ROW_LABELS[i]!, {
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            color: '#aab8c0',
+          })
+          .setOrigin(0, 0),
+      );
+      valueTexts.push(
+        this.add
+          .text(panelX + panelW - 16, y, '', {
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            fontStyle: 'bold',
+            color: '#e9d5ff',
+          })
+          .setOrigin(1, 0),
+      );
+    }
+
+    // Container groups everything under one depth so the panel sits
+    // above the action effects (depth 10) but below the title text and
+    // menu items (default depth 0 — but they're outside the panel rect
+    // anyway, so the visual layering only matters for the action arc /
+    // thorns sweeping behind the card).
+    const container = this.add.container(0, 0, [
+      bg,
+      accent,
+      titleText,
+      subtitleText,
+      ...labelTexts,
+      ...valueTexts,
+    ]);
+    container.setDepth(15);
+    // Hidden by default — title-screen art shouldn't be obscured every
+    // time you boot the game. Player opts in via [I] when curious.
+    container.setVisible(false);
+
+    // [I] toggle — bottom-of-screen hint mirrors the [S] / cycle hint
+    // styling so both feel like part of the same widget family. Hint
+    // sits above the character cycle so the bottom row stays focused on
+    // character/skin pickers.
+    const hintLabel = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 22, '[I]  CHARACTER  INFO', {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#aab8c0',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.85);
+
+    this.input.keyboard?.on('keydown-I', () => {
+      const next = !container.visible;
+      container.setVisible(next);
+      // Swap the hint label so [I] always announces the *opposite* state.
+      hintLabel.setText(next ? '[I]  HIDE  INFO' : '[I]  CHARACTER  INFO');
+    });
+
+    interface StatProfile {
+      title: string;
+      subtitle: string;
+      values: readonly [string, string, string, string, string, string];
+    }
+    const PROFILES: Record<CharacterId, StatProfile> = {
+      wizard: {
+        title: 'WIZARD',
+        subtitle: 'Sustained ranged caster',
+        values: ['3 HEARTS', '4.0 / s', '1.0', '—', 'Small orb', '—'],
+      },
+      spellblade: {
+        title: 'SPELLBLADE',
+        subtitle: 'Glass-cannon swordmage',
+        values: ['2 HEARTS', '1.1 / s', '1.5', '1 baseline', 'Large bolt', '[SHIFT] dodge'],
+      },
+    };
+
+    const update = (character: CharacterId): void => {
+      const profile = PROFILES[character];
+      titleText.setText(profile.title);
+      subtitleText.setText(profile.subtitle);
+      for (let i = 0; i < valueTexts.length; i++) {
+        valueTexts[i]!.setText(profile.values[i]!);
+      }
+    };
+
+    return { update };
   }
 
   // ---------------------------------------------------------------------------

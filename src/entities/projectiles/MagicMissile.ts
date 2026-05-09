@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
   DEFAULT_MISSILE_TINT,
   MISSILE_RADIUS,
+  MISSILE_VELOCITY_INHERIT_FACTOR,
   TextureKeys,
 } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
@@ -40,6 +41,20 @@ export interface MagicMissileFireOptions {
    *  Spellblade Bolt so the blade points along its trajectory). The
    *  wizard's omni-directional orb leaves this off. */
   rotateToDirection?: boolean;
+  /** Player body velocity at fire time. Multiplied by
+   *  `MISSILE_VELOCITY_INHERIT_FACTOR` and added to the cardinal velocity
+   *  so movement angles the shot. Defaults to (0, 0) when omitted —
+   *  pre-2026-05-09 behaviour. */
+  inheritVx?: number;
+  inheritVy?: number;
+  /** Override the body radius post-setScale. Used by the Spellblade Bolt
+   *  to keep its hitbox at MISSILE_RADIUS even though the visual is
+   *  scaled up 1.5× — without this, the bigger body extends past the
+   *  player body when fired against the top/bottom wall and the bolt
+   *  spawns mid-overlap with the wall (gets stuck / instantly killed).
+   *  When omitted, the body stays at the auto-scaled value (= MISSILE_RADIUS
+   *  × scale, the default Phaser behaviour the wizard relies on). */
+  bodyRadiusOverride?: number;
 }
 
 /**
@@ -84,14 +99,38 @@ export class MagicMissile extends Phaser.Physics.Arcade.Sprite {
   fire(x: number, y: number, direction: Direction, opts: MagicMissileFireOptions): void {
     const v = DIRECTION_VECTORS[direction];
     this.enableBody(true, x, y, true, true);
-    this.setVelocity(v.x * opts.speed, v.y * opts.speed);
+    // Movement-angle: combine the cardinal cast-vector with a fraction of
+    // the player's current body velocity so moving while firing tilts the
+    // shot. Both wizard and Spellblade go through this — the inherit
+    // factor is identical, the visible difference comes from the
+    // cadence + size of each character's projectile.
+    const finalVx =
+      v.x * opts.speed + (opts.inheritVx ?? 0) * MISSILE_VELOCITY_INHERIT_FACTOR;
+    const finalVy =
+      v.y * opts.speed + (opts.inheritVy ?? 0) * MISSILE_VELOCITY_INHERIT_FACTOR;
+    this.setVelocity(finalVx, finalVy);
     this.setScale(opts.scale);
     // Texture / rotation: pool members default to the wizard orb. When the
     // Spellblade fires we swap to the bolt sprite + rotate it along the
-    // flight vector. Reset both on every fire so a recycled bolt-sprite
-    // doesn't carry over to a wizard's next cast.
+    // flight vector (using the FINAL velocity so the blade points along
+    // its actual trajectory, not the cardinal cast direction). Reset
+    // both on every fire so a recycled bolt-sprite doesn't carry over to
+    // a wizard's next cast.
     this.setTexture(opts.textureKey ?? TextureKeys.MagicMissile);
-    this.setRotation(opts.rotateToDirection ? Math.atan2(v.y, v.x) : 0);
+    this.setRotation(opts.rotateToDirection ? Math.atan2(finalVy, finalVx) : 0);
+    // Body-radius override (Spellblade Bolt path). Phaser auto-scales the
+    // body with `setScale`, so to pin the *world-space* body radius at
+    // MISSILE_RADIUS regardless of the visual scale, divide by the scale
+    // before passing into setCircle — Phaser's auto-scale step then
+    // multiplies it back out. Wizard skips this branch (omits
+    // `bodyRadiusOverride`) so missileScale items keep growing the
+    // hitbox normally.
+    if (opts.bodyRadiusOverride !== undefined && opts.scale > 0) {
+      const r = opts.bodyRadiusOverride / opts.scale;
+      const halfW = this.width / 2;
+      const halfH = this.height / 2;
+      this.setCircle(r, halfW - r, halfH - r);
+    }
     if (opts.tint === DEFAULT_MISSILE_TINT) {
       this.clearTint();
     } else {
@@ -117,6 +156,18 @@ export class MagicMissile extends Phaser.Physics.Arcade.Sprite {
     if (this.homingTurnRate > 0) {
       this.tickHoming(delta);
     }
+  }
+
+  /**
+   * True iff the missile is still inside its spawn-grace window. Used by
+   * the wall / barrier / blocker collider's processCallback to skip the
+   * deactivate step on the very first frames after spawn — fixes the
+   * Spellblade-bolt-stuck-in-wall bug at room edges where the bigger
+   * 1.5× body overlaps the wall on spawn. After the grace expires the
+   * collider works as before.
+   */
+  isInSpawnGrace(now: number, graceMs: number): boolean {
+    return now - this.spawnedAt < graceMs;
   }
 
   /** Dreht die Velocity gradweise zum nächsten aktiven Enemy. Frame-by-frame

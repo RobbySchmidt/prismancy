@@ -34,6 +34,13 @@ export const WORLD_SPRITE_SCALE = 1.25;
 
 export const PLAYER_SPEED = 220;
 export const PLAYER_MAX_HEALTH = 6;
+/** Spellblade starts with 2 hearts (vs Wizard's 3). Glass-cannon trade —
+ *  Spellblade gets +50% damage, baseline pierce-1, bigger hitbox, AND
+ *  dash i-frames over the wizard, so the lower starting HP forces the
+ *  player to actually use the dash defensively instead of treating it
+ *  as a free dodge. HP-up items (Heart Container, Pixie Dust, etc.) still
+ *  scale max HP normally on top of this baseline. */
+export const SPELLBLADE_MAX_HEALTH = 4;
 /** Player hitbox radius. Tuned 13 → 11 (2026-05-07) after user-flagged
  * "tight dodges feel unfair" — the circle reached visually past the boots,
  * so projectiles brushing the legs registered as hits. Combined with the
@@ -53,6 +60,35 @@ export const MISSILE_RADIUS = 8;
 export const MISSILE_DAMAGE = 1;
 export const MISSILE_FIRE_INTERVAL_MS = 250;
 export const MISSILE_POOL_SIZE = 64;
+/** Fraction of the player's body velocity that gets *added* to a freshly
+ *  fired projectile's cardinal velocity. Lets movement angle the shot —
+ *  at base PLAYER_SPEED 220 px/s + factor 0.25, a projectile fired
+ *  perpendicular to a full-speed move comes out at atan2(55, 420) ≈ 7.5°
+ *  off-axis. Subtle enough to feel like "the bolt carries momentum"
+ *  rather than "I'm steering a boat".
+ *
+ *  **Asymmetric application** (chosen 2026-05-09): only the Spellblade
+ *  Bolt inherits — Player.fireSpellbladeBolt passes inheritVx/inheritVy,
+ *  Player.fireWizardMissile omits them so the wizard stays pure
+ *  cardinal. Reads thematically as "the heavy spell-sword carries
+ *  momentum / the wand-orb is sniper-precise". User flagged a
+ *  short-lived shared-inheritance iteration with "der wizard schießt
+ *  jetzt anders" — wizard reverted, Spellblade keeps the angle.
+ *
+ *  Tuning history: 0.5 → 0.25 (2026-05-09, user-flagged "zu stark"
+ *  during normal movement; dash-cancel-bolt at 0.5 angled ~40° which
+ *  felt unintentional). */
+export const MISSILE_VELOCITY_INHERIT_FACTOR = 0.25;
+/** Brief window after spawn during which the player's missile is allowed
+ *  to overlap walls / barriers / blockers without being deactivated.
+ *  Fixes the "Spellblade bolt stuck in wall" bug: the bigger 1.5×-scaled
+ *  body extends beyond the player body when the player is up against the
+ *  top / bottom edge, so the bolt spawns mid-overlap with the wall and
+ *  the wall collider deactivates it before it can clear. 60 ms is enough
+ *  for any fired bolt to leave the spawn cell at MISSILE_SPEED. After the
+ *  window expires the wall collider works as before — bolts shot AT a
+ *  wall still die on contact, just not on spawn-overlap. */
+export const MISSILE_SPAWN_GRACE_MS = 60;
 
 // --- Spellblade Bolt + Dash ------------------------------------------------
 // The Spellblade's projectile replacement for the Magic Missile. A spell-
@@ -65,9 +101,14 @@ export const MISSILE_POOL_SIZE = 64;
 // everything"). Replaced with a projectile to bring the Spellblade back
 // in line with the wizard's range trade-off curve.
 
-/** Cadence between bolts. Slower than the wizard's 250 ms — every cast
- *  feels weightier and the chunky-damage-per-shot read is preserved. */
-export const SPELLBLADE_BOLT_FIRE_INTERVAL_MS = 400;
+/** Cadence between bolts. Heavy sword-swing feel — 3.6× slower than the
+ *  wizard's 250 ms — to read as "the spellblade swings a sword, not flicks
+ *  a wand". Single-target DPS lands at 1.67/s vs wizard's 4.0/s, so the
+ *  wizard is 2.4× faster on isolated targets; pierce + bigger hitbox keep
+ *  the Spellblade competitive in mob lines and bullet-hell rooms.
+ *  Tuned 400 → 600 → 900 (2026-05-09) — first 600 ms still felt like
+ *  a flick, user-flagged "es muss schwerfälliger sein". */
+export const SPELLBLADE_BOLT_FIRE_INTERVAL_MS = 900;
 /** Damage multiplier applied to the player's `damage` stat when firing
  *  a bolt. Base damage 1 × 1.5 = 1.5/shot — Mossy Slime (HP 5) takes 4
  *  hits (vs wizard's 5), Forest Sprite (HP 3) takes 2, Pixie (HP 2) 2.

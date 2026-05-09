@@ -27,6 +27,13 @@ export class ItemPickup extends BasePickup {
     return this.itemDef.id;
   }
 
+  /** Display name (e.g. "Telescopic Wand") for prompt labels — used by the
+   *  shop's [E]-press prompt to read "BUY TELESCOPIC WAND" when the player
+   *  is standing on the pedestal. */
+  get displayName(): string {
+    return this.itemDef.displayName;
+  }
+
   constructor(
     scene: Phaser.Scene,
     x: number,
