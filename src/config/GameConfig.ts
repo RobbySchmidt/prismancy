@@ -54,6 +54,60 @@ export const MISSILE_DAMAGE = 1;
 export const MISSILE_FIRE_INTERVAL_MS = 250;
 export const MISSILE_POOL_SIZE = 64;
 
+// --- Spellblade Bolt + Dash ------------------------------------------------
+// The Spellblade's projectile replacement for the Magic Missile. A spell-
+// sword-shaped magic bolt that flies through enemies once before flying on
+// (baseline Pierce 1) — slower cadence + chunkier damage than the wizard,
+// pierce gives a clear character-specific identity even before items.
+//
+// Pivot from the original Phase B melee slash design (2026-05-09): slash
+// felt OP in playtest ("complete game was free, basically one-shot
+// everything"). Replaced with a projectile to bring the Spellblade back
+// in line with the wizard's range trade-off curve.
+
+/** Cadence between bolts. Slower than the wizard's 250 ms — every cast
+ *  feels weightier and the chunky-damage-per-shot read is preserved. */
+export const SPELLBLADE_BOLT_FIRE_INTERVAL_MS = 400;
+/** Damage multiplier applied to the player's `damage` stat when firing
+ *  a bolt. Base damage 1 × 1.5 = 1.5/shot — Mossy Slime (HP 5) takes 4
+ *  hits (vs wizard's 5), Forest Sprite (HP 3) takes 2, Pixie (HP 2) 2.
+ *  +damage items scale linearly. Tuned conservatively after the 3× slash
+ *  iteration trivialised floor-1 combat. */
+export const SPELLBLADE_BOLT_DAMAGE_MULT = 1.5;
+/** Baseline pierce count added to the player's `piercingCount` stat
+ *  ONLY when the Spellblade fires. Means a fresh-run Spellblade always
+ *  pierces 1 enemy per shot, and Magic Shard (+2) stacks on top to 3
+ *  total. Damage taper is the standard PIERCING_DAMAGE_FACTORS sequence
+ *  (1.0 → 0.75 → 0.5), so a piercing bolt does 1.5 → 1.125 dmg by the
+ *  second hit at base. Wizard's bolt count is unaffected. */
+export const SPELLBLADE_BOLT_BASELINE_PIERCE = 1;
+/** Extra visual / hitbox scale multiplied onto the player's `missileScale`
+ *  stat ONLY when the Spellblade fires. The bolt sprite is the same 24×24
+ *  frame as the wizard orb (so the shared pool's setCircle math stays
+ *  valid) — at the wizard's 1.0× scale the spell-sword reads small. 1.5×
+ *  bumps both the sprite and the hitbox to match the chunky-damage feel.
+ *  Hitbox-bump is welcome here: pierce-1 baseline + slow cadence means a
+ *  slightly more forgiving projectile-vs-enemy collision is on-theme. */
+export const SPELLBLADE_BOLT_VISUAL_SCALE = 1.5;
+
+/** Spellblade dash on [Shift]. Burst-of-speed dodge with i-frames + a
+ *  short cooldown — the answer to bullet hell since the spellblade can't
+ *  out-range projectiles like the wizard. Direction comes from the
+ *  movement input vector (WASD); if no direction is held, dash uses the
+ *  last-pressed cardinal as fallback. */
+export const DASH_DURATION_MS = 160;
+/** Dash velocity (px/s). Tuned so total displacement = ~115 px (just over
+ *  1 tile + buffer). Big enough to clear a thorn line, small enough that
+ *  you can't dash across the room in one go. */
+export const DASH_SPEED = 720;
+/** Cooldown from dash-end to next available dash. Stops the player from
+ *  permanently dash-canceling — there's downtime to commit to slashing. */
+export const DASH_COOLDOWN_MS = 1500;
+/** Invincibility window granted at dash start. Slightly longer than the
+ *  dash duration so the back-edge of the dash also has a small grace,
+ *  matching how Isaac-style dodge-rolls feel. */
+export const DASH_INVINCIBILITY_MS = 220;
+
 export const KNOCKBACK_FORCE_PLAYER = 280;
 export const KNOCKBACK_FORCE_ENEMY = 220;
 export const KNOCKBACK_DURATION_MS = 120;
@@ -862,6 +916,11 @@ export const TextureKeys = {
    *  WHILE playing the Spellblade (separate gate from the character
    *  unlock; the Spellblade itself unlocks on any Prismarch kill). */
   PlayerSpellbladePrismarch: 'tex-player-spellblade-prismarch',
+  /** Spellblade Bolt — small spell-sword projectile, 24×24 like the
+   *  Magic Missile so it shares the missile pool's hitbox math. Drawn
+   *  white so `missileTint` colours the blade glow. Rotated per-cast
+   *  to match the bolt's flight direction. */
+  SpellbladeBolt: 'tex-spellblade-bolt',
 } as const;
 
 export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];

@@ -32,6 +32,14 @@ export interface MagicMissileFireOptions {
   homingTurnRate: number;
   /** Burn-Schadens-Anteil (0 = kein Burn). Im Overlap angewandt. */
   burnDamageFactor: number;
+  /** Optional alternate texture key (Spellblade Bolt re-uses this pool
+   *  with a sword-shaped sprite + direction rotation). When omitted the
+   *  missile keeps the default `TextureKeys.MagicMissile` sprite. */
+  textureKey?: string;
+  /** When true the sprite rotates to match the flight direction (used by
+   *  Spellblade Bolt so the blade points along its trajectory). The
+   *  wizard's omni-directional orb leaves this off. */
+  rotateToDirection?: boolean;
 }
 
 /**
@@ -78,6 +86,12 @@ export class MagicMissile extends Phaser.Physics.Arcade.Sprite {
     this.enableBody(true, x, y, true, true);
     this.setVelocity(v.x * opts.speed, v.y * opts.speed);
     this.setScale(opts.scale);
+    // Texture / rotation: pool members default to the wizard orb. When the
+    // Spellblade fires we swap to the bolt sprite + rotate it along the
+    // flight vector. Reset both on every fire so a recycled bolt-sprite
+    // doesn't carry over to a wizard's next cast.
+    this.setTexture(opts.textureKey ?? TextureKeys.MagicMissile);
+    this.setRotation(opts.rotateToDirection ? Math.atan2(v.y, v.x) : 0);
     if (opts.tint === DEFAULT_MISSILE_TINT) {
       this.clearTint();
     } else {

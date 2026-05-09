@@ -1,5 +1,9 @@
 import Phaser from 'phaser';
 import {
+  DASH_COOLDOWN_MS,
+  DASH_DURATION_MS,
+  DASH_INVINCIBILITY_MS,
+  DASH_SPEED,
   HIT_FLASH_DURATION_MS,
   HIT_FLASH_TINT_PLAYER,
   KNOCKBACK_DURATION_MS,
@@ -9,13 +13,17 @@ import {
   PLAYER_HITBOX_RADIUS,
   PLAYER_INVINCIBILITY_MS,
   PLAYER_MAX_HEALTH,
+  SPELLBLADE_BOLT_BASELINE_PIERCE,
+  SPELLBLADE_BOLT_DAMAGE_MULT,
+  SPELLBLADE_BOLT_FIRE_INTERVAL_MS,
+  SPELLBLADE_BOLT_VISUAL_SCALE,
   TextureKeys,
   WORLD_SPRITE_SCALE,
 } from '../config/GameConfig';
 import { DepthLayers } from '../config/DepthLayers';
-import { type Direction, type Vector2 } from '../types';
+import { type Direction, DIRECTION_VECTORS, type Vector2 } from '../types';
 import { type InputManager } from '../systems/InputManager';
-import { MetaProgress } from '../systems/MetaProgress';
+import { MetaProgress, type CharacterId } from '../systems/MetaProgress';
 import { PlayerHealth } from '../systems/PlayerHealth';
 import { getSfxSynth } from '../systems/SfxSynth';
 import { type StatsSystem } from '../systems/StatsSystem';
@@ -50,12 +58,25 @@ export function resolvePlayerTextureKey(): string {
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   readonly health: PlayerHealth;
+  /** Frozen at construction so character-specific behaviour (bolt vs
+   *  missile, dash unlock) is consistent for the whole run even if the
+   *  player changes their menu pick mid-game (which would only take
+   *  effect on the next run anyway). */
+  readonly character: CharacterId;
 
   private readonly inputManager: InputManager;
   private readonly missilePool: MagicMissilePool;
   private readonly stats: StatsSystem;
   private nextFireAt = 0;
   private knockbackUntil = 0;
+
+  // --- Dash state (Spellblade only) -----------------------------------------
+  /** Timestamp at which the current dash burst ends. Move input is
+   *  suppressed while in dash. 0 = not currently dashing. */
+  private dashUntil = 0;
+  /** Earliest timestamp the next dash is allowed. `dashUntil` advances
+   *  this on dash-start so consecutive dashes can't chain. */
+  private dashCooldownUntil = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -75,6 +96,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    this.character = MetaProgress.getSelectedCharacter();
     this.inputManager = input;
     this.missilePool = missilePool;
     this.stats = stats;
@@ -108,8 +130,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
     if (!this.active || !this.health.isAlive()) return;
-    this.handleMovement(time);
-    this.handleShooting(time);
+    // Dash velocity is set at the start of a dash and runs out at
+    // `dashUntil`; we just have to skip movement input while in flight so
+    // WASD doesn't override the burst velocity. Spellblade-only — wizard's
+    // `dashUntil` stays 0 so this branch is a no-op.
+    if (time >= this.dashUntil) {
+      this.handleMovement(time);
+    }
+    if (this.character === 'spellblade') {
+      this.tickDashInput(time);
+    }
+    this.handleAttacking(time);
     this.tickInvincibilityBlink(time);
   }
 
@@ -120,11 +151,28 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setVelocity(move.x * speed, move.y * speed);
   }
 
-  private handleShooting(time: number): void {
+  /**
+   * Top-level combat tick. Both characters fire from the same MagicMissile
+   * pool — the wizard casts the omni-orb at default cadence, while the
+   * spellblade swaps to a sword-shaped bolt with slower cadence, chunkier
+   * damage, and a baseline pierce-1 so groups read as worth one shot per
+   * line. `damage`, `fireRate`, and other stat-driven items apply to
+   * both unchanged.
+   */
+  private handleAttacking(time: number): void {
     if (time < this.nextFireAt) return;
     const dir: Direction | null = this.inputManager.getShootDirection();
     if (!dir) return;
     const fireRate = this.stats.getEffective('fireRate');
+    if (this.character === 'spellblade') {
+      this.fireSpellbladeBolt(dir, time, fireRate);
+    } else {
+      this.fireWizardMissile(dir, time, fireRate);
+    }
+  }
+
+  /** Wizard cast — the original magic-missile orb. */
+  private fireWizardMissile(dir: Direction, time: number, fireRate: number): void {
     const interval = fireRate > 0 ? MISSILE_FIRE_INTERVAL_MS / fireRate : MISSILE_FIRE_INTERVAL_MS;
     // Spawn from the body's world centre, not the texture origin. The hitbox
     // sits +12 px below the texture centre (so the robe is the hitbox, not the
@@ -145,6 +193,71 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     });
     this.nextFireAt = time + interval;
     this.spawnWandSparkle();
+    getSfxSynth().playPlayerCast();
+  }
+
+  /**
+   * Spellblade cast — same pool + flight physics as the wizard's missile,
+   * but swaps the texture to the bolt sprite, rotates it along the flight
+   * vector, slows the cadence, and stacks `+SPELLBLADE_BOLT_BASELINE_PIERCE`
+   * onto the player's pierce stat so a fresh-run Spellblade always
+   * pierces one extra enemy. Damage stat is multiplied by
+   * `SPELLBLADE_BOLT_DAMAGE_MULT` so each shot lands chunkier — base
+   * 1 dmg × 1.5 = 1.5/shot.
+   */
+  private fireSpellbladeBolt(dir: Direction, time: number, fireRate: number): void {
+    const interval = fireRate > 0
+      ? SPELLBLADE_BOLT_FIRE_INTERVAL_MS / fireRate
+      : SPELLBLADE_BOLT_FIRE_INTERVAL_MS;
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    this.missilePool.fire(body.center.x, body.center.y, dir, {
+      speed: this.stats.getEffective('missileSpeed'),
+      lifetime: MISSILE_LIFETIME_MS,
+      damage: this.stats.getEffective('damage') * SPELLBLADE_BOLT_DAMAGE_MULT,
+      scale: this.stats.getEffective('missileScale') * SPELLBLADE_BOLT_VISUAL_SCALE,
+      tint: this.stats.getMissileTint(),
+      piercing: this.stats.getEffective('piercingCount') + SPELLBLADE_BOLT_BASELINE_PIERCE,
+      homingTurnRate: this.stats.getEffective('homingTurnRate'),
+      burnDamageFactor: this.stats.getEffective('burnDamageFactor'),
+      textureKey: TextureKeys.SpellbladeBolt,
+      rotateToDirection: true,
+    });
+    this.nextFireAt = time + interval;
+    this.spawnWandSparkle();
+    getSfxSynth().playPlayerCast();
+  }
+
+  /**
+   * Spellblade dash on [Shift]. Sets a burst velocity along the current
+   * WASD direction (or last shoot direction as a fallback so still-aiming
+   * players can dash backward / sideways from their cast), grants i-frames
+   * for the dash window, and starts the cooldown clock.
+   *
+   * Wizard never reaches this method (`tickDashInput` is gated on
+   * character).
+   */
+  private tickDashInput(time: number): void {
+    if (!this.inputManager.wasDashJustPressed()) return;
+    if (time < this.dashCooldownUntil) return;
+    if (time < this.dashUntil) return; // already dashing
+    // Direction priority: current move input > current aim > skip.
+    // No "last cardinal" memory — keeps it deterministic and easy to read.
+    const dir = this.inputManager.getMoveDirection() ?? this.inputManager.getShootDirection();
+    if (!dir) return;
+    this.startDash(dir, time);
+  }
+
+  private startDash(dir: Direction, time: number): void {
+    const v = DIRECTION_VECTORS[dir];
+    this.setVelocity(v.x * DASH_SPEED, v.y * DASH_SPEED);
+    this.dashUntil = time + DASH_DURATION_MS;
+    this.dashCooldownUntil = this.dashUntil + DASH_COOLDOWN_MS;
+    // Knockback lock would otherwise swallow the dash velocity on a hit-
+    // mid-dash; clear it so the dash always commits.
+    this.knockbackUntil = 0;
+    this.health.grantInvincibility(DASH_INVINCIBILITY_MS, time);
+    // Light cast SFX as a placeholder dash sound — distinct slash/dash
+    // recipes are a future polish pass.
     getSfxSynth().playPlayerCast();
   }
 

@@ -19,6 +19,8 @@ interface ControlEntry {
 const CONTROLS: ControlEntry[] = [
   { action: 'Move', keys: 'W A S D' },
   { action: 'Cast Magic', keys: 'Arrow Keys' },
+  { action: 'Active Item', keys: 'Q' },
+  { action: 'Dash (Spellblade)', keys: 'Shift + WASD' },
   { action: 'Map / Inventory', keys: 'TAB' },
   { action: 'Pause', keys: 'ESC' },
   { action: 'Restart Run', keys: 'Hold R (1 s)' },

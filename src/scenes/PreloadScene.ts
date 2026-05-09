@@ -96,6 +96,7 @@ export class PreloadScene extends Phaser.Scene {
     this.drawSpellbladeTexture(g, this.DEFAULT_SPELLBLADE_PALETTE, TextureKeys.PlayerSpellblade);
     this.drawSpellbladeTexture(g, this.PRISMARCH_SPELLBLADE_PALETTE, TextureKeys.PlayerSpellbladePrismarch);
     this.drawMagicMissileTexture(g);
+    this.drawSpellbladeBoltTexture(g);
     this.drawForestSpriteTexture(g);
     this.drawMossySlimeTexture(g);
     this.drawVineSproutTexture(g);
@@ -959,6 +960,95 @@ export class PreloadScene extends Phaser.Scene {
     g.fillCircle(cx - 2, cy - 2, 1.5);
 
     g.generateTexture(TextureKeys.MagicMissile, size, size);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Spellblade Bolt (Spellblade-character projectile)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Spellblade Bolt — a small spell-sword shape pointing along +x so the
+   * sprite can be rotated per-cast to face the flight direction. Same
+   * 24×24 frame as the Magic Missile so the shared pool's hitbox math
+   * (`MISSILE_RADIUS` setCircle in MagicMissile.constructor) stays valid.
+   * Drawn pure white — `missileTint` plus per-skin glow colour the blade.
+   *
+   * Layered: faint outer halo → mid violet body diamond → bright blade
+   * silhouette (elongated diamond, sharp +x tip) → white-hot edge highlight
+   * along the leading edge → small pommel circle at the trailing end.
+   */
+  private drawSpellbladeBoltTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = 24;
+    const cx = size / 2;
+    const cy = size / 2;
+    g.clear();
+
+    // 1) Faint outer halo — soft glow that reads as "magic" past the
+    //    blade silhouette.
+    g.fillStyle(0xffffff, 0.18);
+    g.fillEllipse(cx, cy, size, size * 0.5);
+
+    // 2) Mid violet body — slightly squashed diamond so the trail reads
+    //    as "magic blade" rather than "thrown sword". Drawn as an
+    //    elongated diamond polygon along the +x axis.
+    const blade: Array<{ x: number; y: number }> = [
+      { x: cx + 11, y: cy },     // tip (right)
+      { x: cx + 2, y: cy - 3 },  // upper shoulder
+      { x: cx - 6, y: cy - 1.5 },// upper hilt taper
+      { x: cx - 9, y: cy },      // pommel point (left)
+      { x: cx - 6, y: cy + 1.5 },// lower hilt taper
+      { x: cx + 2, y: cy + 3 },  // lower shoulder
+    ];
+    // Outline (dark)
+    g.fillStyle(0x2a0c4a, 1);
+    g.fillPoints(blade, true);
+    // Mid violet body — slightly inset so the outline shows.
+    g.fillStyle(0xa855f7, 1);
+    const bladeInset: Array<{ x: number; y: number }> = [
+      { x: cx + 10, y: cy },
+      { x: cx + 2, y: cy - 2.3 },
+      { x: cx - 5.3, y: cy - 1 },
+      { x: cx - 8, y: cy },
+      { x: cx - 5.3, y: cy + 1 },
+      { x: cx + 2, y: cy + 2.3 },
+    ];
+    g.fillPoints(bladeInset, true);
+
+    // 3) Bright lavender inner body — narrower diamond, the "hot core" of
+    //    the blade.
+    g.fillStyle(0xe9d5ff, 1);
+    const bladeCore: Array<{ x: number; y: number }> = [
+      { x: cx + 9, y: cy },
+      { x: cx + 1, y: cy - 1.4 },
+      { x: cx - 4, y: cy - 0.6 },
+      { x: cx - 7, y: cy },
+      { x: cx - 4, y: cy + 0.6 },
+      { x: cx + 1, y: cy + 1.4 },
+    ];
+    g.fillPoints(bladeCore, true);
+
+    // 4) White-hot leading-edge highlight — a thin top-edge sliver from
+    //    the upper shoulder to the tip. Sells "this side is the cutting
+    //    edge" and gives the sprite a clear directional read so the
+    //    rotation in fire() is legible.
+    g.fillStyle(0xffffff, 0.95);
+    g.fillTriangle(cx + 10, cy, cx + 1, cy - 1.6, cx + 1, cy - 0.6);
+    g.fillTriangle(cx + 10, cy, cx + 1, cy - 0.6, cx + 6, cy - 0.4);
+
+    // 5) Pommel orb — small bright circle at the trailing end so the
+    //    sprite reads as "spell sword" not "shard". Mirrors the wizard
+    //    missile's sparkle vocabulary.
+    g.fillStyle(0xfff8c0, 1);
+    g.fillCircle(cx - 9, cy, 1.4);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillCircle(cx - 9, cy - 0.4, 0.6);
+
+    // 6) Specular sparkle on the upper blade — same trick as the missile
+    //    texture (top-left highlight pixel) for a consistent "magic" feel.
+    g.fillStyle(0xffffff, 0.9);
+    g.fillCircle(cx + 4, cy - 1.2, 0.8);
+
+    g.generateTexture(TextureKeys.SpellbladeBolt, size, size);
   }
 
   // ---------------------------------------------------------------------------

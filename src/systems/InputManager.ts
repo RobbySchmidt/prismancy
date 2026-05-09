@@ -17,6 +17,11 @@ export class InputManager {
   private readonly keyLeft: Phaser.Input.Keyboard.Key;
   private readonly keyRight: Phaser.Input.Keyboard.Key;
 
+  /** Spellblade dash trigger ([Shift]). Wizard ignores this. Both Shift
+   *  keys map to the same logical key so left- and right-handed players
+   *  can use whichever is comfortable. */
+  private readonly keyShift: Phaser.Input.Keyboard.Key;
+
   constructor(scene: Phaser.Scene) {
     const kb = scene.input.keyboard;
     if (!kb) throw new Error('InputManager: keyboard plugin unavailable');
@@ -30,6 +35,7 @@ export class InputManager {
     this.keyDown = kb.addKey(Keys.DOWN);
     this.keyLeft = kb.addKey(Keys.LEFT);
     this.keyRight = kb.addKey(Keys.RIGHT);
+    this.keyShift = kb.addKey(Keys.SHIFT);
   }
 
   /** Returns a normalized movement vector based on WASD. */
@@ -60,5 +66,26 @@ export class InputManager {
     if (this.keyUp.isDown) return 'up';
     if (this.keyDown.isDown) return 'down';
     return null;
+  }
+
+  /**
+   * Cardinal direction the player is currently moving (WASD), or null if no
+   * movement key is held. Used by the Spellblade dash to pick a dash
+   * direction — diagonal WASD prefers the latest-pressed axis to keep the
+   * dash readable as a cardinal commit. We pick horizontal first when both
+   * are held, mirroring `getShootDirection`'s tie-breaker so the two feel
+   * consistent.
+   */
+  getMoveDirection(): Direction | null {
+    if (this.keyA.isDown) return 'left';
+    if (this.keyD.isDown) return 'right';
+    if (this.keyW.isDown) return 'up';
+    if (this.keyS.isDown) return 'down';
+    return null;
+  }
+
+  /** True the frame [Shift] was pressed (edge-triggered). Spellblade dash. */
+  wasDashJustPressed(): boolean {
+    return Phaser.Input.Keyboard.JustDown(this.keyShift);
   }
 }
