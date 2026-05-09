@@ -10,6 +10,8 @@ import {
   MISSILE_FIRE_INTERVAL_MS,
   MISSILE_LIFETIME_MS,
   MISSILE_RADIUS,
+  MULTISHOT_DAMAGE_MULT,
+  MULTISHOT_OFFSET_PX,
   PLAYER_HITBOX_OFFSET_Y,
   PLAYER_HITBOX_RADIUS,
   PLAYER_INVINCIBILITY_MS,
@@ -56,6 +58,32 @@ export function resolvePlayerTextureKey(): string {
       : TextureKeys.PlayerSpellblade;
   }
   return skin === 'prismancy' ? TextureKeys.PlayerPrismancy : TextureKeys.Player;
+}
+
+/**
+ * Lay out perpendicular offsets for `shots` parallel projectiles fired in
+ * `dir`. Single shot returns `[(0, 0)]` (centred). Two-shot returns a pair
+ * spread by `MULTISHOT_OFFSET_PX` perpendicular to the cast axis (gap = 14
+ * px so both bolts land on a boss-sized hitbox but trash often eats just
+ * one). Three-plus shots fan symmetrically around the centre with the
+ * same total perpendicular span — adjacent bolts get tighter as the count
+ * grows. Centre-aligned so an odd-count multishot has a bolt on the cast
+ * line. The cast direction itself stays cardinal — only the spawn position
+ * shifts; velocity vector is unchanged so the bolts fly parallel rather
+ * than fanning out.
+ */
+function computeMultishotOffsets(dir: Direction, shots: number): readonly Vector2[] {
+  if (shots <= 1) return [{ x: 0, y: 0 }];
+  const dirVec = DIRECTION_VECTORS[dir];
+  // Perpendicular axis = 90° rotation of direction vector.
+  const perpX = -dirVec.y;
+  const perpY = dirVec.x;
+  const out: Vector2[] = [];
+  for (let i = 0; i < shots; i++) {
+    const t = i / (shots - 1) - 0.5; // -0.5..+0.5
+    out.push({ x: perpX * t * MULTISHOT_OFFSET_PX, y: perpY * t * MULTISHOT_OFFSET_PX });
+  }
+  return out;
 }
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
@@ -200,22 +228,27 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // overlapping the wall and instantly deactivate it. Body centre is always
     // inside the playable area because that's what the wall collider stops.
     const body = this.body as Phaser.Physics.Arcade.Body;
-    this.missilePool.fire(body.center.x, body.center.y, dir, {
-      speed: this.stats.getEffective('missileSpeed'),
-      lifetime: MISSILE_LIFETIME_MS,
-      damage: this.stats.getEffective('damage'),
-      scale: this.stats.getEffective('missileScale'),
-      tint: this.stats.getMissileTint(),
-      piercing: this.stats.getEffective('piercingCount'),
-      homingTurnRate: this.stats.getEffective('homingTurnRate'),
-      burnDamageFactor: this.stats.getEffective('burnDamageFactor'),
-      // Wizard intentionally does NOT inherit player velocity — pure
-      // cardinal. The orb is sniper-precise; only the heavy Spellblade
-      // bolt carries movement momentum (asymmetric feel chosen
-      // 2026-05-09 after a brief shared-inheritance iteration was
-      // user-flagged as "wizard schießt jetzt anders"). Omitting
-      // inheritVx/inheritVy → MagicMissile.fire defaults them to 0.
-    });
+    const shots = Math.max(1, Math.round(this.stats.getEffective('multishotCount')));
+    const damagePerShot = this.stats.getEffective('damage') * (shots > 1 ? MULTISHOT_DAMAGE_MULT : 1.0);
+    const offsets = computeMultishotOffsets(dir, shots);
+    for (const off of offsets) {
+      this.missilePool.fire(body.center.x + off.x, body.center.y + off.y, dir, {
+        speed: this.stats.getEffective('missileSpeed'),
+        lifetime: MISSILE_LIFETIME_MS,
+        damage: damagePerShot,
+        scale: this.stats.getEffective('missileScale'),
+        tint: this.stats.getMissileTint(),
+        piercing: this.stats.getEffective('piercingCount'),
+        homingTurnRate: this.stats.getEffective('homingTurnRate'),
+        burnDamageFactor: this.stats.getEffective('burnDamageFactor'),
+        // Wizard intentionally does NOT inherit player velocity — pure
+        // cardinal. The orb is sniper-precise; only the heavy Spellblade
+        // bolt carries movement momentum (asymmetric feel chosen
+        // 2026-05-09 after a brief shared-inheritance iteration was
+        // user-flagged as "wizard schießt jetzt anders"). Omitting
+        // inheritVx/inheritVy → MagicMissile.fire defaults them to 0.
+      });
+    }
     this.nextFireAt = time + interval;
     this.spawnWandSparkle();
     getSfxSynth().playPlayerCast();
@@ -235,25 +268,33 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       ? SPELLBLADE_BOLT_FIRE_INTERVAL_MS / fireRate
       : SPELLBLADE_BOLT_FIRE_INTERVAL_MS;
     const body = this.body as Phaser.Physics.Arcade.Body;
-    this.missilePool.fire(body.center.x, body.center.y, dir, {
-      speed: this.stats.getEffective('missileSpeed'),
-      lifetime: MISSILE_LIFETIME_MS,
-      damage: this.stats.getEffective('damage') * SPELLBLADE_BOLT_DAMAGE_MULT,
-      scale: this.stats.getEffective('missileScale') * SPELLBLADE_BOLT_VISUAL_SCALE,
-      tint: this.stats.getMissileTint(),
-      piercing: this.stats.getEffective('piercingCount') + SPELLBLADE_BOLT_BASELINE_PIERCE,
-      homingTurnRate: this.stats.getEffective('homingTurnRate'),
-      burnDamageFactor: this.stats.getEffective('burnDamageFactor'),
-      textureKey: TextureKeys.SpellbladeBolt,
-      rotateToDirection: true,
-      inheritVx: body.velocity.x,
-      inheritVy: body.velocity.y,
-      // Body stays at MISSILE_RADIUS even though visual scales 1.5×.
-      // Without this, the body extends past the player's hitbox at top/
-      // bottom-wall edges and the bolt spawns mid-overlap with the wall
-      // (deactivated immediately or stuck after the spawn-grace window).
-      bodyRadiusOverride: MISSILE_RADIUS,
-    });
+    const shots = Math.max(1, Math.round(this.stats.getEffective('multishotCount')));
+    const damagePerShot =
+      this.stats.getEffective('damage') *
+      SPELLBLADE_BOLT_DAMAGE_MULT *
+      (shots > 1 ? MULTISHOT_DAMAGE_MULT : 1.0);
+    const offsets = computeMultishotOffsets(dir, shots);
+    for (const off of offsets) {
+      this.missilePool.fire(body.center.x + off.x, body.center.y + off.y, dir, {
+        speed: this.stats.getEffective('missileSpeed'),
+        lifetime: MISSILE_LIFETIME_MS,
+        damage: damagePerShot,
+        scale: this.stats.getEffective('missileScale') * SPELLBLADE_BOLT_VISUAL_SCALE,
+        tint: this.stats.getMissileTint(),
+        piercing: this.stats.getEffective('piercingCount') + SPELLBLADE_BOLT_BASELINE_PIERCE,
+        homingTurnRate: this.stats.getEffective('homingTurnRate'),
+        burnDamageFactor: this.stats.getEffective('burnDamageFactor'),
+        textureKey: TextureKeys.SpellbladeBolt,
+        rotateToDirection: true,
+        inheritVx: body.velocity.x,
+        inheritVy: body.velocity.y,
+        // Body stays at MISSILE_RADIUS even though visual scales 1.5×.
+        // Without this, the body extends past the player's hitbox at top/
+        // bottom-wall edges and the bolt spawns mid-overlap with the wall
+        // (deactivated immediately or stuck after the spawn-grace window).
+        bodyRadiusOverride: MISSILE_RADIUS,
+      });
+    }
     this.nextFireAt = time + interval;
     this.spawnWandSparkle();
     getSfxSynth().playPlayerCast();

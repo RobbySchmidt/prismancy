@@ -230,16 +230,26 @@ export const ITEMS = {
   wizardGlasses: {
     id: 'wizardGlasses',
     displayName: 'Wizard Glasses',
-    description: 'Missiles home in on the nearest enemy. +10% missile speed.',
+    description: 'Cast two parallel bolts. Each does 80% damage. +10% missile speed.',
     textureKey: TextureKeys.ItemWizardGlasses,
     pools: [ItemPool.Boss],
     effects: [
-      { stat: 'homingTurnRate', add: 80 },
+      // +1 multishot → 2 parallel bolts pro Cast. Damage pro Shot wird
+      // automatisch in Player.fire... auf MULTISHOT_DAMAGE_MULT (0.75)
+      // skaliert wenn count > 1 — beide Hits zusammen ergeben 1.5× DPS
+      // auf Boss-Hitboxen, ein Hit auf Trash ist 0.75× (Sniper-Trade-off).
+      // Replaces the old homing-turn-rate effect (2026-05-09): user-flag
+      // "homing macht keinen spass, ich skippe das item eigentlich immer.
+      // und beim neuen char funktioniert es auch nicht gut" (Spellblade-
+      // Bolt rotiert visuell zu seiner Velocity, mit Homing kurvt der
+      // Diamond-Sprite weird durch die Bahn). Homing-Mechanik bleibt im
+      // Code — wenn ein zukünftiges Item homingTurnRate granted, läuft
+      // sie weiter durch MagicMissile.tickHoming.
+      { stat: 'multishotCount', add: 1 },
       // +10% Missile-Speed statt eines klassischen Range-Stats — gibt
       // effektiv mehr Reichweite in der fixen MISSILE_LIFETIME_MS, ohne
       // den Range-Stat wieder einzuführen (Phase-5-Polish-Entscheidung:
-      // Range trivialisierte Bosse). Synergiert sauber mit Homing —
-      // die Tracking-Korrekturen kommen schneller am Ziel an.
+      // Range trivialisierte Bosse).
       { stat: 'missileSpeed', mult: 1.1 },
     ],
     /** No `floor` tag — drops on every floor's boss-pool roll. */
@@ -263,7 +273,18 @@ export const ITEMS = {
      *  just spent the active or can't afford it yet). Re-pickup of a heart
      *  refills HP → slot swaps back to the full vial. */
     activeEmptyTextureKey: TextureKeys.ItemBloodOfMarquisEmpty,
-    pools: [ItemPool.Boss],
+    /** Treasure-Pool floor-agnostic (2026-05-09 rework): vorher
+     *  Boss-Pool + Onyx-locked → das ergab effektiv nur einen einzigen
+     *  sinnvollen Use-Case (Marquis im aktuellen Run hat's gedroppt
+     *  → spart's für den Prismarch auf), und um's überhaupt zu sehen
+     *  musste man den Marquis zweimal across-runs schlagen. Treasure-
+     *  Pool macht das Item zu einem mid-run pivot pickup: man entscheidet
+     *  früh ob man auf den Glass-Cannon-Build commitet (max HP locked
+     *  auf 2 = die nächsten Heart-Container etc. sind dead picks) und
+     *  hat dafür mehrere Floors um den +30%-Power-Spike auszuspielen.
+     *  metaUnlock bleibt — first-run pickups sehen's nicht, ab dem
+     *  zweiten run pro-Marquis-Kill rollt's. */
+    pools: [ItemPool.Treasure],
     effects: [
       { stat: 'damage', mult: 1.3 },
       { stat: 'fireRate', mult: 1.3 },
@@ -280,12 +301,12 @@ export const ITEMS = {
       kind: ActiveItemKind.EchoesOfBlood,
       bossDamageFraction: 0.3,
     },
-    /** Onyx-pool gem — drops on the Onyx boss-pool roll. */
-    floor: 'onyx-mansion',
+    /** No `floor` tag — Treasure-Pool ist sowieso floor-agnostic, der
+     *  Floor-Filter in `pickItemFromPool` greift nur für Boss-Pool. */
     /** Meta-locked behind a Marquis-of-Mirages defeat: only appears in the
      *  pool after the player has beaten Marquis at least once across all
-     *  runs. Until then the Onyx pool sees Bloodbound / Signet / Obsidian
-     *  Heart only. Same gating pattern the Prismancy skin uses. */
+     *  runs. First-run pickups sehen's nicht. Same gating pattern wie
+     *  die Prismancy-Skins benutzen. */
     metaUnlock: 'boss-marquis-of-mirages',
   },
 } as const satisfies Record<string, ItemDefinition>;

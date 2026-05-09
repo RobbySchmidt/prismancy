@@ -1113,7 +1113,23 @@ export const BASE_PLAYER_STATS: PlayerStats = {
   piercingCount: 0,
   homingTurnRate: 0,
   burnDamageFactor: 0,
+  multishotCount: 1,
 };
+
+/** Damage-Multiplier pro Multishot-Shot wenn `multishotCount > 1`. Single
+ * shot bleibt 1.0× damage, alles ab 2 Shots fired bei 0.80×/Shot. So
+ * gibt Wizard Glasses (count = 2) auf großen Targets 1.6× DPS und auf
+ * Single-Hit-Trash 0.80× (Sniper-Trade-off, vermeidet generic +damage).
+ * War zwischenzeitlich 0.75 (1.5× / 0.75×) — gebumped 2026-05-09 nach
+ * User-Feedback "fühlt sich kaum wie ein upgrade an" weil der
+ * Trash-Case zu schmerzhaft war. 0.80 hält den Trade-off (Item ist
+ * Boss-Killer, nicht Group-Cleaner) liest sich aber spürbarer als Up. */
+export const MULTISHOT_DAMAGE_MULT = 0.8;
+/** Perpendikulärer Abstand zwischen den Multishot-Projektilen (in Pixel,
+ * im World-Space). 14 px ergibt bei 2 Shots einen 14-px-Gap, sodass beide
+ * Bolts auf großen Boss-Hitboxen problemlos landen aber bei kleinem Trash
+ * (Forest Sprite ~16 px Hitbox) oft nur einer trifft. */
+export const MULTISHOT_OFFSET_PX = 14;
 
 /** Damage-Multiplier-Sequenz für die Magic-Shard-Pierces. Index 0 = erster
  * Hit (volle Schadensapplikation), Index 1 = nach erstem Pierce (75 %),

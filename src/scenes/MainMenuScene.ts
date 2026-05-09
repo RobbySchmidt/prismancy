@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, SceneKeys, TextureKeys } from '../config/GameConfig';
+import { ITEMS } from '../data/items';
 import { STARTING_FLOOR_ID } from '../data/floors';
 import { Cosmetics } from '../systems/Cosmetics';
 import { MetaProgress, type CharacterId, type SkinId } from '../systems/MetaProgress';
@@ -119,6 +120,14 @@ export class MainMenuScene extends Phaser.Scene {
     }
 
     this.setupTitleMusicHint();
+
+    // TEMPORARY beta-tester convenience: [U] flips every meta-progression
+    // gate (Spellblade character, both Prismancy skins, Blood-of-Marquis
+    // discovery filter, full item-trophy log) so testers don't have to
+    // grind a Prismarch kill to access the late-game build space. **Remove
+    // this hint + key handler when the beta period closes** — the hotkey
+    // makes the game's progression rewards meaningless in production.
+    this.setupBetaUnlockHint();
   }
 
   /**
@@ -149,6 +158,84 @@ export class MainMenuScene extends Phaser.Scene {
         targets: hint,
         alpha: 0,
         duration: 400,
+        onComplete: () => hint.destroy(),
+      });
+    });
+  }
+
+  /**
+   * **TEMPORARY beta-tester hotkey.** Top-right amber hint "[U] BETA:
+   * UNLOCK ALL"; on press flips every meta-progression gate via
+   * `MetaProgress.unlockAllForTesting`, plays a brief cyan flash + on-
+   * screen confirmation, then restarts the menu so the character cycle
+   * + skin toggle re-render with the now-available picks visible.
+   * Distinct visual treatment (amber vs the regular [I]/[S]/[M] white)
+   * marks it as out-of-band — beta testers see it as obviously "this is
+   * not part of the normal game". **Delete this method + the call from
+   * `create()` when the beta closes.**
+   */
+  private setupBetaUnlockHint(): void {
+    const hint = this.add
+      .text(GAME_WIDTH - 18, 18, '[U]  BETA:  UNLOCK  ALL', {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        fontStyle: 'bold',
+        // Amber/orange so it visually reads "this is a debug affordance"
+        // and doesn't blend in with the normal hint family.
+        color: '#ffb84a',
+        stroke: '#1a0828',
+        strokeThickness: 3,
+      })
+      .setOrigin(1, 0)
+      .setAlpha(0.85)
+      .setDepth(20);
+
+    this.input.keyboard?.once('keydown-U', () => {
+      const allItemIds = Object.keys(ITEMS);
+      MetaProgress.unlockAllForTesting(allItemIds);
+
+      // Visual confirmation — brief gold flash text bottom-of-screen,
+      // then restart the scene so the character cycle / skin toggle
+      // re-paint with all picks visible.
+      const confirm = this.add
+        .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'EVERYTHING  UNLOCKED', {
+          fontFamily: 'monospace',
+          fontSize: '36px',
+          fontStyle: 'bold',
+          color: '#ffd84a',
+          stroke: '#1a0828',
+          strokeThickness: 6,
+        })
+        .setOrigin(0.5)
+        .setDepth(100)
+        .setAlpha(0);
+
+      this.tweens.add({
+        targets: confirm,
+        alpha: 1,
+        scale: { from: 0.85, to: 1.0 },
+        duration: 220,
+        ease: 'Sine.Out',
+        onComplete: () => {
+          this.tweens.add({
+            targets: confirm,
+            alpha: 0,
+            duration: 600,
+            delay: 600,
+            onComplete: () => {
+              confirm.destroy();
+              this.scene.restart();
+            },
+          });
+        },
+      });
+
+      // Hide the hint immediately — feedback should make the press feel
+      // committed.
+      this.tweens.add({
+        targets: hint,
+        alpha: 0,
+        duration: 200,
         onComplete: () => hint.destroy(),
       });
     });

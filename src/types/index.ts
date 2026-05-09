@@ -219,6 +219,15 @@ export interface PlayerStats {
   /** Anteil des Hit-Damages der zusätzlich als Burn-DoT appliziert wird (über
    * 2 Ticks à 600 ms). Base 0 = kein Burn. Fire Orb setzt das auf 0.30. */
   burnDamageFactor: number;
+  /** Wie viele Projektile pro Cast gefeuert werden. Base 1 = single shot.
+   * Wizard Glasses setzt das auf 2 — die Pair fliegt parallel mit
+   * `MULTISHOT_OFFSET_PX` Gap perpendikulär zur Cast-Richtung. Damage pro
+   * Shot wird auf `MULTISHOT_DAMAGE_MULT` runterskaliert (0.75) sobald
+   * count > 1, damit der Stack nicht wieder ein klassisches "+damage"-Item
+   * wird — beide Hits zusammen ergeben 1.5× DPS auf großen Targets, ein
+   * einzelner Hit auf Trash ist 0.75× (Trade-off zwischen Boss-Killer und
+   * Group-Clear). */
+  multishotCount: number;
 }
 export type StatKey = keyof PlayerStats;
 

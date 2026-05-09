@@ -408,4 +408,47 @@ export const MetaProgress = {
   unlockPrismancySkin(): void {
     this.recordBossDefeated('boss-lord-onyx', this.getSelectedCharacter());
   },
+
+  /**
+   * **TEMPORARY beta-tester helper.** Flips every gate that affects what
+   * a fresh-install player can see / play:
+   *   - Adds `boss-lord-onyx` to both ledgers (shared + Spellblade-only)
+   *     → unlocks Spellblade character + Wizard Prismancy skin + Spellblade
+   *       Prismarch-tier skin
+   *   - Adds `boss-marquis-of-mirages` to the shared ledger → unlocks
+   *     Blood of Marquis from the Treasure-pool (after metaUnlock-gate)
+   *   - Adds every known item id to `itemsDiscovered` → trophy/collection
+   *     overlay shows "X / X items" — purely cosmetic, items are never
+   *     gameplay-gated by discovery state
+   * Wired from a [U] hotkey on the Main Menu so beta testers can flip
+   * the full unlock state without grinding. Triggered manually only —
+   * no in-game gameplay flow ever calls this. **Remove the [U] hotkey +
+   * this method when the beta period ends.** Item ids are passed in by
+   * the caller (rather than imported here) to keep MetaProgress
+   * dependency-free of the item catalogue.
+   */
+  unlockAllForTesting(allItemIds: readonly string[]): void {
+    const s = load();
+    let dirty = false;
+    const bossesToFlip = ['boss-lord-onyx', 'boss-marquis-of-mirages'];
+    for (const id of bossesToFlip) {
+      if (!s.bossesDefeated.includes(id)) {
+        s.bossesDefeated.push(id);
+        dirty = true;
+      }
+    }
+    // Spellblade-skin gate is the Prismarch-as-Spellblade kill. Flip it
+    // too so the red-helm Spellblade variant is selectable straight away.
+    if (!s.bossesDefeatedAsSpellblade.includes('boss-lord-onyx')) {
+      s.bossesDefeatedAsSpellblade.push('boss-lord-onyx');
+      dirty = true;
+    }
+    for (const id of allItemIds) {
+      if (!s.itemsDiscovered.includes(id)) {
+        s.itemsDiscovered.push(id);
+        dirty = true;
+      }
+    }
+    if (dirty) persist();
+  },
 };
