@@ -463,6 +463,13 @@ export class GameScene extends Phaser.Scene {
     // (see `enterRoom`), so we go through `this.enemies` lazily.
     this.missilePool.setHomingTargetGetter((x, y) => this.findNearestEnemyTo(x, y));
     this.enemyProjectilePool = new EnemyProjectilePool(this);
+    // Per-floor default thorn texture so Sapphire-Swamp mobs + bosses
+    // shoot blue thorns instead of emerald-green ones. Bosses with their
+    // own bullet textures (Marquis BloodProjectile, Mirror MansionMissile,
+    // Candelabra FlameMissile) override per-call and bypass this default.
+    this.enemyProjectilePool.setDefaultTextureKey(
+      this.currentFloorId === 'sapphire-swamp' ? TextureKeys.SapphireThorn : TextureKeys.Thorn,
+    );
     this.waxPuddleGroup = new WaxPuddleGroup(this);
     this.mirrorPortals = this.physics.add.group({
       classType: MirrorPortal,

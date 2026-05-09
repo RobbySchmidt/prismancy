@@ -50,6 +50,7 @@ export class Room {
   private readonly scene: Phaser.Scene;
   private readonly decorations: Phaser.GameObjects.GameObject[] = [];
   private readonly floorTiles: Phaser.GameObjects.GameObject[] = [];
+  private readonly wallVisuals: Phaser.GameObjects.GameObject[] = [];
   private readonly atmosphere: RoomAtmosphere;
 
   constructor(scene: Phaser.Scene, theme: FloorTheme, descriptor: RoomDescriptor) {
@@ -107,16 +108,137 @@ export class Room {
   }
 
   private buildWallsWithDoorGaps(): void {
+    // Visual tile sprites — purely cosmetic, no physics body. Each tile-
+    // position gets the themed wall texture so the room reads correctly.
+    // Door tiles are skipped; the Door instance places its own barrier sprite.
     for (let tx = 0; tx < ROOM_WIDTH_TILES; tx++) {
-      if (!this.isDoorTile(tx, 0)) this.placeWall(tx, 0);
+      if (!this.isDoorTile(tx, 0)) this.placeWallVisual(tx, 0);
       if (!this.isDoorTile(tx, ROOM_HEIGHT_TILES - 1))
-        this.placeWall(tx, ROOM_HEIGHT_TILES - 1);
+        this.placeWallVisual(tx, ROOM_HEIGHT_TILES - 1);
     }
     for (let ty = 1; ty < ROOM_HEIGHT_TILES - 1; ty++) {
-      if (!this.isDoorTile(0, ty)) this.placeWall(0, ty);
+      if (!this.isDoorTile(0, ty)) this.placeWallVisual(0, ty);
       if (!this.isDoorTile(ROOM_WIDTH_TILES - 1, ty))
-        this.placeWall(ROOM_WIDTH_TILES - 1, ty);
+        this.placeWallVisual(ROOM_WIDTH_TILES - 1, ty);
     }
+
+    // Collision: one continuous static rectangle per wall side, optionally
+    // split in two by a door gap. Replaces the previous per-tile static
+    // bodies whose internal seams caught the player's circle body when
+    // sliding along left/right walls (Phaser circle-vs-AABB picks the
+    // wrong separation axis at the joint between two stacked AABBs). With
+    // one long rectangle there are no internal seams and the slide is
+    // perfectly clean. Corners belong to the top/bottom strips so left/
+    // right strips only span ty=1..ROOM_HEIGHT_TILES-2 — no overlapping
+    // bodies.
+    const doors = this.descriptor.doors;
+    this.addHorizontalWallStrip(0, 0, ROOM_WIDTH_TILES - 1, doors.up.exists ? DOOR_TILE.N.tx : -1);
+    this.addHorizontalWallStrip(
+      ROOM_HEIGHT_TILES - 1,
+      0,
+      ROOM_WIDTH_TILES - 1,
+      doors.down.exists ? DOOR_TILE.S.tx : -1,
+    );
+    this.addVerticalWallStrip(
+      0,
+      1,
+      ROOM_HEIGHT_TILES - 2,
+      doors.left.exists ? DOOR_TILE.W.ty : -1,
+    );
+    this.addVerticalWallStrip(
+      ROOM_WIDTH_TILES - 1,
+      1,
+      ROOM_HEIGHT_TILES - 2,
+      doors.right.exists ? DOOR_TILE.E.ty : -1,
+    );
+  }
+
+  private addHorizontalWallStrip(
+    ty: number,
+    txStart: number,
+    txEnd: number,
+    doorTx: number,
+  ): void {
+    if (doorTx < txStart || doorTx > txEnd) {
+      this.addWallCollider(txStart, ty, txEnd - txStart + 1, 1);
+      return;
+    }
+    // Each split strip has its door-adjacent end face disabled — see
+    // `addWallCollider` for why. The first half ends at the door (east-
+    // facing); the second half starts after the door (west-facing).
+    if (doorTx > txStart) {
+      this.addWallCollider(txStart, ty, doorTx - txStart, 1, { disableEast: true });
+    }
+    if (doorTx < txEnd) {
+      this.addWallCollider(doorTx + 1, ty, txEnd - doorTx, 1, { disableWest: true });
+    }
+  }
+
+  private addVerticalWallStrip(
+    tx: number,
+    tyStart: number,
+    tyEnd: number,
+    doorTy: number,
+  ): void {
+    if (doorTy < tyStart || doorTy > tyEnd) {
+      this.addWallCollider(tx, tyStart, 1, tyEnd - tyStart + 1);
+      return;
+    }
+    if (doorTy > tyStart) {
+      this.addWallCollider(tx, tyStart, 1, doorTy - tyStart, { disableSouth: true });
+    }
+    if (doorTy < tyEnd) {
+      this.addWallCollider(tx, doorTy + 1, 1, tyEnd - doorTy, { disableNorth: true });
+    }
+  }
+
+  private addWallCollider(
+    txStart: number,
+    tyStart: number,
+    wTiles: number,
+    hTiles: number,
+    /**
+     * Each face flag, when true, disables that AABB face in Phaser's
+     * separator. Only used for split-strip ends adjacent to a door tile:
+     * the door-facing corner of the strip is the one that snagged the
+     * player's circle body when sliding past (Phaser's circle-vs-AABB
+     * separator picks the axis with smaller penetration at corners, and
+     * the player got nudged perpendicular to his slide direction by the
+     * sharp 90° corner). Disabling the door-adjacent face means the
+     * separator can only push the player along the wall axis, not into
+     * the door tile, eliminating the corner-roll snag. The player can
+     * still penetrate the strip from the door side, but he never
+     * approaches a strip from inside the wall row — only from the room
+     * floor — so the disabled face is unreachable in practice. The
+     * door barrier (when closed) covers the door tile fully and has its
+     * own cross-axis-disable in `Door.close()`, so the player still
+     * can't pass through a closed door.
+     */
+    opts?: {
+      disableNorth?: boolean;
+      disableSouth?: boolean;
+      disableEast?: boolean;
+      disableWest?: boolean;
+    },
+  ): void {
+    const w = wTiles * TILE_SIZE;
+    const h = hTiles * TILE_SIZE;
+    const cx = txStart * TILE_SIZE + w / 2;
+    const cy = tyStart * TILE_SIZE + h / 2;
+    const rect = this.scene.add.rectangle(cx, cy, w, h);
+    rect.setVisible(false);
+    this.scene.physics.add.existing(rect, true);
+    // Re-sync the static body explicitly. Rectangle has no texture so
+    // Phaser's default body-derivation can be off; setSize + updateFromGameObject
+    // pin the body to the rectangle's exact dimensions and centered position.
+    const body = rect.body as Phaser.Physics.Arcade.StaticBody;
+    body.setSize(w, h);
+    body.updateFromGameObject();
+    if (opts?.disableNorth) body.checkCollision.up = false;
+    if (opts?.disableSouth) body.checkCollision.down = false;
+    if (opts?.disableEast) body.checkCollision.right = false;
+    if (opts?.disableWest) body.checkCollision.left = false;
+    this.walls.add(rect);
   }
 
   private isDoorTile(tx: number, ty: number): boolean {
@@ -128,7 +250,7 @@ export class Room {
     return false;
   }
 
-  private placeWall(tx: number, ty: number): void {
+  private placeWallVisual(tx: number, ty: number): void {
     const wall = this.scene.add
       .image(
         tx * TILE_SIZE + TILE_SIZE / 2,
@@ -136,8 +258,7 @@ export class Room {
         wallTileKey(this.theme.id),
       )
       .setDepth(DepthLayers.Wall);
-    this.scene.physics.add.existing(wall, true);
-    this.walls.add(wall);
+    this.wallVisuals.push(wall);
   }
 
   private buildDoors(initiallyOpen: boolean): void {
@@ -334,6 +455,8 @@ export class Room {
     this.decorations.length = 0;
     for (const tile of this.floorTiles) tile.destroy();
     this.floorTiles.length = 0;
+    for (const wallVisual of this.wallVisuals) wallVisual.destroy();
+    this.wallVisuals.length = 0;
     this.atmosphere.destroy();
     this.walls.clear(true, true);
     this.walls.destroy();

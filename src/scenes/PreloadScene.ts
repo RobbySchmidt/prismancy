@@ -131,6 +131,7 @@ export class PreloadScene extends Phaser.Scene {
     this.drawBloodProjectileTexture(g);
     this.drawBossLordOnyxTexture(g);
     this.drawThornTexture(g);
+    this.drawSapphireThornTexture(g);
     this.drawHeartTextures(g);
     this.drawCoinTexture(g);
     this.drawKeyTexture(g);
@@ -3805,6 +3806,58 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(baseX + 4, cy + 5, 1, 1);
 
     g.generateTexture(TextureKeys.Thorn, w, h);
+  }
+
+  /**
+   * Sapphire-Swamp counterpart of the default Thorn texture. Same silhouette
+   * + dimensions so it slots into `EnemyProjectile` without any layout work
+   * — only the palette swaps to a sapphire/cyan ramp so swamp bosses + mobs
+   * don't fire visibly emerald-tinted shards. The pool defaults to this
+   * texture whenever the active floor is `sapphire-swamp`.
+   */
+  private drawSapphireThornTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 36;
+    const h = 22;
+    const cy = h / 2;
+    const tipX = w - 4;
+    const baseX = 4;
+
+    g.clear();
+
+    // Outer glow halo (two layers, sapphire-cyan)
+    g.fillStyle(0x4ad8ff, 0.2);
+    g.fillEllipse(w / 2, cy, w - 4, h - 4);
+    g.fillStyle(0x4ad8ff, 0.4);
+    g.fillEllipse(w / 2, cy, w - 12, h - 12);
+
+    // Outline triangle (deep sapphire)
+    g.fillStyle(0x041a30, 1);
+    g.fillTriangle(baseX - 1, cy - 7, tipX + 1, cy, baseX - 1, cy + 7);
+
+    // Dark base body (deep blue)
+    g.fillStyle(0x0e2a5a, 1);
+    g.fillTriangle(baseX, cy - 6, tipX, cy, baseX, cy + 6);
+
+    // Mid-blue body
+    g.fillStyle(0x2d5a99, 1);
+    g.fillTriangle(baseX + 1, cy - 5, tipX - 1, cy, baseX + 1, cy + 5);
+
+    // Bright top ridge highlight (cyan)
+    g.fillStyle(0x88dcff, 1);
+    g.fillTriangle(baseX + 3, cy - 3, tipX - 3, cy - 0.5, tipX - 3, cy + 0.5);
+
+    // Tip glint (white-hot pixel)
+    g.fillStyle(0xe0f4ff, 1);
+    g.fillCircle(tipX - 1, cy, 1.6);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(tipX - 1, cy - 1, 1, 1);
+
+    // Two small base notches (deep sapphire)
+    g.fillStyle(0x041a30, 1);
+    g.fillRect(baseX + 4, cy - 5, 1, 1);
+    g.fillRect(baseX + 4, cy + 5, 1, 1);
+
+    g.generateTexture(TextureKeys.SapphireThorn, w, h);
   }
 
   // ---------------------------------------------------------------------------

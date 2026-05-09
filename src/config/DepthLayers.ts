@@ -3,18 +3,19 @@ export const DepthLayers = {
   FloorDecoration: 10,
   Pickup: 20,
   Missile: 30,
-  Enemy: 40,
   EnemyProjectile: 60,
   Wall: 70,
-  // Player renders ABOVE walls (was 50, below Wall) so the wizard's hat
-  // doesn't clip into the wall texture when standing right against the
-  // top edge of a room — body-vs-visual mismatch from the +12 px hitbox
-  // offset (deliberate for fine collision squeezing) was punching the
-  // hat into the wall pixels. Putting the player on top reads as "the
-  // wizard is in front of the wall" rather than "the wizard's head is
-  // sliced off". Enemies stay at their original layer below the wall
-  // since their sprites are smaller and the user didn't flag any
-  // similar clipping for them.
+  // Enemies render ABOVE walls so larger sprites (bosses especially) don't
+  // get visually sliced off when standing close to the top wall — same
+  // body-vs-visual mismatch as the wizard. Sapphire / Onyx bosses are
+  // 2.4× scaled and their sprite extends well past their physics body,
+  // so without this they'd disappear from the chest up against the top
+  // wall. Their bodies still collide with the wall normally; only the
+  // visual rendering order changes.
+  Enemy: 72,
+  // Player renders ABOVE walls + enemies so the wizard's hat doesn't
+  // clip into the wall texture when standing right against the top edge
+  // of a room, and so the player is always visually on top in pile-ups.
   Player: 75,
   Particle: 80,
   HUD: 1000,

@@ -206,7 +206,21 @@ export const ROOM_ENTRY_GRACE_MS = 700;
 // --- Enemy projectiles -------------------------------------------------------
 
 export const ENEMY_PROJECTILE_SPEED = 240;
-export const ENEMY_PROJECTILE_LIFETIME_MS = 1500;
+/**
+ * Default lifetime for enemy projectiles. Bumped 2026-05-09 from 1500
+ * → 2200 to fix the boss-cheese where the player could stand at the
+ * far wall and out-range the rooted mid-room bosses (Forest Heart,
+ * Bloomheart) — at 240 px/s, 1500 ms = 360 px, but the farthest
+ * reachable player position from room center is ~472 px (corner of
+ * the playable area). 2200 ms × 240 px/s = 528 px covers that with
+ * a small buffer. Bosses with their own lifetime overrides via
+ * `EnemyProjectile.setLifetime()` (Onyx all-phases, BogColossus
+ * orbit, CursedMirror, MarquisOfMirages homing) are unaffected.
+ * Side effect: stationary mobs like Vine Sprout / Snapper Bloom
+ * also reach a bit further now — intended, gives them positional
+ * weight without becoming bullet-hell.
+ */
+export const ENEMY_PROJECTILE_LIFETIME_MS = 2200;
 export const ENEMY_PROJECTILE_DAMAGE = 1;
 export const ENEMY_PROJECTILE_RADIUS = 8;
 export const ENEMY_PROJECTILE_POOL_SIZE = 96;
@@ -877,6 +891,12 @@ export const TextureKeys = {
   Player: 'tex-player',
   MagicMissile: 'tex-missile',
   Thorn: 'tex-enemy-thorn',
+  /** Sapphire-themed thorn variant — same silhouette as the default green
+   *  Thorn but blue/cyan-coded so Sapphire-Swamp mobs + bosses don't look
+   *  like they're throwing emerald shards on a swamp floor. The Pool
+   *  picks this one automatically when the active floor is sapphire-swamp.
+   */
+  SapphireThorn: 'tex-enemy-thorn-sapphire',
   ForestSprite: 'tex-enemy-forest-sprite',
   MossySlime: 'tex-enemy-mossy-slime',
   VineSprout: 'tex-enemy-vine-sprout',

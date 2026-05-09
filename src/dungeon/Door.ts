@@ -113,26 +113,37 @@ export class Door {
       textureKey,
     );
     this.barrier.setDepth(DepthLayers.Wall);
-    // Disable collision on the cross-axis faces of the barrier so the
-    // player's body doesn't catch at the seam where the barrier meets
-    // the wall tiles above/below (vertical door) or left/right
-    // (horizontal door). Phaser's arcade separator can pick the wrong
-    // axis when a dynamic body straddles the seam between two stacked
-    // static AABBs — the snag was most visible sliding along the right
-    // wall past a closed door. Disabling the cross-axis faces means
-    // Phaser only ever separates from the door axis (east/west for
-    // vertical doors, north/south for horizontal), eliminating the
-    // ambiguity. The wall tiles next to the door still cover those
-    // cross-axis sides solidly, so the player can't actually pass
-    // through the barrier — they just slide past cleanly.
     const body = this.barrier.body as Phaser.Physics.Arcade.StaticBody;
+    // Extend the barrier body PAST the door tile edges by `BARRIER_OVERLAP`
+    // pixels along the wall axis so it OVERLAPS the adjacent wall strips
+    // instead of butting up exactly against them. The 4-px overlap
+    // eliminates the tile-seam where the player's circle body used to
+    // catch — Phaser's arcade separator picks the wrong axis at the
+    // exact-edge boundary between two static AABBs (rounded down vs up),
+    // causing a brief perpendicular nudge as the player slides past.
+    // Overlap means the player is always inside ONE body's range during
+    // the transition, never on a discrete edge. The texture itself stays
+    // 64×64 (rendered at door tile center), only the physics body grows.
+    // Cross-axis faces stay disabled (perpendicular to door direction)
+    // so the player still slides cleanly along the wall direction; only
+    // the door-axis face blocks. Disabled-face logic on the wall strips
+    // (Room.addHorizontalWallStrip / addVerticalWallStrip) is the other
+    // half of the same fix.
+    const BARRIER_OVERLAP = 4;
     if (this.direction === 'left' || this.direction === 'right') {
+      // Vertical wall door: extend along the y-axis to overlap upper +
+      // lower wall strips. Cross-axis = up/down disabled.
+      body.setSize(TILE_SIZE, TILE_SIZE + 2 * BARRIER_OVERLAP);
       body.checkCollision.up = false;
       body.checkCollision.down = false;
     } else {
+      // Horizontal wall door (top/bottom): extend along the x-axis to
+      // overlap left + right wall strips. Cross-axis = left/right disabled.
+      body.setSize(TILE_SIZE + 2 * BARRIER_OVERLAP, TILE_SIZE);
       body.checkCollision.left = false;
       body.checkCollision.right = false;
     }
+    body.updateFromGameObject();
   }
 
   /**

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ENEMY_PROJECTILE_POOL_SIZE } from '../../config/GameConfig';
+import { ENEMY_PROJECTILE_POOL_SIZE, TextureKeys } from '../../config/GameConfig';
 import { getSfxSynth } from '../../systems/SfxSynth';
 import { EnemyProjectile } from './EnemyProjectile';
 
@@ -9,6 +9,15 @@ import { EnemyProjectile } from './EnemyProjectile';
  */
 export class EnemyProjectilePool {
   private readonly group: Phaser.Physics.Arcade.Group;
+  /**
+   * Texture used when a `fire()` caller doesn't pass an explicit `textureKey`.
+   * GameScene swaps this per-floor so Sapphire-Swamp mobs/bosses fire blue
+   * thorns instead of the default green ones — without every enemy having
+   * to know which floor it's on. Bosses with their own bullet textures
+   * (Marquis BloodProjectile, Mirror MansionMissile, Candelabra FlameMissile)
+   * still pass an explicit `textureKey` and bypass this default.
+   */
+  private defaultTextureKey: string = TextureKeys.Thorn;
 
   constructor(scene: Phaser.Scene) {
     this.group = scene.physics.add.group({
@@ -22,10 +31,19 @@ export class EnemyProjectilePool {
   }
 
   /**
+   * Set the texture used when callers of `fire()` don't pass a `textureKey`.
+   * GameScene calls this on every floor entry/transition.
+   */
+  setDefaultTextureKey(key: string): void {
+    this.defaultTextureKey = key;
+  }
+
+  /**
    * Spawn an enemy projectile from the pool. `textureKey` overrides the
-   * default Thorn sprite (used by the Cursed Mirror's amethyst shard, which
-   * reads as a magic-missile-style bullet rather than a vine thorn). If
-   * omitted the projectile is rendered with the default Thorn texture.
+   * pool's default sprite (used by the Cursed Mirror's amethyst shard, the
+   * Marquis's BloodProjectile, etc.). If omitted the projectile renders
+   * with the pool's `defaultTextureKey` — green Thorn on Emerald, blue
+   * Sapphire-Thorn on Sapphire, etc.
    */
   fire(
     x: number,
@@ -36,7 +54,7 @@ export class EnemyProjectilePool {
   ): EnemyProjectile | null {
     const p = this.group.getFirstDead(false) as EnemyProjectile | null;
     if (!p) return null;
-    p.fire(x, y, vx, vy, textureKey);
+    p.fire(x, y, vx, vy, textureKey ?? this.defaultTextureKey);
     // Throttled inside SfxSynth so multi-thorn fans collapse to one cast sound.
     getSfxSynth().playEnemyCast();
     return p;
