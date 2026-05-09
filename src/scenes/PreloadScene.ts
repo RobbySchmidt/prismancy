@@ -387,6 +387,17 @@ export class PreloadScene extends Phaser.Scene {
     g.fillEllipse(cx - 3, top + 42, 3.5, 2);
     g.fillEllipse(cx + 3, top + 42, 3.5, 2);
 
+    // Ground shadow under the boots — matches the Spellblade's
+    // `figBot`-anchored shadow so both playable characters have the same
+    // visual ground reference. Without this the wizard's visible bottom
+    // is at the boots (y=44) while the spellblade's is at the shadow
+    // (y=53), and the same body-center hitbox reads as "hovering" on the
+    // spellblade vs. "at ground" on the wizard. Same dimensions / alpha
+    // as the spellblade variant for visual parity. User-flagged
+    // 2026-05-09 ("der kreis beim wizard höher aussieht vom boden aus").
+    g.fillStyle(palette.SHADOW, 0.45);
+    g.fillEllipse(cx, figBot, 14, 2);
+
     // 5) BEARD — soft rounded tuft below the face.
     const beard: Array<{ x: number; y: number }> = [
       { x: cx - 3, y: top + 14 },
