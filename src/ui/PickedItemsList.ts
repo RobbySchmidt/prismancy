@@ -8,29 +8,49 @@ import { type ItemSystem } from '../systems/ItemSystem';
 
 const ANCHOR_X = GAME_WIDTH * 0.62;
 const ANCHOR_Y = GAME_HEIGHT * 0.18;
-const ROW_HEIGHT = 44;
+/** Bottom margin so the panel doesn't run into the HUD. Used by overflow
+ *  detection — when the items + gems block would push past this, the layout
+ *  collapses to compact mode (icon + name only, no description). */
+const PANEL_BOTTOM_Y = GAME_HEIGHT - 24;
 const ICON_SCALE = 1.7;
+const COMPACT_ICON_SCALE = 1.2;
 /** Column where the text starts (right of the icon column). */
 const TEXT_X_OFFSET = 36;
-/** Approximate chars-per-line for description wrap. The fallback word-wrap
- *  width below in pixels handles fine-grained breaking. */
+const COMPACT_TEXT_X_OFFSET = 28;
+/** Word-wrap width for description lines, in pixels. Phaser counts pixels not
+ *  chars, so this also caps the column width. */
 const DESC_WRAP_WIDTH = 280;
-/** Flavor text shown when the player hovers a no-hit gem in the list.
- *  All three floors share the same line — the gem itself encodes which
- *  floor it came from, the tooltip just explains the achievement. */
-const GEM_TOOLTIP_TEXT = 'Crystallized from a flawless victory';
+/** Vertical gap between the name baseline and the description top. */
+const DESC_OFFSET_Y = 18;
+/** Padding between rows so the description of one item doesn't visually
+ *  collide with the next row's name. */
+const ROW_GAP = 10;
+const COMPACT_ROW_GAP = 4;
+/** Height of the gems section overhead (divider + heading + flavor line). */
+const GEM_HEADER_HEIGHT = 50;
+/** Height of one gem row (icon + label, fixed). */
+const GEM_ROW_HEIGHT = 24;
+/** Flavor text shown under "No-Hit Gems" — pinned, not a tooltip. Earlier
+ *  hover-tooltip implementation got clipped by the panel right-edge and was
+ *  unreadable; the user asked for a fixed line under the heading instead. */
+const GEM_FLAVOR_TEXT = 'Crystallized from a flawless victory';
 
 /**
  * Right-side panel shown together with the ExpandedMap while map-mode is
  * open. Lists every picked-up item (icon + name + short description) so the
  * player can see what their current build does without memorising toasts.
  *
+ * Layout strategy: rows are laid out top-down with dynamic Y advancement
+ * based on the actual rendered description height, so multi-line descriptions
+ * don't overrun the next row's name (the previous fixed `ROW_HEIGHT = 44`
+ * caused the last item's description to clip into the gem-section divider).
+ * If the full-detail layout would overflow `PANEL_BOTTOM_Y`, we re-render in
+ * compact mode (icon + name only, smaller spacing) so a 12-item run still
+ * fits.
+ *
  * State source: reads `(scene.registry.get('itemSystem') as ItemSystem).
  * getPickedIds()` on `show()` / `refresh()`. The list is rebuilt each time
  * map-mode opens so it always reflects the current run state.
- *
- * All GameObjects this widget owns are tracked in `rows` and destroyed on
- * scene SHUTDOWN to keep us from leaking detached UI.
  */
 export class PickedItemsList {
   private readonly scene: Phaser.Scene;
@@ -38,10 +58,6 @@ export class PickedItemsList {
   private readonly emptyText: Phaser.GameObjects.Text;
   /** Currently displayed row objects (icon + 2 text lines per row). */
   private rows: Phaser.GameObjects.GameObject[] = [];
-  /** Shared tooltip text for gem-row hover. Single instance reused across
-   *  rows — `pointerover` sets the content + position, `pointerout` hides. */
-  private readonly gemTooltip: Phaser.GameObjects.Text;
-  private readonly gemTooltipBg: Phaser.GameObjects.Rectangle;
   private visible = false;
 
   constructor(scene: Phaser.Scene) {
@@ -67,34 +83,10 @@ export class PickedItemsList {
       .setDepth(DepthLayers.HUD + 4)
       .setVisible(false);
 
-    // Gem hover tooltip — single shared instance, painted on pointerover and
-    // hidden on pointerout / hide / clearRows. Padded background so the
-    // italic flavor text reads against the painterly map backdrop. Depth one
-    // above the rows so it always paints on top.
-    this.gemTooltipBg = scene.add
-      .rectangle(0, 0, 1, 1, 0x1a0c20, 0.92)
-      .setOrigin(0, 0.5)
-      .setStrokeStyle(1, 0x6effa0, 0.6)
-      .setScrollFactor(0)
-      .setDepth(DepthLayers.HUD + 5)
-      .setVisible(false);
-    this.gemTooltip = scene.add
-      .text(0, 0, GEM_TOOLTIP_TEXT, {
-        fontSize: '13px',
-        color: '#c8f0d8',
-        fontStyle: 'italic',
-      })
-      .setOrigin(0, 0.5)
-      .setScrollFactor(0)
-      .setDepth(DepthLayers.HUD + 6)
-      .setVisible(false);
-
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.clearRows();
       this.heading.destroy();
       this.emptyText.destroy();
-      this.gemTooltip.destroy();
-      this.gemTooltipBg.destroy();
     });
   }
 
@@ -107,7 +99,6 @@ export class PickedItemsList {
     this.visible = false;
     this.heading.setVisible(false);
     this.emptyText.setVisible(false);
-    this.hideGemTooltip();
     this.clearRows();
   }
 
@@ -115,6 +106,10 @@ export class PickedItemsList {
    * Tear down old rows and rebuild from the current ItemSystem state. Called
    * from `show()` so the list always opens fresh — also safe to call on its
    * own after a pickup if some future code wants live updates.
+   *
+   * Two-pass layout: paints in full detail first, then if the rendered
+   * content runs past `PANEL_BOTTOM_Y` clears + re-paints in compact mode.
+   * Compact mode drops descriptions and tightens spacing so 12+ items fit.
    */
   refresh(): void {
     this.clearRows();
@@ -132,23 +127,43 @@ export class PickedItemsList {
     }
     this.emptyText.setVisible(false);
 
+    const inventory = this.scene.registry.get('inventory') as Inventory | undefined;
+    const gems = inventory?.getGems();
+    const gemCount = gems?.size ?? 0;
+
+    // First pass: detailed layout. If it overflows, retry compact.
+    const overflowed = this.paintItems(ids, gemCount, false);
+    if (overflowed) {
+      this.clearRows();
+      this.paintItems(ids, gemCount, true);
+    }
+
+    if (gemCount > 0 && gems) {
+      this.paintGems(gems);
+    }
+  }
+
+  /**
+   * Paint the items rows and return whether the rendered content (items +
+   * the projected gem-section block) would run past `PANEL_BOTTOM_Y`.
+   * Caller uses the boolean to decide whether to redraw in compact mode.
+   * In compact mode itself, always returns false (no further fallback).
+   */
+  private paintItems(ids: string[], gemCount: number, compact: boolean): boolean {
+    const iconScale = compact ? COMPACT_ICON_SCALE : ICON_SCALE;
+    const textXOffset = compact ? COMPACT_TEXT_X_OFFSET : TEXT_X_OFFSET;
+    const rowGap = compact ? COMPACT_ROW_GAP : ROW_GAP;
+    const nameSize = compact ? '14px' : '16px';
+
+    let cursorY = ANCHOR_Y;
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i] as ItemId;
       const def = ITEMS[id];
       if (!def) continue;
-      const rowY = ANCHOR_Y + i * ROW_HEIGHT;
-
-      const icon = this.scene.add
-        .image(ANCHOR_X, rowY + 12, def.textureKey)
-        .setOrigin(0, 0.5)
-        .setScale(ICON_SCALE)
-        .setScrollFactor(0)
-        .setDepth(DepthLayers.HUD + 4);
-      this.rows.push(icon);
 
       const nameText = this.scene.add
-        .text(ANCHOR_X + TEXT_X_OFFSET, rowY, def.displayName, {
-          fontSize: '16px',
+        .text(ANCHOR_X + textXOffset, cursorY, def.displayName, {
+          fontSize: nameSize,
           color: '#ffd84a',
           fontStyle: 'bold',
         })
@@ -156,24 +171,54 @@ export class PickedItemsList {
         .setDepth(DepthLayers.HUD + 4);
       this.rows.push(nameText);
 
-      const descText = this.scene.add
-        .text(ANCHOR_X + TEXT_X_OFFSET, rowY + 18, def.description, {
-          fontSize: '13px',
-          color: '#c4a8e8',
-          wordWrap: { width: DESC_WRAP_WIDTH, useAdvancedWrap: true },
-        })
+      // Center the icon vertically against either the single name line
+      // (compact) or the name + description block (full).
+      const iconCenterY = compact ? cursorY + nameText.height / 2 : cursorY + 12;
+      const icon = this.scene.add
+        .image(ANCHOR_X, iconCenterY, def.textureKey)
+        .setOrigin(0, 0.5)
+        .setScale(iconScale)
         .setScrollFactor(0)
         .setDepth(DepthLayers.HUD + 4);
-      this.rows.push(descText);
+      this.rows.push(icon);
+
+      let rowBottom = cursorY + nameText.height;
+      if (!compact) {
+        const descText = this.scene.add
+          .text(ANCHOR_X + textXOffset, cursorY + DESC_OFFSET_Y, def.description, {
+            fontSize: '13px',
+            color: '#c4a8e8',
+            wordWrap: { width: DESC_WRAP_WIDTH, useAdvancedWrap: true },
+          })
+          .setScrollFactor(0)
+          .setDepth(DepthLayers.HUD + 4);
+        this.rows.push(descText);
+        rowBottom = cursorY + DESC_OFFSET_Y + descText.height;
+      }
+
+      cursorY = rowBottom + rowGap;
     }
 
-    // Gems section: divider line + one row per earned no-hit gem (icon +
-    // floor display name). Skipped entirely when the player has no gems.
-    const inventory = this.scene.registry.get('inventory') as Inventory | undefined;
-    const gems = inventory?.getGems();
-    if (!gems || gems.size === 0) return;
+    // Project the gem section's footprint so we can detect overflow before
+    // painting it. Includes header overhead + N gem rows.
+    if (gemCount > 0) {
+      cursorY += GEM_HEADER_HEIGHT + gemCount * GEM_ROW_HEIGHT;
+    }
 
-    const dividerY = ANCHOR_Y + ids.length * ROW_HEIGHT - 4;
+    // Stash the cursor so paintGems can pick up where we stopped, plus an
+    // overflow check for the caller. Compact mode never asks for a redraw —
+    // it's the last-ditch layout, so swallow the overflow there.
+    this.cursorAfterItems = cursorY - (gemCount > 0 ? GEM_HEADER_HEIGHT + gemCount * GEM_ROW_HEIGHT : 0);
+    return !compact && cursorY > PANEL_BOTTOM_Y;
+  }
+
+  /** Y just below the last item row, set by `paintItems` so `paintGems` can
+   *  paint the divider + gem rows immediately below without re-walking the
+   *  list. */
+  private cursorAfterItems = 0;
+
+  private paintGems(gems: ReadonlySet<string>): void {
+    const dividerY = this.cursorAfterItems;
     const divider = this.scene.add
       .rectangle(ANCHOR_X, dividerY, 320, 1, 0x6effa0, 0.45)
       .setOrigin(0, 0.5)
@@ -191,9 +236,22 @@ export class PickedItemsList {
       .setDepth(DepthLayers.HUD + 4);
     this.rows.push(gemHeading);
 
+    // Pinned flavor line below the heading. Replaces an earlier hover-tooltip
+    // that got clipped by the panel right-edge ("Crystallized from a..." cut
+    // off mid-sentence).
+    const flavor = this.scene.add
+      .text(ANCHOR_X, dividerY + 24, GEM_FLAVOR_TEXT, {
+        fontSize: '12px',
+        color: '#a8c8b8',
+        fontStyle: 'italic',
+      })
+      .setScrollFactor(0)
+      .setDepth(DepthLayers.HUD + 4);
+    this.rows.push(flavor);
+
     let gemIdx = 0;
     for (const floorId of gems) {
-      const rowY = dividerY + 28 + gemIdx * 24;
+      const rowY = dividerY + GEM_HEADER_HEIGHT + gemIdx * GEM_ROW_HEIGHT;
       const icon = this.scene.add
         .image(ANCHOR_X, rowY, gemTextureKey(floorId))
         .setOrigin(0, 0.5)
@@ -213,56 +271,12 @@ export class PickedItemsList {
         .setScrollFactor(0)
         .setDepth(DepthLayers.HUD + 4);
       this.rows.push(text);
-
-      // Hover tooltip on the whole row (icon + text) — both share the same
-      // pointerover/out so a slow mouse sweep across the gap doesn't flicker
-      // the tooltip on/off. Hit area sized to span the full row visually.
-      const HIT_W = 320;
-      const HIT_H = 20;
-      const hitArea = new Phaser.Geom.Rectangle(0, -HIT_H / 2, HIT_W, HIT_H);
-      const showTooltip = (): void => this.showGemTooltip(rowY);
-      const hideTooltip = (): void => this.hideGemTooltip();
-      icon
-        .setInteractive(hitArea, Phaser.Geom.Rectangle.Contains)
-        .on('pointerover', showTooltip)
-        .on('pointerout', hideTooltip);
-      text
-        .setInteractive(hitArea, Phaser.Geom.Rectangle.Contains)
-        .on('pointerover', showTooltip)
-        .on('pointerout', hideTooltip);
-
       gemIdx++;
     }
-  }
-
-  /**
-   * Position the shared tooltip beside the hovered gem row and reveal it.
-   * Anchored to the right of the items column so it doesn't overlap the
-   * gem icon/label. Padded background sized to the text bounds.
-   */
-  private showGemTooltip(rowY: number): void {
-    const TIP_X = ANCHOR_X + 200;
-    const PAD_X = 8;
-    const PAD_Y = 4;
-    this.gemTooltip.setPosition(TIP_X + PAD_X, rowY);
-    this.gemTooltip.setVisible(true);
-    const w = this.gemTooltip.width + PAD_X * 2;
-    const h = this.gemTooltip.height + PAD_Y * 2;
-    this.gemTooltipBg.setPosition(TIP_X, rowY);
-    this.gemTooltipBg.setSize(w, h);
-    this.gemTooltipBg.setVisible(true);
-  }
-
-  private hideGemTooltip(): void {
-    this.gemTooltip.setVisible(false);
-    this.gemTooltipBg.setVisible(false);
   }
 
   private clearRows(): void {
     for (const obj of this.rows) obj.destroy();
     this.rows = [];
-    // Old hover may still be live if the player closes the map mid-hover —
-    // hide so the tooltip doesn't dangle next time the panel re-shows.
-    this.hideGemTooltip();
   }
 }

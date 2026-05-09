@@ -14,8 +14,9 @@ const REQUIRED_GEM_FLOORS: readonly FloorId[] = [
 const SEAL_WIDTH = 84;
 const SEAL_HEIGHT = 60;
 /** Cooldown between hint-text reshows so a player parked on the trigger
- * doesn't spam the toast. */
-const HINT_COOLDOWN_MS = 1500;
+ * doesn't spam the toast. Set ≥ the full HOLD+FADE so a re-press while the
+ * existing hint is still visible doesn't restart it on top of itself. */
+const HINT_COOLDOWN_MS = 3400;
 /** Duration for the gem to fly from its altar socket into the boss's
  * prism when a Prism Special charges. Lands ~400ms before the charge
  * window ends, so the prism visibly absorbs the gem before the pattern
@@ -610,12 +611,25 @@ export class GemSeal {
       .setOrigin(0.5, 1)
       .setDepth(DepthLayers.HUD - 1);
     this.hintLabel = label;
+    // Hold the hint at full alpha for HOLD_MS so the player can read it,
+    // then fade out over FADE_MS. The y-drift runs the full duration as a
+    // subtle "ascending whisper" cue. Earlier single-tween Sine-Out fade
+    // was unreadable — the alpha started decaying immediately, leaving
+    // ~400 ms of legible time.
+    const HOLD_MS = 2500;
+    const FADE_MS = 900;
     this.scene.tweens.add({
       targets: label,
-      y: label.y - 12,
-      alpha: { from: 1, to: 0 },
-      duration: 1600,
+      y: label.y - 16,
+      duration: HOLD_MS + FADE_MS,
       ease: 'Sine.Out',
+    });
+    this.scene.tweens.add({
+      targets: label,
+      alpha: { from: 1, to: 0 },
+      delay: HOLD_MS,
+      duration: FADE_MS,
+      ease: 'Sine.In',
       onComplete: () => {
         label.destroy();
         if (this.hintLabel === label) this.hintLabel = null;
