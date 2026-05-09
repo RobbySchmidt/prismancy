@@ -262,6 +262,20 @@ export class GameScene extends Phaser.Scene {
    */
   private stairsSprite: Phaser.GameObjects.Image | null = null;
   private stairsOverlap: Phaser.Physics.Arcade.Collider | null = null;
+  /** Floating "[E] ENTER NEXT FLOOR" prompt rendered above the stairs sprite,
+   * fades in/out with overlap. Like the GemSeal prompt, the player must
+   * confirm with [E] — walking onto the sigil no longer auto-advances. */
+  private stairsPrompt: Phaser.GameObjects.Text | null = null;
+  /** Callback fired when the player confirms with [E] while standing on the
+   * stairs. Default: `advanceToNextFloor`. Onyx exit overrides to fire the
+   * incomplete-victory EndScene path. */
+  private stairsAction: (() => void) | null = null;
+  /** Mirror of the live player↔stairs overlap. Polled by `tickStairsInteract`
+   * each frame so the [E] press fires only when the wizard is on the sigil. */
+  private stairsInRange = false;
+  /** Set true the first frame the action fires so a long [E] press doesn't
+   * re-fire the transition mid-fade-out. Cleared on next stairs spawn. */
+  private stairsActionFired = false;
   /** Pending carry-over snapshot from the previous floor's `init` call. */
   private carryOverFromInit: RunCarryOver | null = null;
 
@@ -580,6 +594,10 @@ export class GameScene extends Phaser.Scene {
       this.currentShopPriceLabels = [];
       this.stairsSprite = null;
       this.stairsOverlap = null;
+      this.stairsPrompt = null;
+      this.stairsAction = null;
+      this.stairsInRange = false;
+      this.stairsActionFired = false;
       this.gemSeal = null;
       this.interactKey = null;
       this.restartHoldStartedAt = null;
@@ -1293,7 +1311,7 @@ export class GameScene extends Phaser.Scene {
     if (desc.kind === RoomKind.Boss && desc.cleared) {
       if (this.currentFloorId === 'onyx-mansion') {
         this.spawnGemSealInCurrentRoom();
-        this.spawnStairsInCurrentRoom(() => this.handleOnyxExit());
+        this.spawnStairsInCurrentRoom(() => this.handleOnyxExit(), 'ENTER THE LIGHT');
       } else if (this.hasNextFloor()) {
         this.spawnStairsInCurrentRoom();
       }
@@ -1356,6 +1374,11 @@ export class GameScene extends Phaser.Scene {
     this.stairsOverlap = null;
     this.stairsSprite?.destroy();
     this.stairsSprite = null;
+    this.stairsPrompt?.destroy();
+    this.stairsPrompt = null;
+    this.stairsAction = null;
+    this.stairsInRange = false;
+    this.stairsActionFired = false;
 
     // Gem seal — same room-scoped lifecycle as the stairs.
     this.gemSeal?.destroy();
@@ -1766,7 +1789,7 @@ export class GameScene extends Phaser.Scene {
       // floors, fall back to the normal "stairs to next floor" path.
       if (this.currentFloorId === 'onyx-mansion') {
         this.spawnGemSealInCurrentRoom();
-        this.spawnStairsInCurrentRoom(() => this.handleOnyxExit());
+        this.spawnStairsInCurrentRoom(() => this.handleOnyxExit(), 'ENTER THE LIGHT');
       } else if (this.hasNextFloor()) {
         this.spawnStairsInCurrentRoom();
       }
@@ -1791,10 +1814,16 @@ export class GameScene extends Phaser.Scene {
   /**
    * Place the stairs sprite in the current room (above the loot, so the
    * player picks rewards up first then walks onto the stairs to descend).
-   * Wires a player-overlap that calls `onOverlap` on contact — defaults to
-   * `advanceToNextFloor` for normal floors. Idempotent.
+   * Wires a player-overlap that the per-frame `tickStairsInteract` reads to
+   * gate an [E]-confirmed action — defaults to `advanceToNextFloor` for
+   * normal floors. The Onyx exit path overrides both `onConfirm` (to fire
+   * the incomplete-victory EndScene) and `promptText` ("ENTER THE LIGHT").
+   * Idempotent.
    */
-  private spawnStairsInCurrentRoom(onOverlap?: () => void): void {
+  private spawnStairsInCurrentRoom(
+    onConfirm?: () => void,
+    promptText: string = 'ENTER NEXT FLOOR',
+  ): void {
     const center = this.currentRoom?.getCenter();
     if (!center) return;
 
@@ -1803,6 +1832,11 @@ export class GameScene extends Phaser.Scene {
     this.stairsOverlap = null;
     this.stairsSprite?.destroy();
     this.stairsSprite = null;
+    this.stairsPrompt?.destroy();
+    this.stairsPrompt = null;
+    this.stairsAction = null;
+    this.stairsInRange = false;
+    this.stairsActionFired = false;
 
     // Stairs sit ~2.5 tiles above center, above the gem-reward slot, so the
     // boss-pool item + hearts read first as the player walks up.
@@ -1834,10 +1868,58 @@ export class GameScene extends Phaser.Scene {
       repeat: -1,
     });
 
-    const action = onOverlap ?? (() => this.advanceToNextFloor());
-    this.stairsOverlap = this.physics.add.overlap(this.player, this.stairsSprite, () => {
-      action();
-    });
+    // [E] interact prompt — same pattern as GemSeal. Sits above the sigil,
+    // fades in only when the player overlaps the stairs sprite.
+    this.stairsPrompt = this.add
+      .text(stairsX, stairsY - 28, `[E]  ${promptText}`, {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#ffd0a0',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(DepthLayers.HUD - 1)
+      .setAlpha(0);
+
+    this.stairsAction = onConfirm ?? (() => this.advanceToNextFloor());
+  }
+
+  /**
+   * Per-frame stairs interaction tick — mirror of `tickGemSealInteract`.
+   * Updates the `[E] ENTER NEXT FLOOR` prompt's alpha based on the live
+   * player↔stairs overlap, then fires `stairsAction` on a fresh [E] press.
+   * `stairsActionFired` latches the call so a long [E] press across the
+   * fade-out doesn't double-fire. Skipped during room transitions.
+   */
+  private tickStairsInteract(): void {
+    const sprite = this.stairsSprite;
+    if (!sprite) return;
+    if (this.inTransition) return;
+
+    const inRange = !!this.physics.overlap(this.player, sprite);
+    if (inRange !== this.stairsInRange) {
+      this.stairsInRange = inRange;
+      if (this.stairsPrompt) {
+        this.tweens.killTweensOf(this.stairsPrompt);
+        this.tweens.add({
+          targets: this.stairsPrompt,
+          alpha: inRange ? 1 : 0,
+          duration: 180,
+          ease: 'Sine.Out',
+        });
+      }
+    }
+    if (
+      inRange &&
+      !this.stairsActionFired &&
+      this.interactKey &&
+      Phaser.Input.Keyboard.JustDown(this.interactKey)
+    ) {
+      this.stairsActionFired = true;
+      this.stairsAction?.();
+    }
   }
 
   /**
@@ -1935,10 +2017,17 @@ export class GameScene extends Phaser.Scene {
     const runStartedAt = (this.registry.get('runStartedAt') as number | undefined) ?? null;
     const durationMs = runStartedAt !== null ? Math.max(0, Date.now() - runStartedAt) : 0;
     MetaProgress.recordRunWonFull(durationMs);
-    // Short window so the camera flash + shake reads, then the EndScene
-    // takes over and fades to black. The headline appears in the EndScene
-    // post-fade, so there's nothing to read in-room.
-    this.time.delayedCall(900, () => this.transitionToEndScene('full'));
+    // Short window so the flash + shake reads, then spawn the exit sigil
+    // with the same [E] confirm pattern as the no-gems Onyx exit. Auto-fade
+    // to EndScene felt abrupt — the player should walk into the light on
+    // their own beat. Doors stay closed (handleLordOnyxKilled bypasses the
+    // normal openAllDoors path), which funnels attention to the sigil.
+    this.time.delayedCall(900, () => {
+      this.spawnStairsInCurrentRoom(
+        () => this.transitionToEndScene('full'),
+        'ENTER THE LIGHT',
+      );
+    });
     void payload;
   }
 
@@ -2001,6 +2090,11 @@ export class GameScene extends Phaser.Scene {
     this.stairsOverlap = null;
     this.stairsSprite?.destroy();
     this.stairsSprite = null;
+    this.stairsPrompt?.destroy();
+    this.stairsPrompt = null;
+    this.stairsAction = null;
+    this.stairsInRange = false;
+    this.stairsActionFired = false;
 
     const banner = this.add
       .text(payload.x, payload.y - 56, 'The Prismarch stirs...', {
@@ -2343,6 +2437,13 @@ export class GameScene extends Phaser.Scene {
           return;
         }
         if (door.isClosed()) return;
+        // Require the player's body center to have crossed past the door
+        // tile's center along the door axis before transitioning. Without
+        // this gate, walking along the inside of the wall and brushing the
+        // edge of the door tile (whose 64x64 trigger zone touches the wall
+        // tiles flanking it) instantly transitions — the player has to
+        // actually step *into* the doorway.
+        if (!this.playerHasCommittedToDoor(door)) return;
         this.transitionThroughDoor(door);
       });
       this.doorTriggerOverlaps.push(c);
@@ -2481,6 +2582,38 @@ export class GameScene extends Phaser.Scene {
         this.inTransition = false;
       });
     });
+  }
+
+  /**
+   * Has the player's body center crossed past the door tile's center along
+   * the door axis? Used to gate door-overlap transitions so the player
+   * actually has to walk into the doorway, not just slide their body's
+   * bounding box against its edge from the inside of the wall.
+   *
+   * The door trigger zone is one full tile (64x64) sitting on the wall row
+   * of the room. Walking along the inside of the wall puts the player's
+   * body adjacent to that zone — Phaser arcade overlap considers touching
+   * AABBs as overlap, so without this gate the trigger fires immediately
+   * on a wall-slide. Requiring center.crossed-axis-past-trigger means the
+   * player must step at least halfway into the door tile to transition.
+   */
+  private playerHasCommittedToDoor(door: Door): boolean {
+    const body = this.player.body as Phaser.Physics.Arcade.Body | null;
+    if (!body) return false;
+    const cx = body.center.x;
+    const cy = body.center.y;
+    const tx = door.trigger.x;
+    const ty = door.trigger.y;
+    switch (door.direction) {
+      case 'up':
+        return cy < ty;
+      case 'down':
+        return cy > ty;
+      case 'left':
+        return cx < tx;
+      case 'right':
+        return cx > tx;
+    }
   }
 
   private neighborRoomId(fromRoomId: string, dir: Direction): string | null {
@@ -2667,6 +2800,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.tickGemSealInteract();
+    this.tickStairsInteract();
 
     if (!this.restartKey) return;
 

@@ -15,6 +15,10 @@ const TEXT_X_OFFSET = 36;
 /** Approximate chars-per-line for description wrap. The fallback word-wrap
  *  width below in pixels handles fine-grained breaking. */
 const DESC_WRAP_WIDTH = 280;
+/** Flavor text shown when the player hovers a no-hit gem in the list.
+ *  All three floors share the same line — the gem itself encodes which
+ *  floor it came from, the tooltip just explains the achievement. */
+const GEM_TOOLTIP_TEXT = 'Crystallized from a flawless victory';
 
 /**
  * Right-side panel shown together with the ExpandedMap while map-mode is
@@ -34,6 +38,10 @@ export class PickedItemsList {
   private readonly emptyText: Phaser.GameObjects.Text;
   /** Currently displayed row objects (icon + 2 text lines per row). */
   private rows: Phaser.GameObjects.GameObject[] = [];
+  /** Shared tooltip text for gem-row hover. Single instance reused across
+   *  rows — `pointerover` sets the content + position, `pointerout` hides. */
+  private readonly gemTooltip: Phaser.GameObjects.Text;
+  private readonly gemTooltipBg: Phaser.GameObjects.Rectangle;
   private visible = false;
 
   constructor(scene: Phaser.Scene) {
@@ -59,10 +67,34 @@ export class PickedItemsList {
       .setDepth(DepthLayers.HUD + 4)
       .setVisible(false);
 
+    // Gem hover tooltip — single shared instance, painted on pointerover and
+    // hidden on pointerout / hide / clearRows. Padded background so the
+    // italic flavor text reads against the painterly map backdrop. Depth one
+    // above the rows so it always paints on top.
+    this.gemTooltipBg = scene.add
+      .rectangle(0, 0, 1, 1, 0x1a0c20, 0.92)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(1, 0x6effa0, 0.6)
+      .setScrollFactor(0)
+      .setDepth(DepthLayers.HUD + 5)
+      .setVisible(false);
+    this.gemTooltip = scene.add
+      .text(0, 0, GEM_TOOLTIP_TEXT, {
+        fontSize: '13px',
+        color: '#c8f0d8',
+        fontStyle: 'italic',
+      })
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0)
+      .setDepth(DepthLayers.HUD + 6)
+      .setVisible(false);
+
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.clearRows();
       this.heading.destroy();
       this.emptyText.destroy();
+      this.gemTooltip.destroy();
+      this.gemTooltipBg.destroy();
     });
   }
 
@@ -75,6 +107,7 @@ export class PickedItemsList {
     this.visible = false;
     this.heading.setVisible(false);
     this.emptyText.setVisible(false);
+    this.hideGemTooltip();
     this.clearRows();
   }
 
@@ -180,12 +213,56 @@ export class PickedItemsList {
         .setScrollFactor(0)
         .setDepth(DepthLayers.HUD + 4);
       this.rows.push(text);
+
+      // Hover tooltip on the whole row (icon + text) — both share the same
+      // pointerover/out so a slow mouse sweep across the gap doesn't flicker
+      // the tooltip on/off. Hit area sized to span the full row visually.
+      const HIT_W = 320;
+      const HIT_H = 20;
+      const hitArea = new Phaser.Geom.Rectangle(0, -HIT_H / 2, HIT_W, HIT_H);
+      const showTooltip = (): void => this.showGemTooltip(rowY);
+      const hideTooltip = (): void => this.hideGemTooltip();
+      icon
+        .setInteractive(hitArea, Phaser.Geom.Rectangle.Contains)
+        .on('pointerover', showTooltip)
+        .on('pointerout', hideTooltip);
+      text
+        .setInteractive(hitArea, Phaser.Geom.Rectangle.Contains)
+        .on('pointerover', showTooltip)
+        .on('pointerout', hideTooltip);
+
       gemIdx++;
     }
+  }
+
+  /**
+   * Position the shared tooltip beside the hovered gem row and reveal it.
+   * Anchored to the right of the items column so it doesn't overlap the
+   * gem icon/label. Padded background sized to the text bounds.
+   */
+  private showGemTooltip(rowY: number): void {
+    const TIP_X = ANCHOR_X + 200;
+    const PAD_X = 8;
+    const PAD_Y = 4;
+    this.gemTooltip.setPosition(TIP_X + PAD_X, rowY);
+    this.gemTooltip.setVisible(true);
+    const w = this.gemTooltip.width + PAD_X * 2;
+    const h = this.gemTooltip.height + PAD_Y * 2;
+    this.gemTooltipBg.setPosition(TIP_X, rowY);
+    this.gemTooltipBg.setSize(w, h);
+    this.gemTooltipBg.setVisible(true);
+  }
+
+  private hideGemTooltip(): void {
+    this.gemTooltip.setVisible(false);
+    this.gemTooltipBg.setVisible(false);
   }
 
   private clearRows(): void {
     for (const obj of this.rows) obj.destroy();
     this.rows = [];
+    // Old hover may still be live if the player closes the map mid-hover —
+    // hide so the tooltip doesn't dangle next time the panel re-shows.
+    this.hideGemTooltip();
   }
 }
