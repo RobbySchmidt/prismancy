@@ -270,6 +270,10 @@ export class GameScene extends Phaser.Scene {
    * second tick to drop it past zero. */
   private activeItemKey: Phaser.Input.Keyboard.Key | null = null;
 
+  /** **TEMPORARY** Boss-spawn-picker overlay (toggled with [B]). Null when
+   * the menu is closed. See `setupBossSpawnMenu` for the cleanup surface. */
+  private bossSpawnMenu: Phaser.GameObjects.Container | null = null;
+
   /**
    * Stairs sprite spawned in the boss room after a kill. Held as a field
    * (not just `pickups` membership) so the player↔stairs overlap can fire
@@ -546,6 +550,30 @@ export class GameScene extends Phaser.Scene {
     // so a long hold doesn't double-fire across the AOE-wave window.
     this.activeItemKey = this.input.keyboard?.addKey('Q') ?? null;
 
+    // **TEMPORARY** [F2] toggles Phaser's arcade-physics debug overlay so
+    // body extents (player hitbox, enemy projectiles, wall colliders) are
+    // visible. Used for hitbox triage / boss-pattern verification.
+    // **Remove when no longer needed** — clutters the screen.
+    this.input.keyboard?.on('keydown-F2', () => {
+      const world = this.physics.world;
+      world.drawDebug = !world.drawDebug;
+      if (world.debugGraphic) {
+        world.debugGraphic.setVisible(world.drawDebug);
+        world.debugGraphic.setDepth(2000);
+      } else if (world.drawDebug) {
+        const g = world.createDebugGraphic();
+        g.setDepth(2000);
+      }
+    });
+
+    // **TEMPORARY** [B] toggles the boss-spawn picker overlay (in-game
+    // alternative to typing `__wiz.spawnBoss('boss-xxx')` in the
+    // console). Built as an in-scene Container overlay so no new Scene
+    // registration is needed; clicking a boss button force-spawns it via
+    // the existing `devSpawnBoss` path. **Remove when boss testing is
+    // complete** — see `setupBossSpawnMenu` for the cleanup surface.
+    this.setupBossSpawnMenu();
+
     this.dropSystem = new DropSystem(
       {
         getLayout: () => this.getLayout(),
@@ -637,6 +665,10 @@ export class GameScene extends Phaser.Scene {
       this.restartHoldBg = null;
       this.restartHoldFill = null;
       this.restartHoldLabel = null;
+      // **TEMPORARY** Boss-spawn-menu cleanup — null the ref so a fresh
+      // create() doesn't see a stale Container handle that Phaser already
+      // tore down. Remove with the rest of the boss-menu scaffolding.
+      this.bossSpawnMenu = null;
     });
 
     // Dev-only browser console hook so the user can spawn a treasure-pool
@@ -1671,6 +1703,175 @@ export class GameScene extends Phaser.Scene {
    * room's enemies first so encounters don't stack. Useful when a specific
    * boss's 25% roll never lines up.
    */
+  /**
+   * **TEMPORARY** Boss-spawn-picker scaffolding. Binds [B] to toggle an
+   * in-scene Container overlay that lists every boss grouped by floor.
+   * Clicking a button force-spawns the boss in the current room via the
+   * existing `devSpawnBoss` path (same as `__wiz.spawnBoss('boss-xxx')`
+   * in the console). **Remove this method + the [B] / [ESC] handlers +
+   * the `bossSpawnMenu` field + the `setupBossSpawnMenu` call in
+   * `create()` when boss testing is complete.**
+   */
+  private setupBossSpawnMenu(): void {
+    this.input.keyboard?.on('keydown-B', () => {
+      // Don't open during transitions or while the scene is paused
+      // (pause menu / map mode own those moments).
+      if (this.inTransition || this.scene.isPaused()) return;
+      if (this.bossSpawnMenu) {
+        this.closeBossSpawnMenu();
+      } else {
+        this.openBossSpawnMenu();
+      }
+    });
+    // ESC closes the menu (handled in `update()` via the pauseKey poll —
+    // see the `if (this.bossSpawnMenu)` branch there). Doing it in update
+    // instead of an event listener avoids racing the pause-menu opener
+    // which also reads ESC from update on the same frame.
+  }
+
+  /** **TEMPORARY** Build + show the boss-spawn picker overlay. */
+  private openBossSpawnMenu(): void {
+    // Color twin: numeric for shape strokes / fills, hex-string for text
+    // styles. Phaser's Text expects '#RRGGBB' style strings while shape
+    // APIs take numbers — twin keeps both call sites clean.
+    const bossesByFloor: {
+      label: string;
+      colorNum: number;
+      colorStr: string;
+      bosses: readonly { id: string; name: string }[];
+    }[] = [
+      {
+        label: 'EMERALD FOREST',
+        colorNum: 0x6effa0,
+        colorStr: '#6effa0',
+        bosses: [
+          { id: 'boss-vine-lord', name: 'Vine Lord' },
+          { id: 'boss-mossy-behemoth', name: 'Mossy Behemoth' },
+          { id: 'boss-pixie-queen', name: 'Pixie Queen' },
+          { id: 'boss-forest-heart', name: 'Forest Heart' },
+        ],
+      },
+      {
+        label: 'SAPPHIRE SWAMP',
+        colorNum: 0x4ad8ff,
+        colorStr: '#4ad8ff',
+        bosses: [
+          { id: 'boss-toad-sovereign', name: 'Toad Sovereign' },
+          { id: 'boss-bloomheart', name: 'Bloomheart' },
+          { id: 'boss-damselfly-empress', name: 'Damselfly Empress' },
+          { id: 'boss-bog-colossus', name: 'Bog Colossus' },
+        ],
+      },
+      {
+        label: 'ONYX MANSION',
+        colorNum: 0xc864ff,
+        colorStr: '#c864ff',
+        bosses: [
+          { id: 'boss-marquis-of-mirages', name: 'Marquis of Mirages' },
+          { id: 'boss-lord-onyx', name: 'The Prismarch' },
+        ],
+      },
+    ];
+
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+    const panelW = 360;
+    const headerH = 56;
+    const sectionGap = 18;
+    const rowH = 26;
+    const sectionHeaderH = 22;
+    const panelH =
+      headerH +
+      bossesByFloor.reduce(
+        (sum, sec) => sum + sectionHeaderH + sec.bosses.length * rowH + sectionGap,
+        0,
+      ) +
+      24;
+
+    const container = this.add.container(cx, cy).setDepth(2500).setScrollFactor(0);
+    this.bossSpawnMenu = container;
+
+    const backdrop = this.add
+      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.55)
+      .setOrigin(0.5);
+    container.add(backdrop);
+
+    const panel = this.add
+      .rectangle(0, 0, panelW, panelH, 0x14081e, 0.96)
+      .setStrokeStyle(2, 0xffb84a, 0.9)
+      .setOrigin(0.5);
+    container.add(panel);
+
+    const titleY = -panelH / 2 + 18;
+    const title = this.add
+      .text(0, titleY, 'BOSS SPAWN PICKER', {
+        fontFamily: 'monospace',
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: '#ffb84a',
+      })
+      .setOrigin(0.5, 0);
+    container.add(title);
+
+    const hint = this.add
+      .text(0, titleY + 22, '[B] / [ESC] to close', {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#aab8c0',
+      })
+      .setOrigin(0.5, 0);
+    container.add(hint);
+
+    let y = titleY + headerH;
+    for (const section of bossesByFloor) {
+      const sectionLabel = this.add
+        .text(0, y, section.label, {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          fontStyle: 'bold',
+          color: section.colorStr,
+        })
+        .setOrigin(0.5, 0);
+      container.add(sectionLabel);
+      y += sectionHeaderH;
+
+      for (const boss of section.bosses) {
+        const rowY = y + rowH / 2;
+        const row = this.add
+          .rectangle(0, rowY, panelW - 32, rowH - 4, 0x261232, 0.9)
+          .setStrokeStyle(1, section.colorNum, 0.35)
+          .setOrigin(0.5);
+        row.setInteractive({ useHandCursor: true });
+        row.on('pointerover', () => row.setFillStyle(0x3a1c4a, 0.95));
+        row.on('pointerout', () => row.setFillStyle(0x261232, 0.9));
+        row.on('pointerdown', () => {
+          this.closeBossSpawnMenu();
+          this.devSpawnBoss(boss.id);
+        });
+        container.add(row);
+
+        const label = this.add
+          .text(0, rowY, boss.name, {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#e9d5ff',
+          })
+          .setOrigin(0.5);
+        container.add(label);
+
+        y += rowH;
+      }
+      y += sectionGap;
+    }
+  }
+
+  /** **TEMPORARY** Tear down the boss-spawn picker overlay. */
+  private closeBossSpawnMenu(): void {
+    if (!this.bossSpawnMenu) return;
+    this.bossSpawnMenu.destroy();
+    this.bossSpawnMenu = null;
+  }
+
   private devSpawnBoss(bossId: string): void {
     if (!this.currentRoom) {
       // eslint-disable-next-line no-console
@@ -3214,15 +3415,18 @@ export class GameScene extends Phaser.Scene {
     void _delta;
     if (this.inTransition) return;
 
-    // ESC → pause overlay. Skip if the map is already pausing the scene
-    // (TAB owns the map-mode pause flow, ESC shouldn't double-pause).
-    if (
-      this.pauseKey &&
-      Phaser.Input.Keyboard.JustDown(this.pauseKey) &&
-      !this.scene.isPaused()
-    ) {
-      this.openPauseMenu();
-      return;
+    // ESC → if the temp boss-spawn menu is open, close it (topmost layer
+    // wins). Otherwise open the pause overlay. Skip pause-trigger if the
+    // scene is already paused (TAB owns the map-mode pause flow).
+    if (this.pauseKey && Phaser.Input.Keyboard.JustDown(this.pauseKey)) {
+      if (this.bossSpawnMenu) {
+        this.closeBossSpawnMenu();
+        return;
+      }
+      if (!this.scene.isPaused()) {
+        this.openPauseMenu();
+        return;
+      }
     }
 
     this.tickGemSealInteract();

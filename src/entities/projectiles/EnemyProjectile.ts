@@ -55,6 +55,18 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     // get recycled across enemies, so without resetting, a previous Mirror
     // shard's purple texture would carry into the next thorn fire.
     this.setTexture(textureKey ?? TextureKeys.Thorn);
+    // Re-center the physics body on the active texture. Pooled sprites swap
+    // between textures of different dimensions (Thorn / SapphireThorn 36×22
+    // vs Blood / Mansion / Flame 16×16), and setCircle's offset is derived
+    // from the current frame size. Computing it once in the constructor (for
+    // the 36×22 Thorn) leaves the body ~10 px off-center the moment a 16×16
+    // texture is set — the hitbox visibly sits ahead of the bullet. User-
+    // flagged 2026-06-06. Recompute here so the circle tracks the frame.
+    this.setCircle(
+      ENEMY_PROJECTILE_RADIUS,
+      this.width / 2 - ENEMY_PROJECTILE_RADIUS,
+      this.height / 2 - ENEMY_PROJECTILE_RADIUS,
+    );
     // Clear any leftover tint from the previous use of this pooled sprite.
     // Without this, a BloodProjectile recycled from a Tide-Mandala sapphire-
     // tinted shot keeps the blue tint — multiplied with the red texture it
