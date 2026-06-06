@@ -52,6 +52,22 @@ export class Bloomheart extends BossEnemy {
   private nextFanAt: number;
   private telegraphScheduled = false;
   private nextSporeAt = 0;
+  /**
+   * Live spores (drift sprites + their drift tween). Tracked so they can be
+   * torn down the instant the boss dies. Each spore is a loose scene object
+   * whose drift-tween `onComplete` fires a burst + touches `this.scene` — if
+   * a spore is still mid-flight when the boss is destroyed (death tween +
+   * `destroy()` run ~220 ms after the killing blow, spore lifetime is 700 ms),
+   * its `onComplete` would run against a destroyed sprite (`this.scene` is
+   * undefined) and throw inside Phaser's update loop, freezing the game.
+   * Burn DoT made this more likely by killing the boss off-beat. (Fixed
+   * 2026-06-06.)
+   */
+  private activeSpores: Array<{
+    spore: Phaser.GameObjects.Arc;
+    halo: Phaser.GameObjects.Arc;
+    tween: Phaser.Tweens.Tween;
+  }> = [];
 
   constructor(scene: Phaser.Scene, x: number, y: number, host: BloomheartHost) {
     super(scene, x, y, ENEMIES['boss-bloomheart']);
@@ -158,13 +174,24 @@ export class Bloomheart extends BossEnemy {
     const distance = (BLOOMHEART_SPORE_SPEED * BLOOMHEART_SPORE_LIFETIME_MS) / 1000;
     const targetX = startX + dirX * distance;
     const targetY = startY + dirY * distance;
-    this.scene.tweens.add({
+    const tween = this.scene.tweens.add({
       targets: [spore, halo],
       x: targetX,
       y: targetY,
       duration: BLOOMHEART_SPORE_LIFETIME_MS,
       ease: 'Sine.Out',
       onComplete: () => {
+        // Untrack this spore — it's completing naturally (a dead boss stops
+        // its spore tweens in clearSpores before this can fire).
+        this.activeSpores = this.activeSpores.filter((e) => e.spore !== spore);
+        // Defensive: if the boss is no longer active (killed within the same
+        // frame the tween completes), skip the burst + scene access and just
+        // clean up the visuals — `this.scene` may already be gone.
+        if (!this.active || !this.scene) {
+          spore.destroy();
+          halo.destroy();
+          return;
+        }
         // Mini-thorn radial burst from the spore's final position.
         const count = BLOOMHEART_SPORE_BURST_COUNT;
         const baseOffset = Math.random() * Math.PI * 2;
@@ -194,6 +221,32 @@ export class Bloomheart extends BossEnemy {
         halo.destroy();
       },
     });
+    this.activeSpores.push({ spore, halo, tween });
+  }
+
+  /**
+   * Stop + destroy every in-flight spore. Stopping the drift tween prevents
+   * its `onComplete` (the burst + ring + `this.scene` access) from firing
+   * after the boss is gone. Idempotent — safe to call from both `die()`
+   * (immediate on death) and `destroy()` (teardown path).
+   */
+  private clearSpores(): void {
+    for (const { spore, halo, tween } of this.activeSpores) {
+      tween.stop();
+      spore.destroy();
+      halo.destroy();
+    }
+    this.activeSpores = [];
+  }
+
+  protected override die(): void {
+    this.clearSpores();
+    super.die();
+  }
+
+  override destroy(fromScene?: boolean): void {
+    this.clearSpores();
+    super.destroy(fromScene);
   }
 
   protected onPhaseChanged(newPhase: number): void {
