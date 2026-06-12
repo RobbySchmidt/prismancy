@@ -143,6 +143,17 @@ export class PlayerHealth {
   }
 
   /**
+   * Lift a glass-cannon cap again — used when the capping item (Blood of
+   * Marquis) is swapped away via the active-item drop flow. Max HP stays
+   * at its current (capped) value; HP-ups that no-op'd while the cap was
+   * active are NOT retroactively granted — the player just regains the
+   * ability to grow from here.
+   */
+  clearMaxHealthCap(): void {
+    this.maxCap = null;
+  }
+
+  /**
    * Grant invincibility for the next `durationMs` from `now`. Used by
    * GameScene to give the player a brief grace period when entering a new
    * uncleared room. Never shortens an already-running window.

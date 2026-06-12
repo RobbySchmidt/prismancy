@@ -91,6 +91,15 @@ export interface FloorTheme {
    */
   enemyHpMultiplier?: number;
   /**
+   * Per-floor HP multiplier for MAIN BOSSES, applied on top of their
+   * DPS-ratio scaling (2026-06-12, user-flagged: with item-rich late-game
+   * builds the floor 2/3 bosses died faster than the miniboss — the
+   * Doppelgänger fight outlasted Marquis + Prismarch combined). Defaults
+   * to 1.0 (Emerald). Minibosses don't read this — they already stack
+   * floor mob mult × full DPS-ratio.
+   */
+  bossHpMultiplier?: number;
+  /**
    * Rooms the generator targets for this floor. Unset falls back to
    * `DUNGEON_TARGET_ROOM_COUNT`. Progressive per floor (10/12/14) since the
    * 2026-06-12 run-length pass.
@@ -217,6 +226,12 @@ export interface PickupSnapshot {
   /** Floor id for `kind === Gem` snapshots. Same boss-room round-trip as
    * `itemId` — uncollected no-hit gems persist across leave/return cycles. */
   gemFloorId?: string;
+  /** True for an active item the player swapped out (it dropped to the
+   * floor when a different active was picked up). Dropped actives are the
+   * one Item-kind that round-trips through `pendingPickups` in ANY room
+   * kind — without the flag they'd vanish on room leave, and a swapped-out
+   * Blood of Marquis is too valuable to silently delete. */
+  droppedActive?: boolean;
 }
 
 // --- Items, stats, pickups, drops -------------------------------------------

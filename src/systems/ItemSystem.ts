@@ -39,6 +39,11 @@ export class ItemSystem {
    * heart spawns full.
    */
   pickUp(item: ItemDefinition): void {
+    // Active-item swap (2026-06-12): picking up a DIFFERENT active while
+    // one is equipped un-picks the old one — its stat modifiers, HP cap
+    // and picked-id all roll back so the dropped item can be re-collected
+    // later without double-applying (GameScene spawns the physical drop).
+    if (item.active !== undefined) this.unpickEquippedActiveFor(item);
     const modifier: ItemModifier = {
       itemId: item.id,
       effects: item.effects,
@@ -111,6 +116,35 @@ export class ItemSystem {
       this.applyDropProfile(item);
       this.picked.add(item.id);
     }
+  }
+
+  /**
+   * Roll back the currently equipped active item's pickup-side state so a
+   * different incoming active can replace it Isaac-style (swap, not
+   * delete). Reverts: stat modifiers (otherwise re-picking the dropped
+   * item would stack its effects a second time — infinite +30% loop with
+   * Blood of Marquis), the glass-cannon max-HP cap, any `maxHealthBonus`,
+   * and the picked-id (so floor-uniqueness + re-collection work). The
+   * PHYSICAL drop is GameScene's job (`tryCollectPickup` compares the
+   * equipped active before/after the collect and spawns the pedestal) —
+   * this system has no scene access. Drop-profile fields
+   * (suppressHeartDrops / coinDropMult) are NOT reverted: aggregates are
+   * one-way folds and no current active carries them (dormant infra).
+   *
+   * No-op when nothing is equipped or the incoming item IS the equipped
+   * one (defensive — the picked-set normally prevents that case).
+   */
+  private unpickEquippedActiveFor(incoming: ItemDefinition): void {
+    const previous = this.activeItemSystem?.getEquippedItem() ?? null;
+    if (!previous || previous.id === incoming.id) return;
+    this.stats.removeModifiersByItemId(previous.id);
+    if (previous.maxHealthCap !== undefined) {
+      this.playerHealth?.clearMaxHealthCap();
+    }
+    if (previous.maxHealthBonus !== undefined && previous.maxHealthBonus > 0) {
+      this.playerHealth?.removeMaxHealth(previous.maxHealthBonus);
+    }
+    this.picked.delete(previous.id);
   }
 
   /** Shared between pickUp + hydrate: fold the item's drop-profile fields

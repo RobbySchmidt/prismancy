@@ -76,6 +76,11 @@ export class GemSeal {
   /** Sockets whose gem has already been consumed by a Prism Special.
    * Sticky so a stale `addGem` can't re-fill the slot. */
   private readonly consumedSockets = new Set<string>();
+  /** Pulsing amethyst attention glow under the altar. The seal is an
+   * interactable, not a decoration — without a "look at me" cue players
+   * walked straight past it after the Marquis fight (user-flagged
+   * 2026-06-12). Breathes until activation, then fades out. */
+  private readonly attentionGlow: Phaser.GameObjects.Ellipse[] = [];
   private readonly specialFiredHandler: (
     payload: GameEvents['lordOnyx:specialFired'],
   ) => void;
@@ -88,6 +93,55 @@ export class GemSeal {
     // so the player + projectiles render *over* the seal (no occlusion).
     this.visuals = scene.add.container(x, y);
     this.visuals.setDepth(DepthLayers.FloorDecoration + 2);
+
+    // Attention glow — two soft fills + a crisp stroked pulse-ring one
+    // depth-step BELOW the altar container. V1 used fills alone at alpha
+    // 0.07–0.3 — near-invisible on the equally-purple mansion parquet
+    // (user screenshot 2026-06-12). V2: lighter lavender tones, roughly
+    // doubled alpha, and the stroke ring as the readability anchor —
+    // crisp lines survive on busy dark floors where soft fills drown.
+    const glowOuter = scene.add
+      .ellipse(x, y + 6, SEAL_WIDTH + 64, SEAL_HEIGHT + 34, 0xc864ff, 0.3)
+      .setDepth(DepthLayers.FloorDecoration + 1);
+    const glowInner = scene.add
+      .ellipse(x, y + 6, SEAL_WIDTH + 22, SEAL_HEIGHT + 8, 0xd88cff, 0.42)
+      .setDepth(DepthLayers.FloorDecoration + 1);
+    const pulseRing = scene.add
+      .ellipse(x, y + 6, SEAL_WIDTH + 40, SEAL_HEIGHT + 18)
+      .setFillStyle(0x000000, 0)
+      .setStrokeStyle(2, 0xe8c8ff, 1)
+      .setDepth(DepthLayers.FloorDecoration + 1);
+    this.attentionGlow.push(glowOuter, glowInner, pulseRing);
+    scene.tweens.add({
+      targets: glowOuter,
+      alpha: { from: 0.16, to: 0.42 },
+      scaleX: { from: 0.94, to: 1.08 },
+      scaleY: { from: 0.94, to: 1.08 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+    });
+    scene.tweens.add({
+      targets: glowInner,
+      alpha: { from: 0.28, to: 0.55 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+      delay: 300,
+    });
+    scene.tweens.add({
+      targets: pulseRing,
+      alpha: { from: 0.3, to: 0.9 },
+      scaleX: { from: 0.97, to: 1.1 },
+      scaleY: { from: 0.97, to: 1.1 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+      delay: 150,
+    });
 
     this.graphics = scene.add.graphics();
     this.drawFrame(this.graphics);
@@ -360,6 +414,7 @@ export class GemSeal {
     void done.then(() => {
       if (this.placedGems.size < total) return;
       this.activated = true;
+      this.fadeOutAttentionGlow();
       if (this.prompt) {
         this.scene.tweens.killTweensOf(this.prompt);
         this.prompt.setAlpha(0);
@@ -375,8 +430,31 @@ export class GemSeal {
     });
   }
 
+  /** Fade the attention glow out (activation path) — the altar stops
+   * advertising interactability the moment the cinematic takes over. */
+  private fadeOutAttentionGlow(): void {
+    for (const glow of this.attentionGlow) {
+      this.scene.tweens.killTweensOf(glow);
+      this.scene.tweens.add({
+        targets: glow,
+        alpha: 0,
+        duration: 420,
+        ease: 'Sine.Out',
+        onComplete: () => glow.destroy(),
+      });
+    }
+    this.attentionGlow.length = 0;
+  }
+
   destroy(): void {
     EventBus.off('lordOnyx:specialFired', this.specialFiredHandler);
+    // Glow ellipses are loose scene objects (not container children) —
+    // clean them on the teardown path too (Bloomheart pattern).
+    for (const glow of this.attentionGlow) {
+      this.scene.tweens.killTweensOf(glow);
+      glow.destroy();
+    }
+    this.attentionGlow.length = 0;
     this.trigger.destroy();
     this.visuals.destroy();
     if (this.hintLabel) {

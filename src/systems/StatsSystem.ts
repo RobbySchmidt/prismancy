@@ -21,6 +21,21 @@ export class StatsSystem {
     this.modifiers.push(modifier);
   }
 
+  /**
+   * Remove every modifier registered under `itemId`. Used by the active-item
+   * swap (2026-06-12): dropping the equipped active must take its passive
+   * stat package with it — otherwise re-picking the dropped item would
+   * stack its effects a second time (pick Blood of Marquis → swap away →
+   * keep +30% → re-pick → +30% again = infinite stat loop). The
+   * latest-wins `missileTint` lookup self-corrects since it scans the
+   * remaining modifiers.
+   */
+  removeModifiersByItemId(itemId: string): void {
+    for (let i = this.modifiers.length - 1; i >= 0; i--) {
+      if (this.modifiers[i]?.itemId === itemId) this.modifiers.splice(i, 1);
+    }
+  }
+
   /** Berechne effektiven Wert: base + Σ add, dann × Π mult. */
   getEffective(stat: StatKey): number {
     let value = this.base[stat];

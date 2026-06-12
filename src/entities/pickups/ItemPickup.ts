@@ -20,6 +20,11 @@ export class ItemPickup extends BasePickup {
   private readonly glow: Phaser.GameObjects.Arc;
   private readonly itemDef: ItemDefinition;
   private readonly itemSystem: ItemSystem;
+  /** True when this pedestal holds an active item the player swapped OUT
+   * (Isaac-style drop). Dropped actives are the one Item-kind pickup that
+   * round-trips through `pendingPickups` in any room — see the teardown
+   * snapshot in GameScene. */
+  droppedActive = false;
 
   /** Item id the pedestal currently displays — read by the boss-room teardown
    * snapshot so a re-entry can rebuild the same pedestal. */

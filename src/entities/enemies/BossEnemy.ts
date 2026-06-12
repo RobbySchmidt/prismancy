@@ -69,8 +69,17 @@ export abstract class BossEnemy extends BaseEnemy {
     super(scene, x, y, definition);
     // Override BaseEnemy's mob-multiplier-applied hp with DPS-ratio scaling so
     // bosses always feel like a base-stats fight regardless of player build.
+    // `bossFloorHpMultiplier` (Sapphire ×1.25, Onyx ×1.5 — 2026-06-12 bump
+    // pass) stacks on top: late-run builds out-DPS what the ratio captures
+    // (multishot/burst/pierce/burn don't enter damage × fireRate), so the
+    // floor 2/3 bosses melted relative to the miniboss without it.
     const scale = readBossHpScale(scene);
-    this.maxHp = Math.max(1, Math.round(definition.hp * scale));
+    const floorMultRaw = scene.registry.get('bossFloorHpMultiplier') as number | undefined;
+    const floorMult =
+      floorMultRaw !== undefined && Number.isFinite(floorMultRaw) && floorMultRaw >= 1
+        ? floorMultRaw
+        : 1.0;
+    this.maxHp = Math.max(1, Math.round(definition.hp * scale * floorMult));
     this.hp = this.maxHp;
   }
 

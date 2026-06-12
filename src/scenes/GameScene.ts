@@ -483,6 +483,10 @@ export class GameScene extends Phaser.Scene {
     // Defaults to 1.0 if the floor doesn't declare one.
     const theme = FLOORS[this.currentFloorId];
     this.registry.set('enemyHpMultiplier', theme.enemyHpMultiplier ?? 1.0);
+    // Boss floor multiplier read by BossEnemy.constructor on top of the
+    // DPS-ratio scale — Sapphire ×1.25, Onyx ×1.5 (2026-06-12 bump pass,
+    // late-run bosses melted faster than the miniboss).
+    this.registry.set('bossFloorHpMultiplier', theme.bossHpMultiplier ?? 1.0);
   }
 
   create(): void {
@@ -824,6 +828,8 @@ export class GameScene extends Phaser.Scene {
             return;
           }
           const center = this.currentRoom.getCenter();
+          // Same DPS-ratio HP refresh as the real miniboss-room spawn path.
+          this.updateBossHpScale();
           this.spawnEnemyAt(minibossId, center.x, center.y - TILE_SIZE);
           // eslint-disable-next-line no-console
           console.log(`[__wiz.spawnMiniboss] ${minibossId} spawned.`);
@@ -1146,6 +1152,46 @@ export class GameScene extends Phaser.Scene {
     const pickup = new ItemPickup(this, x, y, itemDef, this.itemSystem);
     this.pickups.add(pickup);
     return pickup;
+  }
+
+  /**
+   * Spawn the swapped-out active item as a fresh pedestal near the swap
+   * spot. Offset one tile AWAY from the player (continuing the player→
+   * pedestal direction) so the drop doesn't land under their feet — the
+   * auto-collect overlap would otherwise re-grab it the moment the
+   * 700ms spawn protection expires and ping-pong the two actives forever.
+   * Clamped into the playable area; `droppedActive` marks it for the
+   * any-room `pendingPickups` round-trip (see tearDownActiveRoom).
+   */
+  private spawnDroppedActive(
+    itemDef: ItemDefinition,
+    fromX: number,
+    fromY: number,
+    player: Player,
+  ): void {
+    const dx = fromX - player.x;
+    const dy = fromY - player.y;
+    const d = Math.hypot(dx, dy);
+    let ox = 0;
+    let oy = TILE_SIZE;
+    if (d > 4) {
+      ox = (dx / d) * TILE_SIZE;
+      oy = (dy / d) * TILE_SIZE;
+    }
+    const x = Phaser.Math.Clamp(
+      fromX + ox,
+      TILE_SIZE * 1.5,
+      (ROOM_WIDTH_TILES - 1.5) * TILE_SIZE,
+    );
+    const y = Phaser.Math.Clamp(
+      fromY + oy,
+      TILE_SIZE * 1.5,
+      (ROOM_HEIGHT_TILES - 1.5) * TILE_SIZE,
+    );
+    const drop = new ItemPickup(this, x, y, itemDef, this.itemSystem);
+    drop.droppedActive = true;
+    drop.setSpawnProtection(700);
+    this.pickups.add(drop);
   }
 
   /**
@@ -1495,6 +1541,10 @@ export class GameScene extends Phaser.Scene {
           const def = ITEMS[snap.itemId as ItemId];
           if (!def) continue;
           const pickup = new ItemPickup(this, snap.x, snap.y, def, this.itemSystem);
+          // Preserve the dropped-active marker across round-trips — without
+          // it the pedestal would survive ONE leave/return and then vanish
+          // on the next teardown (flag lost = no longer snapshotted).
+          pickup.droppedActive = snap.droppedActive ?? false;
           this.pickups.add(pickup);
           continue;
         }
@@ -1656,12 +1706,16 @@ export class GameScene extends Phaser.Scene {
         if (!(child instanceof BasePickup)) continue;
         if (child.shopSlotIndex !== undefined) continue;
         if (child.kind === PickupKind.Item) {
-          if (captureBossRewards && child instanceof ItemPickup) {
+          // Boss/miniboss rewards round-trip as before; swapped-out actives
+          // (`droppedActive`) round-trip in ANY room — losing a dropped
+          // Blood of Marquis to a room transition would delete it silently.
+          if (child instanceof ItemPickup && (captureBossRewards || child.droppedActive)) {
             snapshots.push({
               kind: child.kind,
               x: child.x,
               y: child.y,
               itemId: child.itemId,
+              ...(child.droppedActive ? { droppedActive: true } : {}),
             });
           }
           continue;
@@ -1703,6 +1757,11 @@ export class GameScene extends Phaser.Scene {
     desc: RoomDescriptor,
     playerSpawn: { x: number; y: number },
   ): void {
+    // Regular mobs read a DAMPENED cut of the DPS-ratio in their
+    // constructor (see BaseEnemy / MOB_HP_DPS_SCALING_FACTOR) — refresh
+    // the registry value against the player's CURRENT build so every
+    // room batch scales with what the player is actually carrying.
+    this.updateBossHpScale();
     const rng = new RNG(`spawn-${desc.id}`);
     const interiorMinX = 2 * TILE_SIZE;
     const interiorMaxX = (ROOM_WIDTH_TILES - 2) * TILE_SIZE;
@@ -1794,6 +1853,9 @@ export class GameScene extends Phaser.Scene {
    */
   spawnEnemyAt(id: EnemyId, x: number, y: number): BaseEnemy | null {
     if (!this.enemies) return null;
+    // Keep the DPS-ratio registry value fresh for ad-hoc spawns too
+    // (boss adds mid-fight, dev hooks) — cheap, two stat lookups.
+    this.updateBossHpScale();
     const ctx = {
       scene: this,
       target: this.player,
@@ -2062,6 +2124,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.enemies.clear(true, true);
     const center = this.currentRoom.getCenter();
+    // Same DPS-ratio HP refresh as the real miniboss-room spawn path.
+    this.updateBossHpScale();
     this.spawnEnemyAt(id, center.x, center.y - TILE_SIZE);
     // eslint-disable-next-line no-console
     console.log(`[devSpawnMiniboss] ${id} spawned.`);
@@ -3470,8 +3534,20 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Active-item swap: remember what's in the [Q] slot BEFORE the collect.
+    // If the incoming pickup equips a different active, ItemSystem.pickUp
+    // rolls the old one's effects/picked-id back and we drop it as a
+    // physical pedestal next to the player (Isaac behaviour — swap, not
+    // delete; user-flagged 2026-06-12).
+    const equippedBefore = this.activeItemSystem?.getEquippedItem() ?? null;
+
     const absorbed = pickup.onCollect(this, this.inventory, player);
     if (!absorbed) return;
+
+    const equippedAfter = this.activeItemSystem?.getEquippedItem() ?? null;
+    if (equippedBefore && equippedAfter && equippedBefore.id !== equippedAfter.id) {
+      this.spawnDroppedActive(equippedBefore, pickup.x, pickup.y, player);
+    }
 
     EventBus.emit('pickup:collected', { kind: pickup.kind });
 
@@ -3719,6 +3795,10 @@ export class GameScene extends Phaser.Scene {
       x = Phaser.Math.Clamp(x, 2 * TILE_SIZE, (ROOM_WIDTH_TILES - 2) * TILE_SIZE);
       y = Phaser.Math.Clamp(y, 2 * TILE_SIZE, (ROOM_HEIGHT_TILES - 2) * TILE_SIZE);
     }
+    // Minibosses use the boss DPS-ratio HP scaling (see BaseEnemy
+    // constructor) — refresh the registry value against the player's
+    // CURRENT build right before construction, same as every boss spawn.
+    this.updateBossHpScale();
     this.spawnEnemyAt(id, x, y);
   }
 

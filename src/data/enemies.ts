@@ -187,8 +187,12 @@ export const ENEMIES = {
   // --- Minibosses (chance-spawned, one candidate per floor — 2026-06-12) ----
   // HP is authored so the EFFECTIVE pool after the floor's mob multiplier
   // lands at roughly half a boss: 28×1.0 / 26×1.5 / 27×2.0 ≈ 28/39/54.
-  // Unlike bosses they do NOT get DPS-ratio scaling — a stacked build is
-  // allowed to shred a miniboss; it's a sometimes-encounter, not a gate.
+  // They ALSO get the boss DPS-ratio scaling on top (user decision
+  // 2026-06-12 — originally exempt, but a stacked build killed one
+  // near-instantly in a playtest): BaseEnemy reads `bossHpScale` for
+  // `miniboss: true` entries, so the fight always lands at the authored
+  // time-to-kill regardless of build. See the Floor-HP-Scaling block in
+  // CLAUDE.md.
   'miniboss-thornwood-shambler': {
     id: 'miniboss-thornwood-shambler',
     textureKey: TextureKeys.MinibossThornwoodShambler,

@@ -183,6 +183,19 @@ export const DUNGEON_TARGET_ROOM_COUNT = 8;
 /** Hard upper bound on random-walk iterations to avoid pathological loops. */
 export const DUNGEON_GENERATOR_MAX_ITERATIONS = 5000;
 
+/**
+ * Dampened DPS-scaling for REGULAR floor mobs (2026-06-12, user-flagged
+ * "ich bin nun eigentlich jeden run absolut OP"): mobs get the boss
+ * DPS-ratio applied at HALF strength on top of their static floor
+ * multiplier — `hp × floorMult × (1 + (dpsRatio − 1) × this)`. At 3×
+ * base-DPS a mob has ×2 HP instead of ×3 (full) or ×1 (none): stacked
+ * builds still clear rooms visibly faster than at base stats (power
+ * fantasy intact), but trash stops evaporating. Bosses + minibosses use
+ * the FULL ratio (factor 1.0, hardwired in their constructors) — their
+ * time-to-kill is meant to be build-invariant.
+ */
+export const MOB_HP_DPS_SCALING_FACTOR = 0.5;
+
 // --- Elite rooms & minibosses (run-length pass, 2026-06-12) -----------------
 
 /** HP multiplier a champion (elite-promoted floor mob) gets ON TOP of the

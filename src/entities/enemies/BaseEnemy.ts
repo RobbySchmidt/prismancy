@@ -11,6 +11,7 @@ import {
   ELITE_HP_MULT,
   ELITE_MOVE_SPEED_MULT,
   ELITE_SCALE_MULT,
+  MOB_HP_DPS_SCALING_FACTOR,
   ENEMY_PROJECTILE_SPEED,
   HIT_FLASH_DURATION_MS,
   HIT_FLASH_TINT_ENEMY,
@@ -51,7 +52,26 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     // scaling in their constructor bodies, so this only really hits mobs.
     const mobHpMult =
       (scene.registry.get('enemyHpMultiplier') as number | undefined) ?? 1.0;
-    this.hp = Math.max(1, Math.round(definition.hp * mobHpMult));
+    // Player DPS-ratio (damage × fireRate vs. base), refreshed by
+    // GameScene.updateBossHpScale before every spawn batch. Two tiers:
+    //  - Minibosses: FULL ratio on top of the floor mult (user decision
+    //    2026-06-12 — their time-to-kill is build-invariant, like bosses).
+    //  - Regular mobs: DAMPENED ratio (`MOB_HP_DPS_SCALING_FACTOR`, 0.5)
+    //    on top of the floor mult — stacked builds still feel faster than
+    //    base, but trash stops evaporating ("jeden run absolut OP" flag).
+    //    At base stats the ratio is 1.0 → both tiers collapse to the
+    //    plain floor-mult value, so fresh runs are untouched.
+    // BossEnemy overwrites this.hp in its own constructor (full ratio,
+    // NO floor mult — boss HP is authored absolute), so this only really
+    // hits mobs + minibosses. The `miniboss:spawned` emit below snapshots
+    // maxHp AFTER this, so the silver HP bar shows the scaled value.
+    const rawScale = scene.registry.get('bossHpScale') as number | undefined;
+    const dpsRatio =
+      rawScale !== undefined && Number.isFinite(rawScale) && rawScale >= 1 ? rawScale : 1.0;
+    const dpsScale = definition.miniboss
+      ? dpsRatio
+      : 1 + (dpsRatio - 1) * MOB_HP_DPS_SCALING_FACTOR;
+    this.hp = Math.max(1, Math.round(definition.hp * mobHpMult * dpsScale));
 
     this.setDepth(DepthLayers.Enemy);
     this.setScale(WORLD_SPRITE_SCALE);

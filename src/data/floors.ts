@@ -38,6 +38,8 @@ export const FLOORS = {
       { id: 'vine-sprout', weight: 2 },
     ] satisfies readonly EnemyRosterEntry[],
     enemyHpMultiplier: 1.0,
+    /** Baseline — floor 1 bosses keep pure DPS-ratio scaling. */
+    bossHpMultiplier: 1.0,
     // Run-length pass (2026-06-12): progressive room counts 10/12/14 replace
     // the old flat 8. Floor 1 stays the snappiest as the run's on-ramp.
     roomCount: 10,
@@ -72,6 +74,10 @@ export const FLOORS = {
       { id: 'bog-tortoise', weight: 1 },
     ] satisfies readonly EnemyRosterEntry[],
     enemyHpMultiplier: 1.5,
+    // Boss-HP bump pass (2026-06-12): with late-run builds the floor 2/3
+    // bosses melted faster than the (fully DPS-scaled) miniboss. Applied
+    // ON TOP of the DPS-ratio scaling in BossEnemy.
+    bossHpMultiplier: 1.25,
     roomCount: 12,
     eliteRoomCount: 2,
     minibossIds: ['miniboss-mire-lurker'],
@@ -108,6 +114,10 @@ export const FLOORS = {
       { id: 'cursed-mirror', weight: 2, minPerRoom: 1 },
     ] satisfies readonly EnemyRosterEntry[],
     enemyHpMultiplier: 2.0,
+    // See sapphire — the endgame bosses need the extra pool the most
+    // (user-flag: Marquis + Prismarch combined felt shorter than the
+    // Doppelgänger fight).
+    bossHpMultiplier: 1.5,
     roomCount: 14,
     eliteRoomCount: 2,
     minibossIds: ['miniboss-doppelganger'],

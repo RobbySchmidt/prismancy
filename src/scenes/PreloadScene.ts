@@ -574,23 +574,30 @@ export class PreloadScene extends Phaser.Scene {
    * to the player silhouette automatically updates the mimic.
    */
   private readonly DOPPELGANGER_WIZARD_PALETTE = {
+    // Brightness pass 2026-06-12 (user-flagged "hebt sich kaum vom Floor
+    // ab"): the original near-black robe family (0x2c1a3c base) vanished
+    // against the mansion's dark parquet. Robe/hat lifted to a vivid
+    // mid-amethyst with bright highlights — still clearly the player's
+    // dark mirror (cool violet vs. the player's purple/white), but it
+    // separates from the floor at a glance. Eyes/tip stay glowing
+    // amethyst as the tell. A ground-glow in Doppelganger.ts backs it up.
     OUT: 0x0a0612,
-    HAT: 0x241430,
-    HAT_DARK: 0x120820,
-    HAT_HI: 0x3c2454,
-    SKIN: 0x9a90a8,
-    SKIN_SHADOW: 0x6a6078,
-    ROBE: 0x2c1a3c,
-    ROBE_HI: 0x482c60,
-    ROBE_SHADOW: 0x180c28,
-    BEARD: 0x554a66,
-    BEARD_SHADOW: 0x382e48,
+    HAT: 0x5a3494,
+    HAT_DARK: 0x3a1e64,
+    HAT_HI: 0x8656cc,
+    SKIN: 0xb0a6c0,
+    SKIN_SHADOW: 0x7a7090,
+    ROBE: 0x6a3aa4,
+    ROBE_HI: 0x9a62e0,
+    ROBE_SHADOW: 0x44246c,
+    BEARD: 0x8a7ea4,
+    BEARD_SHADOW: 0x5c5078,
     BUCKLE: 0xc8a040,
-    WAND: 0x3a3048,
+    WAND: 0x55456c,
     TIP: 0xc864ff,
     SHADOW: 0x140e1e,
-    BOOT: 0x120a18,
-    BOOT_HI: 0x2c1c34,
+    BOOT: 0x241430,
+    BOOT_HI: 0x44286c,
     EYE: 0xc864ff,
     TIP_SPARKLE: 0xe8c8ff,
   } as const;

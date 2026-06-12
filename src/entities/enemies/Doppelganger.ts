@@ -17,9 +17,11 @@ import {
   ENEMY_PROJECTILE_SPEED,
   ROOM_HEIGHT_TILES,
   ROOM_WIDTH_TILES,
+  SAFE_SPAWN_DISTANCE,
   TILE_SIZE,
   TextureKeys,
 } from '../../config/GameConfig';
+import { DepthLayers } from '../../config/DepthLayers';
 import { ENEMIES } from '../../data/enemies';
 import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
@@ -57,6 +59,13 @@ export class Doppelganger extends BaseEnemy {
   private strafeDir = 1;
   private nextStrafeFlipAt = 0;
 
+  /** Amethyst ground-glow — visibility anchor against the dark mansion
+   * parquet (user-flagged "hebt sich kaum vom Floor ab"). Follows the
+   * sprite each frame and mirrors its alpha, so the blink fade-out takes
+   * the glow with it (no "glow betrays the invisible mimic" leak). Loose
+   * scene object → cleaned in destroy() (Bloomheart pattern). */
+  private glow: Phaser.GameObjects.Ellipse | null = null;
+
   constructor(
     scene: Phaser.Scene,
     x: number,
@@ -70,6 +79,28 @@ export class Doppelganger extends BaseEnemy {
     this.startingHp = this.hp;
     this.nextAttackAt = scene.time.now + DOPPELGANGER_ATTACK_INTERVAL_MS / 2;
     this.nextFillerAt = scene.time.now + DOPPELGANGER_FILLER_INTERVAL_MS;
+
+    this.glow = scene.add
+      .ellipse(x, y + 20, 46, 14, 0xc864ff, 0.26)
+      .setDepth(DepthLayers.FloorDecoration + 1);
+  }
+
+  override preUpdate(time: number, delta: number): void {
+    super.preUpdate(time, delta);
+    if (this.glow) {
+      this.glow.setPosition(this.x, this.y + 20);
+      // Mirror the sprite alpha so blink fades + the death tween dim the
+      // glow in lockstep.
+      this.glow.setAlpha(0.26 * this.alpha);
+    }
+  }
+
+  override destroy(fromScene?: boolean): void {
+    if (this.glow) {
+      this.glow.destroy();
+      this.glow = null;
+    }
+    super.destroy(fromScene);
   }
 
   private isEnraged(): boolean {
@@ -174,26 +205,58 @@ export class Doppelganger extends BaseEnemy {
     });
   }
 
-  /** Flanking blink target: the player→mimic vector rotated by a random
+  /**
+   * Flanking blink target: the player→mimic vector rotated by a random
    * ±(70..110)°, re-anchored at kite distance from the player, clamped
-   * into the playable area. */
+   * into the playable area.
+   *
+   * Safe-zone fix (2026-06-12, user-flagged "hat sich einige Male direkt
+   * auf mich drauf gespawnt"): the raw clamp could drag a spot that left
+   * the room bounds straight onto a wall-hugging player — the rotated
+   * point keeps kite distance only BEFORE clamping. Now we try several
+   * candidate rotations (preferred flank → mirrored flank → deeper
+   * fallbacks) and take the first whose CLAMPED position still keeps
+   * `SAFE_SPAWN_DISTANCE` (3 tiles) from the player; if the player is
+   * camping a corner and every candidate collapses, we take the farthest
+   * one best-effort — same philosophy as the Pixie-Queen teleport fix.
+   */
   private pickBlinkSpot(): { x: number; y: number } {
+    const margin = TILE_SIZE * 1.5;
+    const maxX = ROOM_WIDTH_TILES * TILE_SIZE - margin;
+    const maxY = ROOM_HEIGHT_TILES * TILE_SIZE - margin;
     const baseAngle = Math.atan2(this.y - this.target.y, this.x - this.target.x);
     const sign = Math.random() < 0.5 ? -1 : 1;
-    const rotation = Phaser.Math.DegToRad(70 + Math.random() * 40) * sign;
-    const angle = baseAngle + rotation;
-    const margin = TILE_SIZE * 1.5;
-    const x = Phaser.Math.Clamp(
-      this.target.x + Math.cos(angle) * DOPPELGANGER_KITE_DISTANCE,
-      margin,
-      ROOM_WIDTH_TILES * TILE_SIZE - margin,
-    );
-    const y = Phaser.Math.Clamp(
-      this.target.y + Math.sin(angle) * DOPPELGANGER_KITE_DISTANCE,
-      margin,
-      ROOM_HEIGHT_TILES * TILE_SIZE - margin,
-    );
-    return { x, y };
+    const flankDeg = 70 + Math.random() * 40;
+    const candidatesDeg = [
+      sign * flankDeg,
+      -sign * flankDeg,
+      sign * 135,
+      -sign * 135,
+      180,
+    ];
+    const minDistSq = SAFE_SPAWN_DISTANCE * SAFE_SPAWN_DISTANCE;
+    let best: { x: number; y: number } = { x: this.x, y: this.y };
+    let bestDistSq = -1;
+    for (const deg of candidatesDeg) {
+      const angle = baseAngle + Phaser.Math.DegToRad(deg);
+      const x = Phaser.Math.Clamp(
+        this.target.x + Math.cos(angle) * DOPPELGANGER_KITE_DISTANCE,
+        margin,
+        maxX,
+      );
+      const y = Phaser.Math.Clamp(
+        this.target.y + Math.sin(angle) * DOPPELGANGER_KITE_DISTANCE,
+        margin,
+        maxY,
+      );
+      const dSq = (x - this.target.x) ** 2 + (y - this.target.y) ** 2;
+      if (dSq >= minDistSq) return { x, y };
+      if (dSq > bestDistSq) {
+        bestDistSq = dSq;
+        best = { x, y };
+      }
+    }
+    return best;
   }
 
   private beginTelegraphAndFire(): void {
