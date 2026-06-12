@@ -267,19 +267,23 @@ export const ITEMS = {
   bloodlettersPact: {
     id: 'bloodlettersPact',
     displayName: "Bloodletter's Pact",
-    description: 'Foes no longer drop hearts. They bleed coins instead.',
+    description: '[Q] Sacrifice a heart container for +20% to a random stat.',
     textureKey: TextureKeys.ItemBloodlettersPact,
     pools: [ItemPool.Treasure],
-    // Pure drop-profile trade — deliberately no stat effects. Healing moves
-    // into the shop (heart slot, 3 coins), funded by the fatter coin
-    // stream: room-clear heart rolls become coins (DropSystem remap) and
-    // every enemy's coinDropChance is multiplied by 1.6 (BaseEnemy.die via
-    // the `coinDropMultiplier` registry slot). Boss-reward hearts, shop
-    // hearts and crate contents stay untouched — the pact reroutes
-    // healing, it doesn't delete it.
+    // Full rework 2026-06-12: V1 was a passive heart→coin economy trade
+    // (suppressHeartDrops + coinDropMult 1.6) — user playtest verdict "das
+    // item zerstört die komplette money economy". Now a repeatable [Q]
+    // active: each use removes one heart container (max HP −2, gate keeps
+    // the last container) and grants +20% on a seeded-random core stat
+    // (damage / fireRate / missileSpeed / moveSpeed). The granted stat-ups
+    // live in ItemSystem.sacrificialStatUps and carry across floors via
+    // RunCarryOver. The suppressHeartDrops/coinDropMult infrastructure
+    // stays in the codebase (tested, reusable) but no item uses it now.
     effects: [],
-    suppressHeartDrops: true,
-    coinDropMult: 1.6,
+    active: {
+      kind: ActiveItemKind.SacrificialStatUp,
+      statUpMult: 1.2,
+    },
   },
   transmutationStone: {
     id: 'transmutationStone',
@@ -305,18 +309,16 @@ export const ITEMS = {
   hummingbirdFeather: {
     id: 'hummingbirdFeather',
     displayName: 'Hummingbird Feather',
-    description: 'Rhythmic casts in one direction quicken the wand. Turning breaks the beat.',
+    description: 'The wand flutters — casts come as rapid triple bursts.',
     textureKey: TextureKeys.ItemHummingbirdFeather,
     pools: [ItemPool.Treasure],
-    // Wingbeat ramp: +5% fireRate per consecutive cast in the SAME
-    // direction, capped at +40% (reached after 8 beats). Direction switch
-    // or a dropped cadence resets to base — the power lives in committing
-    // to a firing axis, which is exactly the tunnel-vision risk the player
-    // pays for it. Ramp state lives on Player.applyFireRateRamp.
-    effects: [
-      { stat: 'fireRateRampPerCast', add: 0.05 },
-      { stat: 'fireRateRampMax', add: 0.4 },
-    ],
+    // Rework 2026-06-12 (was: fire-rate ramp on same-direction casts —
+    // user wanted bursts instead): each cast trigger fires a 3-shot burst
+    // (BURST_SHOT_GAP_MS apart, direction locked at trigger), with the
+    // between-burst cooldown stretched to BURST_COOLDOWN_FACTOR × base
+    // interval. Net ≈ +25% sustained DPS with front-loaded burst damage —
+    // the item changes the firing rhythm, not just the number.
+    effects: [{ stat: 'burstCount', add: 2 }],
   },
   // --- Active-Item — Blood of Marquis ---------------------------------------
   bloodOfMarquis: {

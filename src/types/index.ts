@@ -259,15 +259,15 @@ export interface PlayerStats {
    * einzelner Hit auf Trash ist 0.75× (Trade-off zwischen Boss-Killer und
    * Group-Clear). */
   multishotCount: number;
-  /** "Flügelschlag-Rhythmus": zusätzlicher fireRate-Faktor pro
-   * aufeinanderfolgendem Cast in DIESELBE Richtung. Base 0 = kein Ramp.
-   * Hummingbird Feather setzt das auf 0.05 (+5 % pro Cast). Der Ramp-State
-   * (Stack-Zähler, letzte Richtung) lebt auf der Player-Instanz analog zu
-   * den Missile-Modifiern; Reset bei Richtungswechsel oder Cast-Pause. */
-  fireRateRampPerCast: number;
-  /** Obergrenze des Ramp-Bonus als Faktor-Anteil (0.4 = max +40 % fireRate).
-   * Base 0. Nur relevant wenn `fireRateRampPerCast > 0`. */
-  fireRateRampMax: number;
+  /** Wie viele Schüsse ein Cast-Trigger als schnelle Salve abfeuert. Base 1
+   * = ein Schuss pro Cast. Hummingbird Feather setzt das auf 3 — der erste
+   * Schuss feuert sofort, die restlichen folgen im `BURST_SHOT_GAP_MS`-Takt
+   * in der beim Trigger gedrückten Richtung (die Salve committet, kein
+   * Re-Aim mid-burst). Der Cooldown ZWISCHEN Salven streckt sich auf
+   * `BURST_COOLDOWN_FACTOR` × Basis-Intervall, damit der Burst ein
+   * Rhythmus-Sidegrade bleibt statt purem ×3-DPS. Ersetzt den
+   * Fire-Rate-Ramp (User-Rework 2026-06-12). */
+  burstCount: number;
 }
 export type StatKey = keyof PlayerStats;
 
@@ -306,6 +306,12 @@ export const ActiveItemKind = {
    * Pure economy valve, no combat effect. Fails silently (no key, no
    * coin spend) when the player can't afford the cost. */
   TransmuteCoinsToKey: 'transmuteCoinsToKey',
+  /** Bloodletter's Pact [Q] (rework 2026-06-12, was a passive heart→coin
+   * economy trade that broke the money economy) — sacrifices one heart
+   * container (max HP −2) for a permanent `statUpMult` multiplier on ONE
+   * randomly picked core stat (damage / fireRate / missileSpeed /
+   * moveSpeed). Repeatable down to the last remaining heart container. */
+  SacrificialStatUp: 'sacrificialStatUp',
 } as const;
 export type ActiveItemKind = (typeof ActiveItemKind)[keyof typeof ActiveItemKind];
 
@@ -323,6 +329,9 @@ export interface ActiveItemSpec {
    * keys stay shop-buyable for 5 so a full wallet can't lock you out of
    * key access entirely). Default handled per-kind (20). */
   itemCost?: number;
+  /** For `sacrificialStatUp`: multiplier granted on the randomly picked
+   * stat per use. Default handled per-kind (1.2 = +20%). */
+  statUpMult?: number;
 }
 
 /**
@@ -387,16 +396,20 @@ export interface ItemDefinition {
    */
   metaUnlock?: string;
   /**
-   * When true, heart drops from room-clear rolls are converted to coins
-   * for the rest of the run (Bloodletter's Pact). Boss-reward hearts,
-   * shop heart slots and crate contents are deliberately unaffected —
-   * the trade moves healing into the shop, it doesn't remove it.
+   * When true, every physically dropped heart is converted to a coin for
+   * the rest of the run (room-clear rolls via DropSystem + the central
+   * remap in `GameScene.spawnPickup` covering boss rewards / crates /
+   * miniboss payouts; only the shop heart slot survives). DORMANT since
+   * the Bloodletter's-Pact rework to an active item (2026-06-12) — no
+   * item sets this anymore, infrastructure kept for future drop-profile
+   * items.
    */
   suppressHeartDrops?: boolean;
   /**
    * Multiplier on every enemy's `coinDropChance` (multiplicative across
    * items, applied in `BaseEnemy.die` via the `coinDropMultiplier`
-   * registry slot). Bloodletter's Pact sets 1.6.
+   * registry slot). DORMANT — see `suppressHeartDrops`; the old
+   * Bloodletter's Pact V1 set 1.6, which broke the money economy.
    */
   coinDropMult?: number;
 }

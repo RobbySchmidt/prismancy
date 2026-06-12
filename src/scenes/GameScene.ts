@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import {
   BASE_PLAYER_STATS,
+  BLOOD_PACT_HEART_COST,
   BURN_TICK_COUNT,
   CAMERA_ZOOM,
   DUNGEON_TARGET_ROOM_COUNT,
@@ -91,6 +92,7 @@ import {
   type ItemDefinition,
   type PickupSnapshot,
   type RoomDescriptor,
+  type StatKey,
 } from '../types';
 import { ITEMS, pickItemFromPool, type ItemId } from '../data/items';
 import { pickBossForFloor } from '../data/bosses';
@@ -110,6 +112,12 @@ export interface RunCarryOver {
   keys: number;
   pickedItemIds: readonly string[];
   gemFloorIds: readonly string[];
+  /** Bloodletter's-Pact stat-ups bought with heart containers, in
+   * activation order. Replayed via `ItemSystem.grantSacrificialStatUp` on
+   * the next floor — unlike item effects they can't be reconstructed from
+   * `pickedItemIds` (runtime-granted, not item-bound). The matching max-HP
+   * cost carries automatically through `healthMax`. */
+  sacrificialStatUps?: readonly StatKey[];
 }
 
 export interface GameSceneInitData {
@@ -273,6 +281,9 @@ export class GameScene extends Phaser.Scene {
    * (`${dungeonSeed}-transmute-${n}`) — same-seed runs replay the same
    * conversion sequence. Reset in the SHUTDOWN block. */
   private transmuteRollCount = 0;
+  /** Per-run counter seeding the Bloodletter's-Pact stat rolls
+   * (`${dungeonSeed}-bloodpact-${n}`). Reset in the SHUTDOWN block. */
+  private bloodPactUseCount = 0;
   /** [Q] active-item activation. JustDown-polled in update so a held key
    * doesn't double-fire — the activation drops HP and we don't want the
    * second tick to drop it past zero. */
@@ -524,6 +535,14 @@ export class GameScene extends Phaser.Scene {
         co.pickedItemIds,
         (id) => (ITEMS as Record<string, ItemDefinition | undefined>)[id],
       );
+      // Replay Bloodletter's-Pact stat-ups (runtime-granted, not item-bound
+      // — the item replay above only re-equips the [Q] slot). The mult is
+      // resolved from the CURRENT item spec so a tuning change applies on
+      // the next floor instead of fossilizing in the snapshot.
+      const pactMult = ITEMS.bloodlettersPact.active?.statUpMult ?? 1.2;
+      for (const stat of co.sacrificialStatUps ?? []) {
+        this.itemSystem.grantSacrificialStatUp(stat, pactMult);
+      }
       this.inventory.hydrate({ coins: co.coins, keys: co.keys, gems: co.gemFloorIds });
       this.player.health.restore(co.healthCurrent, co.healthMax);
     }
@@ -696,6 +715,7 @@ export class GameScene extends Phaser.Scene {
       this.interactKey = null;
       this.activeItemKey = null;
       this.transmuteRollCount = 0;
+      this.bloodPactUseCount = 0;
       this.restartHoldStartedAt = null;
       this.restartKey = null;
       this.pauseKey = null;
@@ -949,6 +969,7 @@ export class GameScene extends Phaser.Scene {
       keys: this.inventory.getKeys(),
       pickedItemIds: Array.from(this.itemSystem.getPickedIds()),
       gemFloorIds: Array.from(this.inventory.getGems()),
+      sacrificialStatUps: Array.from(this.itemSystem.getSacrificialStatUps()),
     };
   }
 
@@ -1157,8 +1178,20 @@ export class GameScene extends Phaser.Scene {
    * register it with the run-wide pickups group. Returns the spawned
    * pickup, or `null` for kinds we don't physically drop yet (HalfHeart /
    * Item).
+   *
+   * Heart-suppression remap: while `ItemSystem.isHeartDropSuppressed()` is
+   * true, EVERY heart that would physically drop becomes a coin — boss
+   * rewards, crate contents, miniboss payouts, restored pendingPickups.
+   * This factory is the single chokepoint for all of those; only the shop
+   * heart slot (own spawn path, `spawnShopHeart`) bypasses it. NOTE: since
+   * the Bloodletter's-Pact rework to an active item (2026-06-12) no item
+   * sets `suppressHeartDrops` anymore — the remap is dormant infrastructure
+   * kept for future drop-profile items.
    */
   spawnPickup(kind: PickupKind, x: number, y: number): BasePickup | null {
+    if (kind === PickupKind.Heart && this.itemSystem?.isHeartDropSuppressed()) {
+      kind = PickupKind.Coin;
+    }
     let pickup: BasePickup | null = null;
     switch (kind) {
       case PickupKind.Heart:
@@ -2511,6 +2544,13 @@ export class GameScene extends Phaser.Scene {
         if (!ok) return;
         break;
       }
+      case 'sacrificialStatUp':
+        // Must keep at least one heart container AFTER paying the cost —
+        // the pact removes capacity, it must never reduce the player to a
+        // zero-heart HUD. Mirrored in ActiveItemSlot.refreshUsable.
+        if (this.player.health.getMax() < BLOOD_PACT_HEART_COST + 2) return;
+        this.executeSacrificialStatUp(equipped.statUpMult ?? 1.2);
+        break;
       default:
         // Unknown kind — defensive against a future ActiveItemKind being
         // added to the type without a switch arm here.
@@ -2670,6 +2710,61 @@ export class GameScene extends Phaser.Scene {
     // Screen-wide red wash + camera shake to sell the cost.
     this.cameras.main.flash(220, 200, 30, 50, false);
     this.cameras.main.shake(280, 0.008);
+  }
+
+  /**
+   * Bloodletter's Pact [Q] — sacrifice one heart container (max HP −2) for
+   * a permanent `mult` on ONE randomly picked core stat. The roll is
+   * seeded per run + use counter so a replayed seed buys the same stat
+   * sequence. Repeatable until only one container remains (gate lives in
+   * `tryActivateActiveItem`). The stat-up registers in ItemSystem so the
+   * floor-transition carry-over can replay it; the HP cost carries
+   * automatically through the `healthMax` snapshot.
+   */
+  private executeSacrificialStatUp(mult: number): void {
+    this.player.health.removeMaxHealth(BLOOD_PACT_HEART_COST);
+
+    const candidates: readonly StatKey[] = ['damage', 'fireRate', 'missileSpeed', 'moveSpeed'];
+    const rng = new RNG(`${this.dungeonSeed}-bloodpact-${this.bloodPactUseCount}`);
+    this.bloodPactUseCount++;
+    const stat = rng.pick(candidates);
+    this.itemSystem.grantSacrificialStatUp(stat, mult);
+
+    // Feedback: crimson ring (blood cost) + floating "+20% DAMAGE" label
+    // drifting up from the player, plus a brief red wash. The label is the
+    // important part — the player must SEE which stat the blood bought.
+    this.spawnTransmuteRing(0xc8284a, 3.6);
+    const STAT_LABELS: Record<string, string> = {
+      damage: 'DAMAGE',
+      fireRate: 'FIRE RATE',
+      missileSpeed: 'MISSILE SPEED',
+      moveSpeed: 'MOVE SPEED',
+    };
+    const label = this.add
+      .text(
+        this.player.x,
+        this.player.y - 34,
+        `+${Math.round((mult - 1) * 100)}% ${STAT_LABELS[stat] ?? stat.toUpperCase()}`,
+        {
+          fontSize: '15px',
+          color: '#ff6070',
+          fontStyle: 'bold',
+          stroke: '#1a0208',
+          strokeThickness: 4,
+        },
+      )
+      .setOrigin(0.5, 0.5)
+      .setDepth(DepthLayers.HUD);
+    this.tweens.add({
+      targets: label,
+      y: label.y - 30,
+      alpha: { from: 1, to: 0 },
+      duration: 1400,
+      ease: 'Sine.In',
+      onComplete: () => label.destroy(),
+    });
+    this.cameras.main.flash(180, 160, 20, 40, false);
+    getSfxSynth().playPlayerHit();
   }
 
   /**
@@ -3532,39 +3627,14 @@ export class GameScene extends Phaser.Scene {
         ),
       );
     }
-    // Staged rewards (2026-06-12): elite rooms pay a guaranteed pickup,
-    // miniboss rooms a chance-gated pedestal or a pickup bundle — risk
-    // ladder reads mob room < elite < miniboss < boss.
-    if (desc.elite) this.spawnEliteClearReward(desc);
+    // Staged rewards (2026-06-12): miniboss rooms pay a chance-gated
+    // pedestal or a pickup bundle. Elite rooms pay ONLY through the
+    // champion itself (guaranteed coin + 3-coin death burst) — the
+    // additional room-clear pickup was double-dipping (user playtest:
+    // "da reicht der champion drop völlig aus").
     if (desc.miniboss) this.spawnMinibossClearReward(desc);
 
     EventBus.emit('floor:roomCleared', { roomId: this.currentRoomId });
-  }
-
-  /**
-   * Guaranteed elite-room clear reward — seeded weighted roll between a
-   * heart, a key, and a small coin spray. Spawned at room center with
-   * spawn protection so the payout is readable before it's hoovered up.
-   */
-  private spawnEliteClearReward(desc: RoomDescriptor): void {
-    const center = this.currentRoom.getCenter();
-    const rng = new RNG(`${this.dungeonSeed}-elite-reward-${desc.id}`);
-    const reward = rng.pickWeighted([
-      { kind: 'heart', weight: 4 },
-      { kind: 'key', weight: 2.5 },
-      { kind: 'coins', weight: 3.5 },
-    ] as const);
-    if (reward.kind === 'coins') {
-      for (let i = 0; i < 3; i++) {
-        this.spawnPickup(PickupKind.Coin, center.x + (i - 1) * 36, center.y)?.setSpawnProtection(700);
-      }
-      return;
-    }
-    this.spawnPickup(
-      reward.kind === 'heart' ? PickupKind.Heart : PickupKind.Key,
-      center.x,
-      center.y,
-    )?.setSpawnProtection(700);
   }
 
   /**

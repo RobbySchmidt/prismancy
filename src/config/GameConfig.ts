@@ -1226,18 +1226,30 @@ export const BASE_PLAYER_STATS: PlayerStats = {
   homingTurnRate: 0,
   burnDamageFactor: 0,
   multishotCount: 1,
-  fireRateRampPerCast: 0,
-  fireRateRampMax: 0,
+  burstCount: 1,
 };
 
 /**
- * Fire-rate-ramp rhythm break ("Hummingbird Feather"): when the gap since
- * the last cast exceeds this multiple of the character's un-ramped fire
- * interval, the ramp stack resets — releasing the cast key breaks the
- * wingbeat rhythm just like switching direction does. 2.5 leaves room for
- * one dropped beat (knockback, brief reposition) without punishing it.
+ * Triple-burst cadence ("Hummingbird Feather", replaced the fire-rate ramp
+ * 2026-06-12). Gap between the shots WITHIN one burst — fast enough to
+ * read as a flutter, slow enough that the three projectiles stay visually
+ * distinct in flight.
  */
-export const FIRE_RATE_RAMP_BREAK_FACTOR = 2.5;
+export const BURST_SHOT_GAP_MS = 80;
+/**
+ * Cooldown stretch BETWEEN bursts, as a factor on the character's normal
+ * fire interval. At 2.4 the wizard fires 3-shot bursts every 600 ms
+ * (vs 1 shot / 250 ms base) = +25% sustained DPS plus front-loaded burst
+ * damage — an upgrade, but a rhythm-changing one, not a flat ×3.
+ */
+export const BURST_COOLDOWN_FACTOR = 2.4;
+
+/**
+ * Bloodletter's Pact [Q] (active rework 2026-06-12): max-HP cost per use in
+ * HP units (2 = one full heart container). The activation gate requires
+ * max HP ≥ cost + 2 so the player always keeps at least one container.
+ */
+export const BLOOD_PACT_HEART_COST = 2;
 
 /** Damage-Multiplier pro Multishot-Shot wenn `multishotCount > 1`. Single
  * shot bleibt 1.0× damage, alles ab 2 Shots fired bei 0.80×/Shot. So

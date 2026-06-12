@@ -5,7 +5,8 @@ import {
   DASH_INVINCIBILITY_MS,
   DASH_SPEED,
   HIT_FLASH_DURATION_MS,
-  FIRE_RATE_RAMP_BREAK_FACTOR,
+  BURST_COOLDOWN_FACTOR,
+  BURST_SHOT_GAP_MS,
   HIT_FLASH_TINT_PLAYER,
   KNOCKBACK_DURATION_MS,
   MISSILE_FIRE_INTERVAL_MS,
@@ -100,17 +101,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly stats: StatsSystem;
   private nextFireAt = 0;
   private knockbackUntil = 0;
-
-  // --- Fire-rate ramp ("Hummingbird Feather") -------------------------------
-  // Per-instance rhythm state, analogous to how missile-modifier mechanics
-  // live on the missile instance: StatsSystem owns the tunables
-  // (`fireRateRampPerCast` / `fireRateRampMax`), the player owns the beat
-  // counter. Stacks build on consecutive casts in the SAME direction and
-  // reset on a direction switch or a broken cadence (gap > break factor ×
-  // un-ramped interval).
-  private rampStacks = 0;
-  private lastCastDir: Direction | null = null;
-  private lastCastAt = Number.NEGATIVE_INFINITY;
 
   // --- Dash state (Spellblade only) -----------------------------------------
   /** Timestamp at which the current dash burst ends. Move input is
@@ -222,48 +212,44 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (time < this.nextFireAt) return;
     const dir: Direction | null = this.inputManager.getShootDirection();
     if (!dir) return;
-    const fireRate = this.applyFireRateRamp(this.stats.getEffective('fireRate'), dir, time);
-    if (this.character === 'spellblade') {
-      this.fireSpellbladeBolt(dir, time, fireRate);
-    } else {
-      this.fireWizardMissile(dir, time, fireRate);
-    }
-  }
-
-  /**
-   * Hummingbird-Feather wingbeat ramp. Each consecutive cast in the SAME
-   * direction adds `fireRateRampPerCast` to the fire-rate factor, capped at
-   * `fireRateRampMax`; switching direction or dropping the cadence (gap
-   * longer than `FIRE_RATE_RAMP_BREAK_FACTOR` un-ramped intervals) resets
-   * the rhythm. No-op (returns `fireRate` untouched) while no ramp item is
-   * held. The first cast of a streak fires at base rate — stacks reward the
-   * beats AFTER the commitment, not the commitment itself.
-   */
-  private applyFireRateRamp(fireRate: number, dir: Direction, time: number): number {
-    const perCast = this.stats.getEffective('fireRateRampPerCast');
-    if (perCast <= 0) {
-      this.lastCastDir = dir;
-      this.lastCastAt = time;
-      return fireRate;
-    }
-    const baseInterval =
-      (this.character === 'spellblade'
+    const fireRate = this.stats.getEffective('fireRate');
+    const baseMs =
+      this.character === 'spellblade'
         ? SPELLBLADE_BOLT_FIRE_INTERVAL_MS
-        : MISSILE_FIRE_INTERVAL_MS) / Math.max(fireRate, 0.01);
-    const rhythmBroken =
-      dir !== this.lastCastDir ||
-      time - this.lastCastAt > baseInterval * FIRE_RATE_RAMP_BREAK_FACTOR;
-    this.rampStacks = rhythmBroken ? 0 : this.rampStacks + 1;
-    this.lastCastDir = dir;
-    this.lastCastAt = time;
+        : MISSILE_FIRE_INTERVAL_MS;
+    const interval = fireRate > 0 ? baseMs / fireRate : baseMs;
 
-    const rampMax = this.stats.getEffective('fireRateRampMax');
-    return fireRate * (1 + Math.min(this.rampStacks * perCast, rampMax));
+    // Burst cadence ("Hummingbird Feather", replaced the fire-rate ramp
+    // 2026-06-12): shot 1 fires immediately, the remaining burst shots
+    // follow at BURST_SHOT_GAP_MS spacing locked to the direction held at
+    // trigger time — the burst commits, no mid-burst re-aim. The cooldown
+    // between bursts stretches to BURST_COOLDOWN_FACTOR × interval so the
+    // item changes the firing RHYTHM instead of just multiplying DPS.
+    const burst = Math.max(1, Math.round(this.stats.getEffective('burstCount')));
+    this.castShot(dir);
+    for (let i = 1; i < burst; i++) {
+      this.scene.time.delayedCall(BURST_SHOT_GAP_MS * i, () => {
+        if (!this.active || !this.health.isAlive()) return;
+        this.castShot(dir);
+      });
+    }
+    this.nextFireAt = time + (burst > 1 ? interval * BURST_COOLDOWN_FACTOR : interval);
   }
 
-  /** Wizard cast — the original magic-missile orb. */
-  private fireWizardMissile(dir: Direction, time: number, fireRate: number): void {
-    const interval = fireRate > 0 ? MISSILE_FIRE_INTERVAL_MS / fireRate : MISSILE_FIRE_INTERVAL_MS;
+  /** Single shot dispatch — shared by the immediate cast and the scheduled
+   *  burst follow-ups. Stats are read per shot, so a mid-burst pickup
+   *  (theoretical) simply applies to the remaining shots. */
+  private castShot(dir: Direction): void {
+    if (this.character === 'spellblade') {
+      this.fireSpellbladeBolt(dir);
+    } else {
+      this.fireWizardMissile(dir);
+    }
+  }
+
+  /** Wizard cast — the original magic-missile orb. Cooldown bookkeeping
+   *  lives in `handleAttacking` (burst-aware); this only spawns the shot. */
+  private fireWizardMissile(dir: Direction): void {
     // Spawn from the body's world centre, not the texture origin. The hitbox
     // sits +12 px below the texture centre (so the robe is the hitbox, not the
     // hat) — when the player presses up against the top wall, the texture
@@ -292,7 +278,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         // inheritVx/inheritVy → MagicMissile.fire defaults them to 0.
       });
     }
-    this.nextFireAt = time + interval;
     this.spawnWandSparkle();
     getSfxSynth().playPlayerCast();
   }
@@ -306,10 +291,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
    * `SPELLBLADE_BOLT_DAMAGE_MULT` so each shot lands chunkier — base
    * 1 dmg × 1.5 = 1.5/shot.
    */
-  private fireSpellbladeBolt(dir: Direction, time: number, fireRate: number): void {
-    const interval = fireRate > 0
-      ? SPELLBLADE_BOLT_FIRE_INTERVAL_MS / fireRate
-      : SPELLBLADE_BOLT_FIRE_INTERVAL_MS;
+  private fireSpellbladeBolt(dir: Direction): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
     const shots = Math.max(1, Math.round(this.stats.getEffective('multishotCount')));
     const damagePerShot =
@@ -338,7 +320,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         bodyRadiusOverride: MISSILE_RADIUS,
       });
     }
-    this.nextFireAt = time + interval;
     this.spawnWandSparkle();
     getSfxSynth().playPlayerCast();
   }

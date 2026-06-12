@@ -1,4 +1,4 @@
-import { type ItemDefinition, type ItemModifier } from '../types';
+import { type ItemDefinition, type ItemModifier, type StatKey } from '../types';
 import { type ActiveItemSystem } from './ActiveItemSystem';
 import { MetaProgress } from './MetaProgress';
 import { type PlayerHealth } from './PlayerHealth';
@@ -128,5 +128,29 @@ export class ItemSystem {
 
   getCoinDropMultiplier(): number {
     return this.coinDropMultiplier;
+  }
+
+  // --- Sacrificial stat-ups (Bloodletter's Pact [Q], 2026-06-12) -------------
+
+  /** Stats bought with heart containers, in activation order. Snapshot for
+   * the floor-transition carry-over — unlike item effects these can't be
+   * replayed from `pickedItemIds` (they're runtime-granted, not item-bound). */
+  private readonly sacrificialStatUps: StatKey[] = [];
+
+  /**
+   * Apply a permanent `mult` multiplier on `stat` and record it for the
+   * carry-over snapshot. Used by the Bloodletter's Pact activation and by
+   * the floor-transition rehydrate (which replays the recorded list).
+   */
+  grantSacrificialStatUp(stat: StatKey, mult: number): void {
+    this.stats.applyModifier({
+      itemId: `sacrificial-stat-up-${this.sacrificialStatUps.length}`,
+      effects: [{ stat, mult }],
+    });
+    this.sacrificialStatUps.push(stat);
+  }
+
+  getSacrificialStatUps(): readonly StatKey[] {
+    return this.sacrificialStatUps;
   }
 }

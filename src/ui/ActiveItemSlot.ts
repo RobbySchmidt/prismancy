@@ -52,13 +52,16 @@ export class ActiveItemSlot {
   /** Cached so `refreshUsable` knows when to flip greyed → usable without
    *  forcing the caller to pass HP every time. */
   private currentHp = 0;
+  /** Cached max HP for the Bloodletter's-Pact gate (sacrifice requires at
+   *  least 2 heart containers so one always survives the cost). */
+  private currentMaxHp = 0;
   /** Cached coin count for the Transmutation Stone's affordability gate —
    *  kept fresh via `inventory:changed`. */
   private currentCoins = 0;
   private readonly playerHealth: PlayerHealth | null;
 
   private readonly equippedHandler: (payload: { itemId: string | null }) => void;
-  private readonly healthHandler: (payload: { current: number }) => void;
+  private readonly healthHandler: (payload: { current: number; max: number }) => void;
   private readonly inventoryHandler: (payload: { coins: number }) => void;
   private readonly activatedHandler: (payload: { itemId: string }) => void;
 
@@ -113,8 +116,9 @@ export class ActiveItemSlot {
     this.setVisibleAll(false);
 
     this.equippedHandler = ({ itemId }) => this.handleEquipped(itemId);
-    this.healthHandler = ({ current }) => {
+    this.healthHandler = ({ current, max }) => {
       this.currentHp = current;
+      this.currentMaxHp = max;
       this.refreshUsable();
     };
     this.inventoryHandler = ({ coins }) => {
@@ -142,6 +146,7 @@ export class ActiveItemSlot {
     this.playerHealth = (scene.registry.get('playerHealth') as PlayerHealth | undefined) ?? null;
     if (this.playerHealth) {
       this.currentHp = this.playerHealth.getCurrent();
+      this.currentMaxHp = this.playerHealth.getMax();
     }
     const inventory = scene.registry.get('inventory') as Inventory | undefined;
     if (inventory) {
@@ -183,11 +188,16 @@ export class ActiveItemSlot {
     if (this.currentItemId === null || !this.currentItemDef) return;
     const def = this.currentItemDef;
     // Per-kind cost gate, mirroring GameScene.tryActivateActiveItem:
-    // Echoes of Blood pays in HP, the Transmutation Stone in coins.
+    // Echoes of Blood pays in HP, the Transmutation Stone in coins, the
+    // Bloodletter's Pact in max HP (needs ≥ 2 heart containers so one
+    // always survives the sacrifice).
     const isTransmute = def.active?.kind === 'transmuteCoinsToKey';
+    const isSacrifice = def.active?.kind === 'sacrificialStatUp';
     const usable = isTransmute
       ? this.currentCoins >= (def.active?.coinCost ?? 5)
-      : this.currentHp >= MIN_HP_TO_ACTIVATE;
+      : isSacrifice
+        ? this.currentMaxHp >= 4
+        : this.currentHp >= MIN_HP_TO_ACTIVATE;
     // The stone auto-upgrades by wallet (≥ itemCost coins → random item
     // instead of key) — surface which conversion the next press fires so
     // the threshold switch never surprises the player.

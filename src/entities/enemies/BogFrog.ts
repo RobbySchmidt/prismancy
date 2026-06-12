@@ -29,6 +29,16 @@ export class BogFrog extends BaseEnemy {
 
   private aiState: FrogState = 'idle';
   private nextStateChangeAt = 0;
+  /**
+   * Authored scale captured at the first telegraph — WORLD_SPRITE_SCALE for
+   * a normal frog, the elite-promoted scale for a champion. The cheek-puff
+   * tween + its reset MUST be relative to this: the old absolute values
+   * (tween to 1.12, reset to `setScale(1, 1)`) shrank every frog to scale
+   * 1.0 after its first shot and nuked the champion's ×1.5 entirely
+   * (user-flagged 2026-06-12: "champions sind so klein wie normale mobs").
+   */
+  private baseScaleX = 0;
+  private baseScaleY = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -71,11 +81,17 @@ export class BogFrog extends BaseEnemy {
     this.aiState = 'telegraph';
     this.nextStateChangeAt = time + BOG_FROG_TELEGRAPH_MS;
     EventBus.emit('enemy:charge');
+    // Lazy capture (promoteToElite runs right after construction, well
+    // before the first telegraph, so this sees the final scale).
+    if (this.baseScaleX === 0) {
+      this.baseScaleX = this.scaleX;
+      this.baseScaleY = this.scaleY;
+    }
     // Cheek-puff: scale up slightly so the player sees a wind-up.
     this.scene.tweens.add({
       targets: this,
-      scaleX: 1.12,
-      scaleY: 0.94,
+      scaleX: this.baseScaleX * 1.12,
+      scaleY: this.baseScaleY * 0.94,
       duration: BOG_FROG_TELEGRAPH_MS,
       ease: 'Sine.Out',
     });
@@ -84,7 +100,7 @@ export class BogFrog extends BaseEnemy {
   private fireTongue(time: number): void {
     // Reset scale from the telegraph tween.
     this.scene.tweens.killTweensOf(this);
-    this.setScale(1, 1);
+    this.setScale(this.baseScaleX, this.baseScaleY);
 
     const dx = this.target.x - this.x;
     const dy = this.target.y - this.y;

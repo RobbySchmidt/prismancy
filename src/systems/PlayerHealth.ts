@@ -108,6 +108,22 @@ export class PlayerHealth {
   }
 
   /**
+   * Lower max HP by `amount` (self-sacrifice costs — Bloodletter's Pact [Q]
+   * trades a heart container for a stat-up). Floors at 2 HP (one heart
+   * container) defensively; the activation gate in GameScene already
+   * requires max ≥ amount + 2 so the floor shouldn't be hit in practice.
+   * Current HP is clamped to the new max but never dropped below 1 — the
+   * sacrifice removes capacity, it can't kill. Emits `healthChanged` so
+   * the HUD sheds the heart immediately.
+   */
+  removeMaxHealth(amount: number): void {
+    if (amount <= 0 || !this.isAlive()) return;
+    this.max = Math.max(2, this.max - amount);
+    this.current = Math.max(1, Math.min(this.current, this.max));
+    EventBus.emit('player:healthChanged', { current: this.current, max: this.max });
+  }
+
+  /**
    * Lock max HP at `cap` for the rest of the run and clamp current/max to
    * that value. Used by glass-cannon items (Blood of Marquis) that trade
    * all HP-up potential for a stat burst. Idempotent — a second call with
