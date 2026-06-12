@@ -339,7 +339,7 @@ Vorgängerdesign **Vampire Twins** (Crimson Lord melee + Sapphire Marquis mage, 
 **Ziel:** Aus dem Prototyp ein Spiel machen.
 
 - [x] **Sound-Effects** — komplett 2026-05-08. 20 prozedurale 8-bit Web-Audio-Recipes in `src/systems/SfxSynth.ts` (kein File-Asset). Player-Cast/Hit, Pickup-Family (coin/key/heart/item/gem), Enemy-Cast (throttled) + Hit + Charge (gehookt an 7+ Telegraph-Punkte), Boss-Death, Door-Open/Close/Unlock + Floor-Teleport, Marquis-Mirror-Special, Prism-Special-Cast (auch GemSeal-Activation), Prism-Explosion. Volle Recipe-Doku + Wiring-Spots in `SFX_BRIEF.md` Repo-Root. Siehe SFX-System-Block unten.
-- [x] **Background-Music pro Floor** — komplett. 8 echte AI-generierte MP3-Tracks (Suno) in `public/audio/music/` + `MusicManager` singleton mit RAF-basierten Crossfades + Floor-/Boss-/EndScene-Wiring. Siehe Audio-System-Block.
+- [x] **Background-Music pro Floor** — komplett. 10 echte AI-generierte MP3-Tracks (Suno) in `public/audio/music/` (inkl. geteiltem Miniboss-Theme `mini-boss.mp3`, 2026-06-12) + `MusicManager` singleton mit RAF-basierten Crossfades + Floor-/Boss-/Miniboss-/EndScene-Wiring. Siehe Audio-System-Block.
 - [~] Partikel-Effekte (Blut, Explosionen, Item-Aura) — **Blut** done (`spawnBloodParticles` aus `enemy:hit` event, 5 rote drops mit gravity-arc); **Burn-Flames** done (`spawnFlameParticle` aus `enemy:burnTick`, gold/orange flicker upward). Item-Aura + Explosions noch offen.
 - [~] Hauptmenü, Pause-Menü, Settings (Volume, Keybindings) — **Pause-Menü** live (Phase 5 Polish), **Hauptmenü** komplett umgebaut (vertikales Menü mit Hover + Keyboard-Nav, siehe MainMenu-Block unten), **Sound-Settings** als Overlay live (Master-Volume-Slider in `SoundSettingsScene`), **Controls-Overlay** als read-only Liste live (`ControlsScene`). Echtes Keybinding-Remap noch nicht implementiert (UI-mäßig out-of-scope für die meisten Indie-Games).
 - [x] **Missile-Modifikatoren (Multishot, Piercing, Burn-DoT)** — Phase-6-Einstieg 2026-05-07. Splitting bewusst weggelassen. Drei Items: **Magic Shard** (Shop, 15 Coins, +piercingCount 2 → 100/75/50% damage über 3 Hits), **Wizard Glasses** (Boss-Pool floor-agnostic, +multishotCount 1 = 2 parallele Bolts à 80% damage / +10% missileSpeed — **Homing-Effekt 2026-05-09 entfernt**, siehe unten), **Fire Orb** (Treasure, +burnDamageFactor 0.30 → 30% des Hit-Damages über 2 Ticks à 600 ms). Synergien (Pierce × Burn → jeder Pierce-Hit ignites; Multishot × Pierce → beide Bolts piercen unabhängig durch Mob-Lines) sind explizit erlaubt. Missile-Modifier sind reguläre StatsSystem-Stats (`piercingCount`, `homingTurnRate`, `burnDamageFactor`, `multishotCount`); Missile liest sie pro `fire()` aus, alle pro-Frame-Mechanik (Homing-Turning, Pierce-Tracking via `hitEnemies` Set) lebt auf der Missile-Instanz. **Homing-Mechanik bleibt im Code aktiv** (`homingTurnRate` Stat + `MagicMissile.tickHoming` + `EnemyProjectile.setHoming` für Cursed Mirror / Lord Onyx / Marquis-Mirror-Special) — sie ist nur kein Player-grantbares Item mehr.
@@ -864,13 +864,14 @@ Alle drei Texturen prozedural in PreloadScene (64×64, deutlich größere Silhou
 **Stack:** Echte AI-generierte MP3-Tracks (Suno) + ein scene-unabhängiger MusicManager-Singleton mit RAF-basierten Crossfades. Ersetzt einen früheren prozeduralen Web-Audio-Versuch (3 Tracks, lookahead-Scheduler) der wieder rausgeflogen ist — proceduraler Sound passte nicht zum painterly Aesthetic. Git-History hat den prozeduralen Code falls je benötigt; aktuell ist nur das echte-Track-System aktiv.
 
 ### Track-Files
-**Location:** `public/audio/music/` (Vite serves `public/` als root). 9 erwartete Tracks:
+**Location:** `public/audio/music/` (Vite serves `public/` als root). 10 erwartete Tracks:
 - `title.mp3` — Title-Theme, läuft auf MainMenuScene
 - `floor-emerald.mp3` / `boss-emerald.mp3` — Floor 1 idle / Boss
 - `floor-sapphire.mp3` / `boss-sapphire.mp3` — Floor 2 idle / Boss
 - `floor-onyx.mp3` — Floor 3 idle
 - `boss-marquis-of-mirages.mp3` — Onyx Standard-Boss
 - `boss-the-prismarch.mp3` — Secret Endboss
+- `mini-boss.mp3` — **geteiltes Miniboss-Theme** (alle 3 Minibosse, floor-übergreifend — 2026-06-12)
 - `victory-credits.mp3` — Run-Finale-Theme, läuft auf EndScene (beide variants — full + incomplete)
 
 Filenames sind **content-based** (nicht "boss-onyx" etc.) damit erkennbar bleibt was wo läuft. `MusicTrackKey` in `MusicManager.ts` ist auf diese Filenames gemappt — bei Rename muss beides synchronisiert werden.
@@ -906,11 +907,12 @@ Erster Page-Load: Audio gesperrt → Title-Musik wird **nicht** abgespielt. Ein 
 - **GameScene.create** — startet Floor-Track basierend auf `currentFloorId` via `floorIdToFloorTrack(floorId)`.
 - **GameScene.spawnBossForRoom** + **devSpawnBoss** + **spawnLordOnyxInCurrentRoom** — alle rufen `switchToBossTrack(boss.displayName)` direkt nach `boss:spawned` Event. Predikat `displayName === 'The Prismarch'` routet auf `boss-the-prismarch`-Track, sonst pro Floor via `bossTrackForFloor(floorId, isPrismarch)`.
 - **GameScene.handleBossKilled** — switcht zurück zum Floor-Track. Prismarch-Branch geht zu `handleLordOnyxKilled` der `transitionToEndScene('full')` triggert (kein switch-back).
+- **Miniboss-Track (2026-06-12)** — `minibossSpawnedMusicHandler` / `minibossGoneMusicHandler` hängen an der `miniboss:spawned` / `miniboss:gone` Event-Familie (gleiche Events wie die Silber-HP-Bar, emittiert aus BaseEnemy via `EnemyDefinition.miniboss`-Tag). Spawn → Crossfade auf `mini-boss`, gone → zurück zum Floor-Track. Gone-Handler gated auf `!inTransition && player.health.isAlive()` — nach Player-Death hat `handlePlayerDied` schon zu Stille gefadet, und während einer Floor-Transition owned die nächste Scene die Musik (Resurrect wäre in beiden Fällen falsch). Dev-Spawns ([B]-Menü, `__wiz.spawnMiniboss`) kriegen den Switch gratis weil die Emission im BaseEnemy-Constructor lebt.
 - **GameScene.handlePlayerDied** — `stop(scene, { fadeMs: 800 })` damit der GameOver-Banner in Stille landet.
 - **GameScene.transitionToEndScene** — `stop(scene, { fadeMs: 600 })` parallel zum Camera-Fade. EndScene picked das Credits-Theme mit cinematic swell-in auf der anderen Seite des Fades.
 - **EndScene.create** — `playTrack(this, 'victory-credits', { firstPlayFadeMs: 1600 })` startet sofort wenn die Scene aufgeht (Headline-Fade-In synchron). **EndScene.returnToMenu** — `stop(this, { fadeMs: 600 })` beim manuellen Back-to-Menu, MainMenu's Title-Track picked up.
 - **PauseScene.create** — `duck()` beim Open, **PauseScene.resumeGame** + **PauseScene.quitToMainMenu** — `unduck()` beim Schließen.
-- **PreloadScene.preload** — `loadMusicTracks()` queue't alle 9 Tracks via `this.load.audio(key, ...)`. Fehlende Files werfen `loaderror` aber crashen nicht — `MusicManager.playTrack` checkt `cache.audio.exists` vor dem Switch und behält bei Miss den current Track.
+- **PreloadScene.preload** — `loadMusicTracks()` queue't alle 10 Tracks via `this.load.audio(key, ...)`. Fehlende Files werfen `loaderror` aber crashen nicht — `MusicManager.playTrack` checkt `cache.audio.exists` vor dem Switch und behält bei Miss den current Track.
 
 ### MainMenu-Redesign (Phase 6 — 2026-05-08)
 Komplett vom alten "PRESS SPACE OR ENTER" Center-Prompt-Layout auf ein **vertikales Menü links** umgestellt. Items:
@@ -967,7 +969,7 @@ GemPickup + ItemPickup haben extra `setScale(1.8 * WORLD_SPRITE_SCALE)` für die
 
 **`CAMERA_ZOOM = 1.0`** in `GameConfig.ts` — bewusst NICHT 1.25, weil Camera-Zoom + scrollender Raum den Spielfeld-Überblick zerstört (kritisch für Bullet-Hell auf Floor 2+). Sprites werden via WORLD_SPRITE_SCALE größer dargestellt, der Raum bleibt immer komplett sichtbar.
 
-**`StyleMockupScene`** (`src/scenes/StyleMockupScene.ts`) — dev-only mockup viewer im MainMenu via `M` taste (gegated mit `import.meta.env.DEV`). 4 pages, TAB cycles:
+**`StyleMockupScene`** (`src/scenes/StyleMockupScene.ts`) — dev-only mockup viewer im MainMenu via **`K`-Taste** (gegated mit `import.meta.env.DEV`; war historisch `M`, die gehört jetzt dem Title-Music-Hint — der alte Bind war dadurch eine Weile komplett unerreichbar, gefixt 2026-06-12). 8 pages, TAB cycles. **Page 8 (2026-06-12): Miniboss-Variant-Mockup** — zwei Reihen (Thornwood Shambler oben / Mire Lurker unten), je CURRENT (live Texture, 1.9×) + 3 gemalte Design-Richtungen: Shambler **A Elder Treant** (tall trunk + Antler-Crown + Heartwood-Glow-Crack), **B Bark Brute** (hunched Knuckle-Walker-Golem + Emerald-Chest-Rune), **C Bramble Stag** (Quadruped-Thorn-Beast mit Branch-Antlers); Lurker **A Bog Maw** (surfacing Croc-Maw + Teeth-Ridge + Angler-Lure), **B Mire Serpent** (raised Head + Coil-Humps + Biolume-Spine-Dots), **C Drowned Shade** (ghostly Weed-Wraith mit Triple-Eye-Cluster — passt zur Submerge/Intangible-Mechanik). User-Anlass: "die ersten beiden Minibosse passen visuell nicht zum Game". Gewählte Variante wird wie bei Prismarch/Marquis nach PreloadScene portiert. Die ersten Pages:
 1. *Backdrop comparison*: links current (real in-game textures) vs rechts proposed (painterly redo). Useful für visual style discussions.
 2. *Emerald Showcase*: Wizard vs. Pixie Queen full-screen painted gameplay frame mit allen Atmospheric Layers + Combat-Effects + Boss HP Bar.
 3. *Sapphire Showcase*: Wizard vs. Toad Sovereign mit cyan halos + sapphire-themed atmospheres.

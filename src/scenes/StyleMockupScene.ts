@@ -14,8 +14,8 @@ import {
 import { FLOORS } from '../data/floors';
 import { RNG } from '../utils/RNG';
 
-type MockupPage = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-const PAGE_COUNT = 7;
+type MockupPage = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+const PAGE_COUNT = 8;
 
 /**
  * Visual mockup with four pages, switched via TAB:
@@ -122,6 +122,14 @@ export class StyleMockupScene extends Phaser.Scene {
           `Page 7/${PAGE_COUNT} Â· Current pixel-art vs. 4 painterly redesigns`,
         );
         this.paintShowcaseWizardVariants();
+        break;
+      case 7:
+        this.paintHeader(
+          cx,
+          'MINIBOSS VARIANT MOCKUP',
+          `Page 8/${PAGE_COUNT} - Shambler (top) + Lurker (bottom), current vs. 3 directions each`,
+        );
+        this.paintShowcaseMinibossVariants();
         break;
     }
     this.paintFooter(cx);
@@ -4681,6 +4689,797 @@ export class StyleMockupScene extends Phaser.Scene {
       g.fillStyle(TIP_HALO, 0.85);
       g.fillRect(bx + 32 + dx, top + 50 + dy, 1, 1);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // PAGE 8 — Miniboss variant mockup (Thornwood Shambler + Mire Lurker)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Two rows of 4 slots: row 1 = Thornwood Shambler (Emerald), row 2 =
+   * Mire Lurker (Sapphire). First slot each renders the LIVE ingame
+   * texture for an honest comparison; the other three are painted design
+   * directions. Same workflow as the Prismarch/Marquis variant pages —
+   * the picked variant gets ported to PreloadScene as the real texture.
+   */
+  private paintShowcaseMinibossVariants(): void {
+    const centers = [120, 360, 600, 840];
+    const row1Top = 96;
+    const row2Top = 312;
+
+    const shamblerSlots: Array<{
+      title: string;
+      lines: readonly string[];
+      paint: (cx: number, cy: number) => void;
+    }> = [
+      {
+        title: 'CURRENT',
+        lines: ['Live ingame texture', '(64x64, blob trunk).'],
+        paint: (cx, cy) => this.paintMinibossCurrent(cx, cy, TextureKeys.MinibossThornwoodShambler, 0x6effa0),
+      },
+      {
+        title: 'A — ELDER TREANT',
+        lines: ['Tall treant: antler crown,', 'glowing heartwood crack.'],
+        paint: (cx, cy) => this.drawShamblerVariantTreant(cx, cy),
+      },
+      {
+        title: 'B — BARK BRUTE',
+        lines: ['Hulking golem: knuckle walk,', 'emerald rune chest.'],
+        paint: (cx, cy) => this.drawShamblerVariantBrute(cx, cy),
+      },
+      {
+        title: 'C — BRAMBLE STAG',
+        lines: ['Thorn-beast: branch antlers,', 'vine-wrapped flanks.'],
+        paint: (cx, cy) => this.drawShamblerVariantStag(cx, cy),
+      },
+    ];
+
+    const lurkerSlots: typeof shamblerSlots = [
+      {
+        title: 'CURRENT',
+        lines: ['Live ingame texture', '(64x64, flat hump).'],
+        paint: (cx, cy) => this.paintMinibossCurrent(cx, cy, TextureKeys.MinibossMireLurker, 0x4ad8ff),
+      },
+      {
+        title: 'A — BOG MAW',
+        lines: ['Surfacing maw: teeth ridge,', 'glowing angler lure.'],
+        paint: (cx, cy) => this.drawLurkerVariantMaw(cx, cy),
+      },
+      {
+        title: 'B — MIRE SERPENT',
+        lines: ['Raised head + coil humps,', 'biolume spine dots.'],
+        paint: (cx, cy) => this.drawLurkerVariantSerpent(cx, cy),
+      },
+      {
+        title: 'C — DROWNED SHADE',
+        lines: ['Ghostly weed-wraith — fits', 'the submerge/intangible kit.'],
+        paint: (cx, cy) => this.drawLurkerVariantShade(cx, cy),
+      },
+    ];
+
+    for (let i = 0; i < 4; i++) {
+      this.paintMinibossSlot(centers[i]!, row1Top, 0x4a9a50, shamblerSlots[i]!);
+      this.paintMinibossSlot(centers[i]!, row2Top, 0x2d6a88, lurkerSlots[i]!);
+    }
+  }
+
+  /** One framed variant slot: title, hero painting on a glow pad, 2 desc lines. */
+  private paintMinibossSlot(
+    sx: number,
+    topY: number,
+    accent: number,
+    slot: { title: string; lines: readonly string[]; paint: (cx: number, cy: number) => void },
+  ): void {
+    const halfW = 105;
+    const slotH = 204;
+    const mobY = topY + 102;
+
+    const frame = this.add.graphics();
+    frame.fillStyle(0x0a0418, 0.6);
+    frame.fillRect(sx - halfW, topY, halfW * 2, slotH);
+    frame.lineStyle(1, accent, 0.45);
+    frame.strokeRect(sx - halfW, topY, halfW * 2, slotH);
+
+    // Shared hover pad so silhouettes compare on an equal baseline.
+    const pad = this.add.graphics();
+    pad.fillStyle(0x000000, 0.5);
+    pad.fillEllipse(sx, mobY + 52, 96, 12);
+    pad.fillStyle(accent, 0.14);
+    pad.fillEllipse(sx, mobY + 52, 70, 8);
+
+    this.add
+      .text(sx, topY + 7, slot.title, {
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: '#e9d5ff',
+        stroke: '#1a0828',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5, 0);
+
+    slot.paint(sx, mobY);
+
+    for (let li = 0; li < slot.lines.length; li++) {
+      this.add
+        .text(sx, topY + 164 + li * 15, slot.lines[li]!, {
+          fontSize: '11px',
+          color: '#aab8c0',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5, 0)
+        .setAlpha(0.9);
+    }
+  }
+
+  /** Live ingame texture, scaled up, with a soft floor-glow for parity. */
+  private paintMinibossCurrent(cx: number, cy: number, textureKey: string, glow: number): void {
+    const halo = this.add.graphics();
+    halo.fillStyle(glow, 0.08);
+    halo.fillCircle(cx, cy, 58);
+    const img = this.add.image(cx, cy, textureKey);
+    img.setScale(1.9);
+  }
+
+  /**
+   * Shambler A — "Elder Treant": tall tapered trunk-torso, branch antler
+   * crown with leaf clusters, glowing heartwood crack down the chest,
+   * splayed root legs. Reads as a walking ancient tree, sibling of the
+   * Vine Lord rather than a moss boulder.
+   */
+  private drawShamblerVariantTreant(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const BARK_DARK = 0x241608;
+    const BARK = 0x4a3018;
+    const BARK_HI = 0x6a4828;
+    const LEAF = 0x1d5a2c;
+    const LEAF_HI = 0x4a9a50;
+    const GLOW = 0x6effa0;
+
+    // Root legs — three splayed claw-roots gripping the ground.
+    g.fillStyle(BARK_DARK, 1);
+    g.fillTriangle(cx - 26, cy + 50, cx - 8, cy + 22, cx - 16, cy + 16);
+    g.fillTriangle(cx + 26, cy + 50, cx + 8, cy + 22, cx + 16, cy + 16);
+    g.fillTriangle(cx - 4, cy + 52, cx - 2, cy + 24, cx + 6, cy + 24);
+
+    // Trunk torso — tall tapered silhouette (widest at hips, narrow chest).
+    g.fillStyle(BARK_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 22, y: cy + 24 },
+        { x: cx - 18, y: cy - 14 },
+        { x: cx - 12, y: cy - 44 },
+        { x: cx + 12, y: cy - 44 },
+        { x: cx + 18, y: cy - 14 },
+        { x: cx + 22, y: cy + 24 },
+      ],
+      true,
+    );
+    g.fillStyle(BARK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 18, y: cy + 22 },
+        { x: cx - 14, y: cy - 14 },
+        { x: cx - 9, y: cy - 41 },
+        { x: cx + 9, y: cy - 41 },
+        { x: cx + 14, y: cy - 14 },
+        { x: cx + 18, y: cy + 22 },
+      ],
+      true,
+    );
+    g.fillStyle(BARK_HI, 1);
+    g.fillEllipse(cx - 7, cy - 18, 9, 26);
+
+    // Gnarled branch arms — one raised high, one trailing low.
+    g.lineStyle(7, BARK_DARK, 1);
+    g.beginPath();
+    g.moveTo(cx - 16, cy - 26);
+    g.lineTo(cx - 34, cy - 38);
+    g.lineTo(cx - 40, cy - 56);
+    g.strokePath();
+    g.lineStyle(6, BARK_DARK, 1);
+    g.beginPath();
+    g.moveTo(cx + 16, cy - 20);
+    g.lineTo(cx + 34, cy - 6);
+    g.lineTo(cx + 42, cy + 8);
+    g.strokePath();
+    // Claw twigs on the raised arm.
+    g.lineStyle(2, BARK, 1);
+    g.beginPath();
+    g.moveTo(cx - 40, cy - 56);
+    g.lineTo(cx - 46, cy - 64);
+    g.moveTo(cx - 40, cy - 56);
+    g.lineTo(cx - 34, cy - 66);
+    g.strokePath();
+
+    // Antler crown — branching twigs sprouting from the head.
+    g.lineStyle(4, BARK_DARK, 1);
+    g.beginPath();
+    g.moveTo(cx - 6, cy - 44);
+    g.lineTo(cx - 14, cy - 62);
+    g.moveTo(cx - 14, cy - 62);
+    g.lineTo(cx - 22, cy - 68);
+    g.moveTo(cx - 14, cy - 62);
+    g.lineTo(cx - 10, cy - 74);
+    g.moveTo(cx + 6, cy - 44);
+    g.lineTo(cx + 13, cy - 60);
+    g.moveTo(cx + 13, cy - 60);
+    g.lineTo(cx + 21, cy - 66);
+    g.moveTo(cx + 13, cy - 60);
+    g.lineTo(cx + 9, cy - 72);
+    g.strokePath();
+    // Leaf clusters on the crown tips.
+    g.fillStyle(LEAF, 1);
+    g.fillEllipse(cx - 18, cy - 68, 16, 10);
+    g.fillEllipse(cx + 16, cy - 64, 14, 9);
+    g.fillEllipse(cx - 2, cy - 76, 13, 8);
+    g.fillStyle(LEAF_HI, 1);
+    g.fillEllipse(cx - 20, cy - 70, 7, 4);
+    g.fillEllipse(cx - 4, cy - 78, 6, 3);
+
+    // Mossy shoulder drape.
+    g.fillStyle(LEAF, 1);
+    g.fillEllipse(cx - 10, cy - 38, 16, 7);
+    g.fillStyle(LEAF_HI, 1);
+    g.fillEllipse(cx - 13, cy - 40, 7, 3);
+
+    // Heartwood crack — zigzag emerald glow down the chest.
+    g.fillStyle(GLOW, 0.22);
+    g.fillEllipse(cx + 1, cy - 6, 16, 30);
+    g.lineStyle(3, GLOW, 1);
+    g.beginPath();
+    g.moveTo(cx + 1, cy - 22);
+    g.lineTo(cx - 3, cy - 12);
+    g.lineTo(cx + 3, cy - 2);
+    g.lineTo(cx - 2, cy + 10);
+    g.strokePath();
+
+    // Hollow face — dark knothole + emerald eyes.
+    g.fillStyle(BARK_DARK, 1);
+    g.fillEllipse(cx, cy - 33, 16, 11);
+    g.fillStyle(GLOW, 1);
+    g.fillRect(cx - 6, cy - 35, 3, 3);
+    g.fillRect(cx + 3, cy - 35, 3, 3);
+    g.fillStyle(0xeafff0, 1);
+    g.fillRect(cx - 6, cy - 35, 1, 1);
+    g.fillRect(cx + 3, cy - 35, 1, 1);
+
+    // Drifting spores.
+    g.fillStyle(GLOW, 0.8);
+    g.fillRect(cx - 32, cy - 12, 2, 2);
+    g.fillRect(cx + 30, cy - 30, 2, 2);
+    g.fillRect(cx + 24, cy + 18, 2, 2);
+  }
+
+  /**
+   * Shambler B — "Bark Brute": hunched bark golem with massive thorn
+   * shoulders, knuckle-walking arms and a carved emerald rune in the
+   * chest. Reads as raw muscle — the slow relentless walker the AI
+   * already is.
+   */
+  private drawShamblerVariantBrute(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const BARK_DARK = 0x241608;
+    const BARK = 0x4a3018;
+    const BARK_HI = 0x6a4828;
+    const MOSS = 0x1d5a2c;
+    const MOSS_HI = 0x4a9a50;
+    const GLOW = 0x6effa0;
+
+    // Stumpy legs.
+    g.fillStyle(BARK_DARK, 1);
+    g.fillRect(cx - 16, cy + 26, 12, 22);
+    g.fillRect(cx + 5, cy + 26, 12, 22);
+
+    // Hunched torso — huge shoulder mass, low small head.
+    g.fillStyle(BARK_DARK, 1);
+    g.fillEllipse(cx, cy + 4, 62, 52);
+    g.fillStyle(BARK, 1);
+    g.fillEllipse(cx, cy + 5, 54, 44);
+    g.fillStyle(BARK_HI, 1);
+    g.fillEllipse(cx - 12, cy - 8, 20, 16);
+
+    // Moss cape across the back/shoulders.
+    g.fillStyle(MOSS, 1);
+    g.fillEllipse(cx - 2, cy - 16, 48, 16);
+    g.fillStyle(MOSS_HI, 1);
+    g.fillEllipse(cx - 14, cy - 18, 14, 6);
+    g.fillEllipse(cx + 10, cy - 15, 10, 5);
+
+    // Thorn rows jutting from the shoulders.
+    g.fillStyle(BARK_DARK, 1);
+    g.fillTriangle(cx - 30, cy - 14, cx - 20, cy - 24, cx - 18, cy - 8);
+    g.fillTriangle(cx - 18, cy - 20, cx - 8, cy - 32, cx - 6, cy - 14);
+    g.fillTriangle(cx + 18, cy - 20, cx + 8, cy - 30, cx + 6, cy - 13);
+    g.fillTriangle(cx + 30, cy - 13, cx + 20, cy - 23, cx + 18, cy - 7);
+
+    // Knuckle-walk arms — thick, fists planted on the ground.
+    g.fillStyle(BARK_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 26, y: cy - 6 },
+        { x: cx - 44, y: cy + 14 },
+        { x: cx - 46, y: cy + 40 },
+        { x: cx - 32, y: cy + 42 },
+        { x: cx - 26, y: cy + 18 },
+      ],
+      true,
+    );
+    g.fillPoints(
+      [
+        { x: cx + 26, y: cy - 6 },
+        { x: cx + 44, y: cy + 14 },
+        { x: cx + 46, y: cy + 40 },
+        { x: cx + 32, y: cy + 42 },
+        { x: cx + 26, y: cy + 18 },
+      ],
+      true,
+    );
+    // Fists.
+    g.fillStyle(BARK, 1);
+    g.fillEllipse(cx - 39, cy + 40, 18, 13);
+    g.fillEllipse(cx + 39, cy + 40, 18, 13);
+    g.fillStyle(BARK_HI, 1);
+    g.fillEllipse(cx - 42, cy + 37, 7, 4);
+    g.fillEllipse(cx + 36, cy + 37, 7, 4);
+
+    // Carved chest rune — emerald glyph with soft halo.
+    g.fillStyle(GLOW, 0.2);
+    g.fillEllipse(cx, cy + 8, 22, 22);
+    g.lineStyle(3, GLOW, 1);
+    g.strokeCircle(cx, cy + 8, 7);
+    g.beginPath();
+    g.moveTo(cx, cy + 1);
+    g.lineTo(cx, cy - 6);
+    g.moveTo(cx - 6, cy + 12);
+    g.lineTo(cx - 11, cy + 16);
+    g.moveTo(cx + 6, cy + 12);
+    g.lineTo(cx + 11, cy + 16);
+    g.strokePath();
+
+    // Low-set head — brow ridge + sunken emerald eyes.
+    g.fillStyle(BARK_DARK, 1);
+    g.fillEllipse(cx, cy - 24, 22, 14);
+    g.fillStyle(BARK, 1);
+    g.fillEllipse(cx, cy - 26, 18, 9);
+    g.fillStyle(GLOW, 1);
+    g.fillRect(cx - 7, cy - 26, 4, 3);
+    g.fillRect(cx + 3, cy - 26, 4, 3);
+    g.fillStyle(0xeafff0, 1);
+    g.fillRect(cx - 6, cy - 26, 1, 1);
+    g.fillRect(cx + 4, cy - 26, 1, 1);
+  }
+
+  /**
+   * Shambler C — "Bramble Stag": quadruped thorn-beast with big branch
+   * antlers and vine-wrapped flanks. Completely different silhouette
+   * from every other Emerald enemy — reads instantly as "special".
+   */
+  private drawShamblerVariantStag(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const BARK_DARK = 0x241608;
+    const BARK = 0x44300f;
+    const BARK_HI = 0x6a4828;
+    const VINE = 0x1d5a2c;
+    const VINE_HI = 0x4a9a50;
+    const GLOW = 0x6effa0;
+
+    // Legs — four slim bark legs, slight stride.
+    g.lineStyle(5, BARK_DARK, 1);
+    g.beginPath();
+    g.moveTo(cx - 26, cy + 12);
+    g.lineTo(cx - 32, cy + 48);
+    g.moveTo(cx - 14, cy + 14);
+    g.lineTo(cx - 10, cy + 48);
+    g.moveTo(cx + 12, cy + 14);
+    g.lineTo(cx + 8, cy + 48);
+    g.moveTo(cx + 24, cy + 12);
+    g.lineTo(cx + 32, cy + 48);
+    g.strokePath();
+
+    // Body — horizontal beast mass.
+    g.fillStyle(BARK_DARK, 1);
+    g.fillEllipse(cx, cy + 2, 60, 30);
+    g.fillStyle(BARK, 1);
+    g.fillEllipse(cx, cy + 3, 53, 24);
+    g.fillStyle(BARK_HI, 1);
+    g.fillEllipse(cx - 10, cy - 3, 22, 10);
+
+    // Neck + head — raised, alert stance.
+    g.fillStyle(BARK_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx + 18, y: cy - 6 },
+        { x: cx + 30, y: cy - 30 },
+        { x: cx + 42, y: cy - 36 },
+        { x: cx + 44, y: cy - 28 },
+        { x: cx + 34, y: cy - 18 },
+        { x: cx + 28, y: cy + 4 },
+      ],
+      true,
+    );
+    // Muzzle.
+    g.fillStyle(BARK, 1);
+    g.fillEllipse(cx + 38, cy - 31, 14, 9);
+
+    // Antlers — big branching thorn-crowns with glow tips.
+    g.lineStyle(3, BARK_DARK, 1);
+    g.beginPath();
+    g.moveTo(cx + 32, cy - 36);
+    g.lineTo(cx + 24, cy - 54);
+    g.moveTo(cx + 24, cy - 54);
+    g.lineTo(cx + 14, cy - 60);
+    g.moveTo(cx + 24, cy - 54);
+    g.lineTo(cx + 26, cy - 68);
+    g.moveTo(cx + 38, cy - 38);
+    g.lineTo(cx + 40, cy - 58);
+    g.moveTo(cx + 40, cy - 58);
+    g.lineTo(cx + 50, cy - 64);
+    g.moveTo(cx + 40, cy - 58);
+    g.lineTo(cx + 34, cy - 70);
+    g.strokePath();
+    g.fillStyle(GLOW, 0.9);
+    for (const [tx, ty] of [
+      [14, -60],
+      [26, -68],
+      [50, -64],
+      [34, -70],
+    ] as const) {
+      g.fillRect(cx + tx - 1, cy + ty - 1, 3, 3);
+    }
+
+    // Vine wrap around the flank — two loops with thorn dots.
+    g.lineStyle(3, VINE, 1);
+    g.beginPath();
+    g.moveTo(cx - 24, cy - 8);
+    g.lineTo(cx - 6, cy + 12);
+    g.lineTo(cx + 12, cy - 6);
+    g.strokePath();
+    g.lineStyle(2, VINE_HI, 1);
+    g.beginPath();
+    g.moveTo(cx - 20, cy + 12);
+    g.lineTo(cx - 2, cy - 8);
+    g.strokePath();
+    g.fillStyle(VINE_HI, 1);
+    g.fillRect(cx - 14, cy + 2, 2, 2);
+    g.fillRect(cx + 4, cy + 2, 2, 2);
+    g.fillRect(cx - 4, cy - 6, 2, 2);
+
+    // Tail tuft.
+    g.fillStyle(VINE, 1);
+    g.fillTriangle(cx - 30, cy - 4, cx - 42, cy - 12, cx - 38, cy + 2);
+
+    // Eye + breath wisp.
+    g.fillStyle(GLOW, 1);
+    g.fillRect(cx + 36, cy - 34, 3, 3);
+    g.fillStyle(0xeafff0, 1);
+    g.fillRect(cx + 36, cy - 34, 1, 1);
+    g.fillStyle(GLOW, 0.5);
+    g.fillEllipse(cx + 48, cy - 24, 7, 3);
+  }
+
+  /**
+   * Lurker A — "Bog Maw": a surfacing crocodilian maw — long toothed
+   * snout breaking the waterline, eye bumps on top, glowing angler lure
+   * arched over the head, ripple rings around the body.
+   */
+  private drawLurkerVariantMaw(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const HIDE_DARK = 0x081826;
+    const HIDE = 0x14405a;
+    const HIDE_HI = 0x2d6a88;
+    const TEETH = 0xd8e8e0;
+    const ALGAE = 0x1d5a44;
+    const GLOW = 0x4ad8ff;
+
+    // Waterline ripple rings.
+    g.lineStyle(2, GLOW, 0.35);
+    g.strokeEllipse(cx, cy + 34, 92, 16);
+    g.lineStyle(1, GLOW, 0.22);
+    g.strokeEllipse(cx, cy + 36, 64, 10);
+
+    // Back hump trailing behind with a fin.
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillEllipse(cx - 30, cy + 22, 36, 20);
+    g.fillStyle(HIDE, 1);
+    g.fillEllipse(cx - 30, cy + 23, 30, 14);
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillTriangle(cx - 36, cy + 12, cx - 24, cy + 12, cx - 30, cy - 2);
+
+    // Head mass — rises from the water at an angle.
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillEllipse(cx + 6, cy + 6, 44, 30);
+    g.fillStyle(HIDE, 1);
+    g.fillEllipse(cx + 6, cy + 6, 38, 24);
+    g.fillStyle(HIDE_HI, 1);
+    g.fillEllipse(cx - 2, cy - 2, 16, 9);
+
+    // Long snout — upper jaw thrust forward-right, mouth slightly open.
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx + 14, y: cy - 6 },
+        { x: cx + 52, y: cy + 2 },
+        { x: cx + 54, y: cy + 12 },
+        { x: cx + 16, y: cy + 12 },
+      ],
+      true,
+    );
+    g.fillStyle(HIDE, 1);
+    g.fillPoints(
+      [
+        { x: cx + 16, y: cy - 3 },
+        { x: cx + 48, y: cy + 4 },
+        { x: cx + 49, y: cy + 9 },
+        { x: cx + 17, y: cy + 9 },
+      ],
+      true,
+    );
+    // Lower jaw — darker, dipping into the water.
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx + 16, y: cy + 16 },
+        { x: cx + 50, y: cy + 18 },
+        { x: cx + 44, y: cy + 26 },
+        { x: cx + 14, y: cy + 24 },
+      ],
+      true,
+    );
+    // Teeth ridge in the gap.
+    g.fillStyle(TEETH, 1);
+    for (let i = 0; i < 5; i++) {
+      const tx = cx + 20 + i * 7;
+      g.fillTriangle(tx, cy + 12, tx + 4, cy + 12, tx + 2, cy + 17);
+    }
+
+    // Eye bumps on top of the head.
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillEllipse(cx - 4, cy - 12, 12, 9);
+    g.fillEllipse(cx + 12, cy - 10, 11, 8);
+    g.fillStyle(GLOW, 1);
+    g.fillRect(cx - 6, cy - 14, 3, 3);
+    g.fillRect(cx + 10, cy - 12, 3, 3);
+    g.fillStyle(0xeaffff, 1);
+    g.fillRect(cx - 6, cy - 14, 1, 1);
+    g.fillRect(cx + 10, cy - 12, 1, 1);
+
+    // Angler lure — thin stalk arching over the head, glowing bulb.
+    g.lineStyle(2, HIDE_DARK, 1);
+    g.beginPath();
+    g.moveTo(cx - 2, cy - 16);
+    g.lineTo(cx + 6, cy - 36);
+    g.lineTo(cx + 22, cy - 44);
+    g.strokePath();
+    g.fillStyle(GLOW, 0.25);
+    g.fillCircle(cx + 26, cy - 46, 12);
+    g.fillStyle(GLOW, 1);
+    g.fillCircle(cx + 26, cy - 46, 4);
+    g.fillStyle(0xeaffff, 1);
+    g.fillRect(cx + 25, cy - 47, 1, 1);
+
+    // Algae drape off the jaw + hump.
+    g.fillStyle(ALGAE, 1);
+    g.fillRect(cx + 30, cy + 24, 3, 8);
+    g.fillRect(cx - 40, cy + 26, 3, 9);
+    g.fillRect(cx - 16, cy + 30, 2, 6);
+  }
+
+  /**
+   * Lurker B — "Mire Serpent": raised cobra-like head with a fin frill
+   * plus two descending coil humps gliding behind — the submerged AI
+   * reads as a sea-serpent wake. Bioluminescent spine dots.
+   */
+  private drawLurkerVariantSerpent(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const HIDE_DARK = 0x081826;
+    const HIDE = 0x14405a;
+    const HIDE_HI = 0x2d6a88;
+    const FIN = 0x0e3048;
+    const ALGAE = 0x1d5a44;
+    const GLOW = 0x4ad8ff;
+
+    // Waterline ripples.
+    g.lineStyle(2, GLOW, 0.32);
+    g.strokeEllipse(cx, cy + 36, 96, 14);
+
+    // Coil hump 2 (far, smallest).
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillEllipse(cx - 38, cy + 24, 26, 18);
+    g.fillStyle(HIDE, 1);
+    g.fillEllipse(cx - 38, cy + 25, 21, 13);
+    g.fillStyle(FIN, 1);
+    g.fillTriangle(cx - 43, cy + 16, cx - 33, cy + 16, cx - 38, cy + 6);
+
+    // Coil hump 1 (mid).
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillEllipse(cx - 8, cy + 20, 34, 24);
+    g.fillStyle(HIDE, 1);
+    g.fillEllipse(cx - 8, cy + 21, 28, 18);
+    g.fillStyle(HIDE_HI, 1);
+    g.fillEllipse(cx - 14, cy + 14, 12, 6);
+    g.fillStyle(FIN, 1);
+    g.fillTriangle(cx - 15, cy + 9, cx - 1, cy + 9, cx - 8, cy - 5);
+
+    // Neck rising out of the water.
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx + 14, y: cy + 30 },
+        { x: cx + 18, y: cy - 8 },
+        { x: cx + 24, y: cy - 28 },
+        { x: cx + 36, y: cy - 28 },
+        { x: cx + 34, y: cy + 2 },
+        { x: cx + 30, y: cy + 32 },
+      ],
+      true,
+    );
+    g.fillStyle(HIDE, 1);
+    g.fillPoints(
+      [
+        { x: cx + 17, y: cy + 26 },
+        { x: cx + 21, y: cy - 8 },
+        { x: cx + 26, y: cy - 25 },
+        { x: cx + 33, y: cy - 25 },
+        { x: cx + 31, y: cy + 2 },
+        { x: cx + 28, y: cy + 28 },
+      ],
+      true,
+    );
+
+    // Head — wedge with slight open jaw, facing left toward the arena.
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx + 36, y: cy - 26 },
+        { x: cx + 22, y: cy - 38 },
+        { x: cx - 2, y: cy - 40 },
+        { x: cx + 2, y: cy - 32 },
+        { x: cx + 20, y: cy - 24 },
+      ],
+      true,
+    );
+    g.fillStyle(HIDE, 1);
+    g.fillEllipse(cx + 18, cy - 34, 18, 9);
+    // Jaw gap + tongue flick.
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillTriangle(cx - 2, cy - 36, cx + 8, cy - 34, cx + 2, cy - 30);
+    g.lineStyle(1, GLOW, 0.9);
+    g.beginPath();
+    g.moveTo(cx - 2, cy - 34);
+    g.lineTo(cx - 10, cy - 33);
+    g.strokePath();
+
+    // Fin frill behind the head.
+    g.fillStyle(FIN, 1);
+    g.fillTriangle(cx + 30, cy - 38, cx + 44, cy - 46, cx + 38, cy - 26);
+    g.fillTriangle(cx + 34, cy - 24, cx + 48, cy - 28, cx + 38, cy - 14);
+
+    // Eye.
+    g.fillStyle(GLOW, 1);
+    g.fillRect(cx + 12, cy - 37, 3, 3);
+    g.fillStyle(0xeaffff, 1);
+    g.fillRect(cx + 12, cy - 37, 1, 1);
+
+    // Bioluminescent spine dots tracing the body line.
+    g.fillStyle(GLOW, 0.85);
+    for (const [dx, dy] of [
+      [26, -16],
+      [24, 0],
+      [-4, 8],
+      [-12, 12],
+      [-36, 16],
+    ] as const) {
+      g.fillRect(cx + dx, cy + dy, 2, 2);
+    }
+
+    // Algae strands.
+    g.fillStyle(ALGAE, 1);
+    g.fillRect(cx + 22, cy + 28, 3, 8);
+    g.fillRect(cx - 24, cy + 28, 2, 7);
+  }
+
+  /**
+   * Lurker C — "Drowned Shade": a ghostly weed-wraith rising from the
+   * mire — tattered translucent hood-mass, triple cyan eye cluster,
+   * dripping tendril arms. Leans into the submerge/intangible mechanic:
+   * THIS is what phases through your missiles.
+   */
+  private drawLurkerVariantShade(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const SHADE_DARK = 0x06141f;
+    const SHADE = 0x0e2c40;
+    const SHADE_HI = 0x1d4a66;
+    const WEED = 0x1d5a44;
+    const GLOW = 0x4ad8ff;
+
+    // Mist + waterline.
+    g.fillStyle(GLOW, 0.06);
+    g.fillEllipse(cx, cy - 4, 100, 90);
+    g.lineStyle(2, GLOW, 0.3);
+    g.strokeEllipse(cx, cy + 38, 84, 13);
+
+    // Outer ghost-mass — translucent layered silhouette, ragged hem.
+    g.fillStyle(SHADE_DARK, 0.85);
+    g.fillPoints(
+      [
+        { x: cx - 30, y: cy + 36 },
+        { x: cx - 34, y: cy + 10 },
+        { x: cx - 26, y: cy - 22 },
+        { x: cx - 12, y: cy - 44 },
+        { x: cx + 8, y: cy - 46 },
+        { x: cx + 24, y: cy - 28 },
+        { x: cx + 32, y: cy + 4 },
+        { x: cx + 28, y: cy + 36 },
+        { x: cx + 20, y: cy + 26 },
+        { x: cx + 12, y: cy + 38 },
+        { x: cx + 2, y: cy + 26 },
+        { x: cx - 8, y: cy + 38 },
+        { x: cx - 18, y: cy + 26 },
+      ],
+      true,
+    );
+    g.fillStyle(SHADE, 0.9);
+    g.fillPoints(
+      [
+        { x: cx - 24, y: cy + 26 },
+        { x: cx - 26, y: cy - 16 },
+        { x: cx - 10, y: cy - 38 },
+        { x: cx + 6, y: cy - 40 },
+        { x: cx + 20, y: cy - 22 },
+        { x: cx + 24, y: cy + 24 },
+      ],
+      true,
+    );
+    g.fillStyle(SHADE_HI, 0.5);
+    g.fillEllipse(cx - 8, cy - 20, 18, 22);
+
+    // Hood void — deep dark recess holding the eye cluster.
+    g.fillStyle(0x020a12, 1);
+    g.fillEllipse(cx - 1, cy - 22, 26, 20);
+    // Triple cyan eye cluster (triangle arrangement).
+    g.fillStyle(GLOW, 0.25);
+    g.fillEllipse(cx - 1, cy - 22, 22, 16);
+    g.fillStyle(GLOW, 1);
+    g.fillRect(cx - 9, cy - 24, 3, 3);
+    g.fillRect(cx + 5, cy - 24, 3, 3);
+    g.fillRect(cx - 2, cy - 17, 3, 3);
+    g.fillStyle(0xeaffff, 1);
+    g.fillRect(cx - 9, cy - 24, 1, 1);
+    g.fillRect(cx + 5, cy - 24, 1, 1);
+    g.fillRect(cx - 2, cy - 17, 1, 1);
+
+    // Inner chest glow — drowned light deep in the mass.
+    g.fillStyle(GLOW, 0.16);
+    g.fillEllipse(cx, cy + 4, 18, 22);
+    g.fillStyle(GLOW, 0.5);
+    g.fillEllipse(cx, cy + 4, 7, 10);
+
+    // Tendril arms — drooping weed-limbs with drips.
+    g.lineStyle(5, SHADE, 0.9);
+    g.beginPath();
+    g.moveTo(cx - 24, cy - 8);
+    g.lineTo(cx - 40, cy + 6);
+    g.lineTo(cx - 42, cy + 26);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(cx + 22, cy - 6);
+    g.lineTo(cx + 38, cy + 10);
+    g.lineTo(cx + 36, cy + 28);
+    g.strokePath();
+
+    // Hanging weeds off the hood + arms.
+    g.fillStyle(WEED, 1);
+    g.fillRect(cx - 14, cy - 38, 2, 8);
+    g.fillRect(cx + 10, cy - 36, 2, 7);
+    g.fillRect(cx - 42, cy + 26, 2, 7);
+    g.fillRect(cx + 35, cy + 28, 2, 6);
+
+    // Drips falling back into the mire.
+    g.fillStyle(GLOW, 0.7);
+    g.fillRect(cx - 41, cy + 36, 1, 3);
+    g.fillRect(cx + 36, cy + 37, 1, 3);
+    g.fillRect(cx + 1, cy + 40, 1, 3);
   }
 }
 

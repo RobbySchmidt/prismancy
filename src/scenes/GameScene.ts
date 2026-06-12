@@ -412,6 +412,24 @@ export class GameScene extends Phaser.Scene {
   private readonly crateOpenedSfxHandler = (): void => {
     getSfxSynth().playChestOpen();
   };
+  /** Crossfade to the shared miniboss theme the moment a miniboss enters
+   * the field. All three minibosses share `mini-boss.mp3` (user decision
+   * 2026-06-12) — fires from BaseEnemy's `miniboss:spawned` emit, so the
+   * dev-menu spawn path gets the track switch for free. */
+  private readonly minibossSpawnedMusicHandler = (): void => {
+    getMusicManager().playTrack(this, 'mini-boss');
+  };
+  /** Crossfade back to the floor track when the miniboss leaves the field
+   * (kill OR despawn). Guards: during a floor transition the next scene
+   * owns the music, and after a player death `handlePlayerDied` has
+   * already faded to silence — resurrecting the floor track over the
+   * game-over beat would be wrong in both cases. */
+  private readonly minibossGoneMusicHandler = (): void => {
+    if (this.inTransition) return;
+    if (!this.player?.health.isAlive()) return;
+    const floorTrack = floorIdToFloorTrack(this.currentFloorId);
+    if (floorTrack) getMusicManager().playTrack(this, floorTrack);
+  };
   private readonly doorsOpenedSfxHandler = (): void => {
     // Delay the open SFX so it doesn't pile on top of the last-hit feedback.
     // `markCurrentRoomCleared` runs on `delayedCall(0)` after the last enemy
@@ -655,6 +673,8 @@ export class GameScene extends Phaser.Scene {
     EventBus.on('item:picked', this.itemPickedSfxHandler);
     EventBus.on('item:picked', this.itemPickedDropProfileHandler);
     EventBus.on('crate:opened', this.crateOpenedSfxHandler);
+    EventBus.on('miniboss:spawned', this.minibossSpawnedMusicHandler);
+    EventBus.on('miniboss:gone', this.minibossGoneMusicHandler);
     EventBus.on('room:doorsOpened', this.doorsOpenedSfxHandler);
     EventBus.on('room:doorsClosed', this.doorsClosedSfxHandler);
     EventBus.on('door:unlocked', this.doorUnlockedSfxHandler);
@@ -681,6 +701,8 @@ export class GameScene extends Phaser.Scene {
       EventBus.off('item:picked', this.itemPickedSfxHandler);
       EventBus.off('item:picked', this.itemPickedDropProfileHandler);
       EventBus.off('crate:opened', this.crateOpenedSfxHandler);
+      EventBus.off('miniboss:spawned', this.minibossSpawnedMusicHandler);
+      EventBus.off('miniboss:gone', this.minibossGoneMusicHandler);
       EventBus.off('room:doorsOpened', this.doorsOpenedSfxHandler);
       EventBus.off('room:doorsClosed', this.doorsClosedSfxHandler);
       EventBus.off('door:unlocked', this.doorUnlockedSfxHandler);

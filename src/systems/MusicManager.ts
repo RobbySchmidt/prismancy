@@ -33,6 +33,11 @@ export type MusicTrackKey =
   | 'floor-onyx'
   | 'boss-marquis-of-mirages'
   | 'boss-the-prismarch'
+  /** Shared theme for all three minibosses (Thornwood Shambler / Mire
+   *  Lurker / Doppelgänger) — one track across floors, user decision
+   *  2026-06-12. Wired via the `miniboss:spawned` / `miniboss:gone`
+   *  EventBus pair in GameScene. */
+  | 'mini-boss'
   | 'victory-credits';
 
 export const ALL_MUSIC_TRACKS: readonly MusicTrackKey[] = [
@@ -44,6 +49,7 @@ export const ALL_MUSIC_TRACKS: readonly MusicTrackKey[] = [
   'floor-onyx',
   'boss-marquis-of-mirages',
   'boss-the-prismarch',
+  'mini-boss',
   'victory-credits',
 ] as const;
 
