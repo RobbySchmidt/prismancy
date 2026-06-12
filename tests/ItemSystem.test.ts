@@ -13,6 +13,7 @@ vi.mock('../src/utils/EventBus', () => ({
 }));
 
 import { ItemSystem } from '../src/systems/ItemSystem';
+import { type StatsSystem } from '../src/systems/StatsSystem';
 import { ItemPool, type ItemDefinition, type ItemModifier } from '../src/types';
 
 class FakeStats {
@@ -44,6 +45,17 @@ const TEST_ITEM_TINTED: ItemDefinition = {
   missileTint: 0xff44aa,
 };
 
+const TEST_ITEM_PACT: ItemDefinition = {
+  id: 'test-pact',
+  displayName: 'Pact',
+  description: '',
+  textureKey: 'tex-test-pact',
+  pools: [ItemPool.Treasure],
+  effects: [],
+  suppressHeartDrops: true,
+  coinDropMult: 1.6,
+};
+
 describe('ItemSystem', () => {
   beforeEach(() => {
     emitMock.mockClear();
@@ -52,7 +64,7 @@ describe('ItemSystem', () => {
   it('pickUp forwards item effects to StatsSystem.applyModifier', () => {
     const stats = new FakeStats();
     // Cast: FakeStats implements just the slice ItemSystem reads.
-    const sys = new ItemSystem(stats as unknown as import('../src/systems/StatsSystem').StatsSystem);
+    const sys = new ItemSystem(stats as unknown as StatsSystem);
     sys.pickUp(TEST_ITEM_PLAIN);
 
     expect(stats.applied).toHaveLength(1);
@@ -62,7 +74,7 @@ describe('ItemSystem', () => {
 
   it('pickUp emits item:picked with the item id', () => {
     const stats = new FakeStats();
-    const sys = new ItemSystem(stats as unknown as import('../src/systems/StatsSystem').StatsSystem);
+    const sys = new ItemSystem(stats as unknown as StatsSystem);
     sys.pickUp(TEST_ITEM_PLAIN);
 
     const calls = emitMock.mock.calls.filter((c) => c[0] === 'item:picked');
@@ -72,7 +84,7 @@ describe('ItemSystem', () => {
 
   it('threads missileTint into the modifier when defined, omits it otherwise', () => {
     const stats = new FakeStats();
-    const sys = new ItemSystem(stats as unknown as import('../src/systems/StatsSystem').StatsSystem);
+    const sys = new ItemSystem(stats as unknown as StatsSystem);
 
     sys.pickUp(TEST_ITEM_PLAIN);
     expect(stats.applied[0]).not.toHaveProperty('missileTint');
@@ -83,7 +95,7 @@ describe('ItemSystem', () => {
 
   it('hasPicked returns true after pickUp, false beforehand', () => {
     const stats = new FakeStats();
-    const sys = new ItemSystem(stats as unknown as import('../src/systems/StatsSystem').StatsSystem);
+    const sys = new ItemSystem(stats as unknown as StatsSystem);
     expect(sys.hasPicked('test-plain')).toBe(false);
     sys.pickUp(TEST_ITEM_PLAIN);
     expect(sys.hasPicked('test-plain')).toBe(true);
@@ -92,7 +104,7 @@ describe('ItemSystem', () => {
 
   it('getPickedIds returns the cumulative set of picked-up ids', () => {
     const stats = new FakeStats();
-    const sys = new ItemSystem(stats as unknown as import('../src/systems/StatsSystem').StatsSystem);
+    const sys = new ItemSystem(stats as unknown as StatsSystem);
     sys.pickUp(TEST_ITEM_PLAIN);
     sys.pickUp(TEST_ITEM_TINTED);
 
@@ -100,5 +112,30 @@ describe('ItemSystem', () => {
     expect(ids.has('test-plain')).toBe(true);
     expect(ids.has('test-tinted')).toBe(true);
     expect(ids.size).toBe(2);
+  });
+
+  it("aggregates drop-profile fields (Bloodletter's Pact) on pickUp, idempotent per id", () => {
+    const stats = new FakeStats();
+    const sys = new ItemSystem(stats as unknown as StatsSystem);
+
+    expect(sys.isHeartDropSuppressed()).toBe(false);
+    expect(sys.getCoinDropMultiplier()).toBe(1);
+
+    sys.pickUp(TEST_ITEM_PACT);
+    expect(sys.isHeartDropSuppressed()).toBe(true);
+    expect(sys.getCoinDropMultiplier()).toBeCloseTo(1.6);
+
+    // Re-picking the same id must not double-apply the multiplier.
+    sys.pickUp(TEST_ITEM_PACT);
+    expect(sys.getCoinDropMultiplier()).toBeCloseTo(1.6);
+  });
+
+  it('hydrate restores drop-profile fields for the floor-transition replay', () => {
+    const stats = new FakeStats();
+    const sys = new ItemSystem(stats as unknown as StatsSystem);
+    sys.hydrate(['test-pact'], (id) => (id === 'test-pact' ? TEST_ITEM_PACT : undefined));
+
+    expect(sys.isHeartDropSuppressed()).toBe(true);
+    expect(sys.getCoinDropMultiplier()).toBeCloseTo(1.6);
   });
 });

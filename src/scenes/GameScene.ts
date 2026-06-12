@@ -265,6 +265,10 @@ export class GameScene extends Phaser.Scene {
   /** Phaser Key for the [E] interact (used for placing gems on the seal).
    * Polled in update(); see `tickGemSealInteract`. */
   private interactKey: Phaser.Input.Keyboard.Key | null = null;
+  /** Per-run counter seeding the Transmutation Stone's random-item rolls
+   * (`${dungeonSeed}-transmute-${n}`) — same-seed runs replay the same
+   * conversion sequence. Reset in the SHUTDOWN block. */
+  private transmuteRollCount = 0;
   /** [Q] active-item activation. JustDown-polled in update so a held key
    * doesn't double-fire — the activation drops HP and we don't want the
    * second tick to drop it past zero. */
@@ -383,6 +387,12 @@ export class GameScene extends Phaser.Scene {
 
   private readonly itemPickedSfxHandler = (): void => {
     getSfxSynth().playPickupItem();
+  };
+  /** Mirror the ItemSystem drop-profile aggregate into the registry slot
+   * BaseEnemy.die reads. Fired on every pickup so a freshly-grabbed
+   * Bloodletter's Pact takes effect with the very next kill. */
+  private readonly itemPickedDropProfileHandler = (): void => {
+    this.registry.set('coinDropMultiplier', this.itemSystem.getCoinDropMultiplier());
   };
   private readonly crateOpenedSfxHandler = (): void => {
     getSfxSynth().playChestOpen();
@@ -505,6 +515,11 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('inventory', this.inventory);
     this.registry.set('itemSystem', this.itemSystem);
     this.registry.set('activeItemSystem', this.activeItemSystem);
+    // Coin-drop multiplier (Bloodletter's Pact): BaseEnemy.die reads this
+    // registry slot at roll time — same pattern as `enemyHpMultiplier`.
+    // Set after hydrate so a carried-over Pact applies on the new floor,
+    // refreshed on every `item:picked` (see `itemPickedDropProfileHandler`).
+    this.registry.set('coinDropMultiplier', this.itemSystem.getCoinDropMultiplier());
     // Expose player health so UIScene can seed its HealthDisplay with the
     // ACTUAL current/max HP at construction time. Without this the floor-
     // transition launches UIScene AFTER GameScene's `restore()` has emitted
@@ -530,6 +545,30 @@ export class GameScene extends Phaser.Scene {
     if (floorTrack) getMusicManager().playTrack(this, floorTrack);
 
     this.enterRoom(this.layout.startId, null);
+
+    // **TEMPORARY** Playtest scaffolding for the three 2026-06-12 trade
+    // items: spawn all three pedestals side by side in the start room so
+    // they can be tested without pool-luck. Remove after the playtest —
+    // grep for **TEMPORARY** finds this block.
+    if (import.meta.env.DEV) {
+      const testCenter = this.currentRoom.getCenter();
+      const testItems = [
+        ITEMS.bloodlettersPact,
+        ITEMS.transmutationStone,
+        ITEMS.hummingbirdFeather,
+      ];
+      testItems.forEach((def, i) => {
+        const pickup = new ItemPickup(
+          this,
+          testCenter.x + (i - 1) * 96,
+          testCenter.y - TILE_SIZE,
+          def,
+          this.itemSystem,
+        );
+        pickup.setSpawnProtection(700);
+        this.pickups.add(pickup);
+      });
+    }
 
     // Hold-R-to-restart: dedicated key (separate from InputManager so
     // movement keys don't get tangled with the restart hold) plus a small
@@ -579,6 +618,7 @@ export class GameScene extends Phaser.Scene {
         getLayout: () => this.getLayout(),
         getCurrentRoomCenter: () => this.getCurrentRoomCenter(),
         spawnPickup: (kind, x, y) => this.spawnPickup(kind, x, y),
+        isHeartDropSuppressed: () => this.itemSystem.isHeartDropSuppressed(),
       },
       this.dungeonSeed,
     );
@@ -600,6 +640,7 @@ export class GameScene extends Phaser.Scene {
     EventBus.on('gem:pickedUp', this.gemPickedUpHandler);
     EventBus.on('pickup:collected', this.pickupCollectedHandler);
     EventBus.on('item:picked', this.itemPickedSfxHandler);
+    EventBus.on('item:picked', this.itemPickedDropProfileHandler);
     EventBus.on('crate:opened', this.crateOpenedSfxHandler);
     EventBus.on('room:doorsOpened', this.doorsOpenedSfxHandler);
     EventBus.on('room:doorsClosed', this.doorsClosedSfxHandler);
@@ -625,6 +666,7 @@ export class GameScene extends Phaser.Scene {
       EventBus.off('gem:pickedUp', this.gemPickedUpHandler);
       EventBus.off('pickup:collected', this.pickupCollectedHandler);
       EventBus.off('item:picked', this.itemPickedSfxHandler);
+      EventBus.off('item:picked', this.itemPickedDropProfileHandler);
       EventBus.off('crate:opened', this.crateOpenedSfxHandler);
       EventBus.off('room:doorsOpened', this.doorsOpenedSfxHandler);
       EventBus.off('room:doorsClosed', this.doorsClosedSfxHandler);
@@ -659,6 +701,7 @@ export class GameScene extends Phaser.Scene {
       this.gemSeal = null;
       this.interactKey = null;
       this.activeItemKey = null;
+      this.transmuteRollCount = 0;
       this.restartHoldStartedAt = null;
       this.restartKey = null;
       this.pauseKey = null;
@@ -709,6 +752,13 @@ export class GameScene extends Phaser.Scene {
           this.inventory.addGem('onyx-mansion');
           // eslint-disable-next-line no-console
           console.log('[__wiz.giveGems] Granted Emerald, Sapphire, Onyx.');
+        },
+        /** Grant coins for shop / Transmutation-Stone testing.
+         * Usage: `__wiz.giveCoins(20)`. */
+        giveCoins: (n = 20) => {
+          this.inventory.addCoins(Math.max(0, Math.floor(n)));
+          // eslint-disable-next-line no-console
+          console.log(`[__wiz.giveCoins] +${n} coins → ${this.inventory.getCoins()}.`);
         },
         /** Spawn Lord Onyx in the current room, regardless of seal state.
          * Replaces any existing boss. Useful for boss-pattern tuning
@@ -2348,21 +2398,110 @@ export class GameScene extends Phaser.Scene {
     const equipped = this.activeItemSystem.getEquipped();
     const equippedItem = this.activeItemSystem.getEquippedItem();
     if (!equipped || !equippedItem) return;
-    // Universal gate: at least 1 full heart of HP. Every active right now
-    // (just Echoes of Blood) costs HP, and dropping below 1 HP would
-    // self-kill via the cost. The HUD slot mirrors this gate visually.
-    if (this.player.health.getCurrent() < 2) return;
 
+    // Cost gates live per-kind: Echoes of Blood pays in HP, the
+    // Transmutation Stone in coins. The HUD slot mirrors the matching
+    // gate visually (see ActiveItemSlot.refreshUsable).
     switch (equipped.kind) {
       case 'echoesOfBlood':
+        // At least 1 full heart — the activation drops the player to 1 HP,
+        // so firing below 2 HP would self-kill via the cost.
+        if (this.player.health.getCurrent() < 2) return;
         this.executeEchoesOfBlood(equipped.bossDamageFraction ?? 0.3);
         break;
+      case 'transmuteCoinsToKey': {
+        // Auto-upgrade by wallet (user decision 2026-06-12): at itemCost+
+        // coins the stone rolls a random treasure item, below that it makes
+        // a key. The HUD slot label mirrors which mode the next press fires.
+        const itemCost = equipped.itemCost ?? 20;
+        const wantsItem = this.inventory.getCoins() >= itemCost;
+        const ok = wantsItem
+          ? this.executeTransmuteCoinsToItem(itemCost)
+          : this.executeTransmuteCoinsToKey(equipped.coinCost ?? 5);
+        if (!ok) return;
+        break;
+      }
       default:
         // Unknown kind — defensive against a future ActiveItemKind being
         // added to the type without a switch arm here.
         return;
     }
     EventBus.emit('activeItem:activated', { itemId: equippedItem.id });
+  }
+
+  /**
+   * Transmutation Stone — [Q] converts `coinCost` coins into one key.
+   * Returns false (no activation event) when the player can't afford it;
+   * `spendCoins` is atomic so a failed attempt costs nothing. Visual is
+   * a small gold sparkle burst on the player plus the key-pickup chime —
+   * the unlock-style magic tail reads as "transmutation" without a new
+   * SFX recipe.
+   */
+  private executeTransmuteCoinsToKey(coinCost: number): boolean {
+    if (!this.inventory.spendCoins(coinCost)) return false;
+    this.inventory.addKeys(1);
+    getSfxSynth().playDoorUnlock();
+    this.spawnTransmuteRing(0xffd84a, 3.2);
+    return true;
+  }
+
+  /**
+   * Transmutation Stone item mode — 20 coins roll a random treasure-pool
+   * item, spawned as a pedestal pickup one tile above the player so the
+   * normal collect flow (toast + SFX + floor-wide-uniqueness bookkeeping)
+   * runs. Excludes picked + floor-reserved ids so the roll can't duplicate
+   * a shop/treasure/boss slot elsewhere on the floor (same exclude union as
+   * `spawnBossPoolItem`). Seeded per-run + roll counter so a run replay is
+   * deterministic. Falls back to the key conversion when the treasure pool
+   * is exhausted (very-late-game edge) — coins are only spent on success.
+   */
+  private executeTransmuteCoinsToItem(itemCost: number): boolean {
+    const pickedIds = this.itemSystem.getPickedIds();
+    const exclude = new Set<ItemId>(pickedIds as ReadonlySet<ItemId>);
+    for (const id of this.getFloorReservedItemIds()) exclude.add(id as ItemId);
+    const rng = new RNG(`${this.dungeonSeed}-transmute-${this.transmuteRollCount}`);
+    const itemDef = pickItemFromPool(ItemPool.Treasure, rng, exclude, this.currentFloorId);
+    if (!itemDef) {
+      // Pool exhausted — degrade gracefully to the key conversion so [Q]
+      // never whiffs while the player can afford SOMETHING.
+      return this.executeTransmuteCoinsToKey(5);
+    }
+    if (!this.inventory.spendCoins(itemCost)) return false;
+    this.transmuteRollCount++;
+
+    const pickup = new ItemPickup(
+      this,
+      this.player.x,
+      this.player.y - TILE_SIZE,
+      itemDef,
+      this.itemSystem,
+    );
+    pickup.setSpawnProtection(700);
+    this.pickups.add(pickup);
+
+    getSfxSynth().playDoorUnlock();
+    this.spawnTransmuteRing(0xffd84a, 4.6);
+    // Second, brighter inner ring sells the bigger conversion tier.
+    this.spawnTransmuteRing(0xfff0a8, 2.4);
+    return true;
+  }
+
+  /** Gold shimmer ring on the player so a transmutation has a body-level
+   * visual anchor, not just the HUD counters ticking. */
+  private spawnTransmuteRing(color: number, endScale: number): void {
+    const ring = this.add
+      .circle(this.player.x, this.player.y, 10)
+      .setStrokeStyle(2, color, 0.9)
+      .setFillStyle(0x000000, 0)
+      .setDepth(DepthLayers.Player + 1);
+    this.tweens.add({
+      targets: ring,
+      scale: endScale,
+      alpha: 0,
+      duration: 420,
+      ease: 'Sine.Out',
+      onComplete: () => ring.destroy(),
+    });
   }
 
   /**

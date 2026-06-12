@@ -945,6 +945,9 @@ export const TextureKeys = {
    *  Same silhouette / glass / cork as the full vial, just no liquid +
    *  dimmer halo so the spent state reads visually. */
   ItemBloodOfMarquisEmpty: 'tex-item-blood-of-marquis-empty',
+  ItemBloodlettersPact: 'tex-item-bloodletters-pact',
+  ItemTransmutationStone: 'tex-item-transmutation-stone',
+  ItemHummingbirdFeather: 'tex-item-hummingbird-feather',
   BossMossyBehemoth: 'tex-boss-mossy-behemoth',
   BossPixieQueen: 'tex-boss-pixie-queen',
   BossForestHeart: 'tex-boss-forest-heart',
@@ -1114,7 +1117,18 @@ export const BASE_PLAYER_STATS: PlayerStats = {
   homingTurnRate: 0,
   burnDamageFactor: 0,
   multishotCount: 1,
+  fireRateRampPerCast: 0,
+  fireRateRampMax: 0,
 };
+
+/**
+ * Fire-rate-ramp rhythm break ("Hummingbird Feather"): when the gap since
+ * the last cast exceeds this multiple of the character's un-ramped fire
+ * interval, the ramp stack resets — releasing the cast key breaks the
+ * wingbeat rhythm just like switching direction does. 2.5 leaves room for
+ * one dropped beat (knockback, brief reposition) without punishing it.
+ */
+export const FIRE_RATE_RAMP_BREAK_FACTOR = 2.5;
 
 /** Damage-Multiplier pro Multishot-Shot wenn `multishotCount > 1`. Single
  * shot bleibt 1.0× damage, alles ab 2 Shots fired bei 0.80×/Shot. So

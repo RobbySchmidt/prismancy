@@ -3,6 +3,7 @@ import { GAME_HEIGHT } from '../config/GameConfig';
 import { DepthLayers } from '../config/DepthLayers';
 import { ITEMS, type ItemId } from '../data/items';
 import { type ActiveItemSystem } from '../systems/ActiveItemSystem';
+import { type Inventory } from '../systems/Inventory';
 import { type PlayerHealth } from '../systems/PlayerHealth';
 import { type ItemDefinition } from '../types';
 import { EventBus } from '../utils/EventBus';
@@ -51,10 +52,14 @@ export class ActiveItemSlot {
   /** Cached so `refreshUsable` knows when to flip greyed → usable without
    *  forcing the caller to pass HP every time. */
   private currentHp = 0;
+  /** Cached coin count for the Transmutation Stone's affordability gate —
+   *  kept fresh via `inventory:changed`. */
+  private currentCoins = 0;
   private readonly playerHealth: PlayerHealth | null;
 
   private readonly equippedHandler: (payload: { itemId: string | null }) => void;
   private readonly healthHandler: (payload: { current: number }) => void;
+  private readonly inventoryHandler: (payload: { coins: number }) => void;
   private readonly activatedHandler: (payload: { itemId: string }) => void;
 
   constructor(scene: Phaser.Scene) {
@@ -112,12 +117,17 @@ export class ActiveItemSlot {
       this.currentHp = current;
       this.refreshUsable();
     };
+    this.inventoryHandler = ({ coins }) => {
+      this.currentCoins = coins;
+      this.refreshUsable();
+    };
     this.activatedHandler = ({ itemId }) => {
       if (itemId === this.currentItemId) this.playActivationFlash();
     };
 
     EventBus.on('activeItem:equipped', this.equippedHandler);
     EventBus.on('player:healthChanged', this.healthHandler);
+    EventBus.on('inventory:changed', this.inventoryHandler);
     EventBus.on('activeItem:activated', this.activatedHandler);
 
     // Prime from current state — equipped item from registry, current HP
@@ -132,12 +142,17 @@ export class ActiveItemSlot {
     this.playerHealth = (scene.registry.get('playerHealth') as PlayerHealth | undefined) ?? null;
     if (this.playerHealth) {
       this.currentHp = this.playerHealth.getCurrent();
-      this.refreshUsable();
     }
+    const inventory = scene.registry.get('inventory') as Inventory | undefined;
+    if (inventory) {
+      this.currentCoins = inventory.getCoins();
+    }
+    this.refreshUsable();
 
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       EventBus.off('activeItem:equipped', this.equippedHandler);
       EventBus.off('player:healthChanged', this.healthHandler);
+      EventBus.off('inventory:changed', this.inventoryHandler);
       EventBus.off('activeItem:activated', this.activatedHandler);
       this.backdrop.destroy();
       this.trimRing.destroy();
@@ -166,8 +181,23 @@ export class ActiveItemSlot {
 
   private refreshUsable(): void {
     if (this.currentItemId === null || !this.currentItemDef) return;
-    const usable = this.currentHp >= MIN_HP_TO_ACTIVATE;
     const def = this.currentItemDef;
+    // Per-kind cost gate, mirroring GameScene.tryActivateActiveItem:
+    // Echoes of Blood pays in HP, the Transmutation Stone in coins.
+    const isTransmute = def.active?.kind === 'transmuteCoinsToKey';
+    const usable = isTransmute
+      ? this.currentCoins >= (def.active?.coinCost ?? 5)
+      : this.currentHp >= MIN_HP_TO_ACTIVATE;
+    // The stone auto-upgrades by wallet (≥ itemCost coins → random item
+    // instead of key) — surface which conversion the next press fires so
+    // the threshold switch never surprises the player.
+    if (isTransmute) {
+      const next =
+        this.currentCoins >= (def.active?.itemCost ?? 20) ? 'ITEM' : 'KEY';
+      this.keyLabel.setText(`[Q] ${next}`);
+    } else {
+      this.keyLabel.setText('[Q]');
+    }
     // If the item provides a dedicated "spent" texture (Blood of Marquis
     // empty vial), texture-swap reads much cleaner than the generic
     // tint+alpha fallback. The full sprite snaps back the moment the

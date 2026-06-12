@@ -5,6 +5,7 @@ import {
   DASH_INVINCIBILITY_MS,
   DASH_SPEED,
   HIT_FLASH_DURATION_MS,
+  FIRE_RATE_RAMP_BREAK_FACTOR,
   HIT_FLASH_TINT_PLAYER,
   KNOCKBACK_DURATION_MS,
   MISSILE_FIRE_INTERVAL_MS,
@@ -99,6 +100,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly stats: StatsSystem;
   private nextFireAt = 0;
   private knockbackUntil = 0;
+
+  // --- Fire-rate ramp ("Hummingbird Feather") -------------------------------
+  // Per-instance rhythm state, analogous to how missile-modifier mechanics
+  // live on the missile instance: StatsSystem owns the tunables
+  // (`fireRateRampPerCast` / `fireRateRampMax`), the player owns the beat
+  // counter. Stacks build on consecutive casts in the SAME direction and
+  // reset on a direction switch or a broken cadence (gap > break factor ×
+  // un-ramped interval).
+  private rampStacks = 0;
+  private lastCastDir: Direction | null = null;
+  private lastCastAt = Number.NEGATIVE_INFINITY;
 
   // --- Dash state (Spellblade only) -----------------------------------------
   /** Timestamp at which the current dash burst ends. Move input is
@@ -210,12 +222,43 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (time < this.nextFireAt) return;
     const dir: Direction | null = this.inputManager.getShootDirection();
     if (!dir) return;
-    const fireRate = this.stats.getEffective('fireRate');
+    const fireRate = this.applyFireRateRamp(this.stats.getEffective('fireRate'), dir, time);
     if (this.character === 'spellblade') {
       this.fireSpellbladeBolt(dir, time, fireRate);
     } else {
       this.fireWizardMissile(dir, time, fireRate);
     }
+  }
+
+  /**
+   * Hummingbird-Feather wingbeat ramp. Each consecutive cast in the SAME
+   * direction adds `fireRateRampPerCast` to the fire-rate factor, capped at
+   * `fireRateRampMax`; switching direction or dropping the cadence (gap
+   * longer than `FIRE_RATE_RAMP_BREAK_FACTOR` un-ramped intervals) resets
+   * the rhythm. No-op (returns `fireRate` untouched) while no ramp item is
+   * held. The first cast of a streak fires at base rate — stacks reward the
+   * beats AFTER the commitment, not the commitment itself.
+   */
+  private applyFireRateRamp(fireRate: number, dir: Direction, time: number): number {
+    const perCast = this.stats.getEffective('fireRateRampPerCast');
+    if (perCast <= 0) {
+      this.lastCastDir = dir;
+      this.lastCastAt = time;
+      return fireRate;
+    }
+    const baseInterval =
+      (this.character === 'spellblade'
+        ? SPELLBLADE_BOLT_FIRE_INTERVAL_MS
+        : MISSILE_FIRE_INTERVAL_MS) / Math.max(fireRate, 0.01);
+    const rhythmBroken =
+      dir !== this.lastCastDir ||
+      time - this.lastCastAt > baseInterval * FIRE_RATE_RAMP_BREAK_FACTOR;
+    this.rampStacks = rhythmBroken ? 0 : this.rampStacks + 1;
+    this.lastCastDir = dir;
+    this.lastCastAt = time;
+
+    const rampMax = this.stats.getEffective('fireRateRampMax');
+    return fireRate * (1 + Math.min(this.rampStacks * perCast, rampMax));
   }
 
   /** Wizard cast — the original magic-missile orb. */

@@ -228,6 +228,15 @@ export interface PlayerStats {
    * einzelner Hit auf Trash ist 0.75× (Trade-off zwischen Boss-Killer und
    * Group-Clear). */
   multishotCount: number;
+  /** "Flügelschlag-Rhythmus": zusätzlicher fireRate-Faktor pro
+   * aufeinanderfolgendem Cast in DIESELBE Richtung. Base 0 = kein Ramp.
+   * Hummingbird Feather setzt das auf 0.05 (+5 % pro Cast). Der Ramp-State
+   * (Stack-Zähler, letzte Richtung) lebt auf der Player-Instanz analog zu
+   * den Missile-Modifiern; Reset bei Richtungswechsel oder Cast-Pause. */
+  fireRateRampPerCast: number;
+  /** Obergrenze des Ramp-Bonus als Faktor-Anteil (0.4 = max +40 % fireRate).
+   * Base 0. Nur relevant wenn `fireRateRampPerCast > 0`. */
+  fireRateRampMax: number;
 }
 export type StatKey = keyof PlayerStats;
 
@@ -262,6 +271,10 @@ export const ActiveItemKind = {
    * Trash mobs instant-kill, bosses take `bossDamageFraction` of their
    * max HP (Phase-Threshold cross natürlich). Player drops to 1/2 heart. */
   EchoesOfBlood: 'echoesOfBlood',
+  /** Transmutation Stone [Q] — converts `coinCost` coins into one key.
+   * Pure economy valve, no combat effect. Fails silently (no key, no
+   * coin spend) when the player can't afford the cost. */
+  TransmuteCoinsToKey: 'transmuteCoinsToKey',
 } as const;
 export type ActiveItemKind = (typeof ActiveItemKind)[keyof typeof ActiveItemKind];
 
@@ -270,6 +283,15 @@ export interface ActiveItemSpec {
   /** For `echoesOfBlood`: fraction of boss's max HP dealt as damage on use.
    * Trash mobs are instant-killed regardless. Defaults handled per-kind. */
   bossDamageFraction?: number;
+  /** For `transmuteCoinsToKey`: coins consumed for the key conversion.
+   * Default handled per-kind (5). */
+  coinCost?: number;
+  /** For `transmuteCoinsToKey`: coins consumed for the random-item
+   * conversion. The activation auto-upgrades — at `itemCost`+ coins [Q]
+   * rolls a treasure-pool item instead of a key (user decision 2026-06-12;
+   * keys stay shop-buyable for 5 so a full wallet can't lock you out of
+   * key access entirely). Default handled per-kind (20). */
+  itemCost?: number;
 }
 
 /**
@@ -333,6 +355,19 @@ export interface ItemDefinition {
    * renames don't break the gate.
    */
   metaUnlock?: string;
+  /**
+   * When true, heart drops from room-clear rolls are converted to coins
+   * for the rest of the run (Bloodletter's Pact). Boss-reward hearts,
+   * shop heart slots and crate contents are deliberately unaffected —
+   * the trade moves healing into the shop, it doesn't remove it.
+   */
+  suppressHeartDrops?: boolean;
+  /**
+   * Multiplier on every enemy's `coinDropChance` (multiplicative across
+   * items, applied in `BaseEnemy.die` via the `coinDropMultiplier`
+   * registry slot). Bloodletter's Pact sets 1.6.
+   */
+  coinDropMult?: number;
 }
 
 export interface DropTableEntry {

@@ -161,6 +161,9 @@ export class PreloadScene extends Phaser.Scene {
     this.drawItemFireOrbTexture(g);
     this.drawItemBloodOfMarquisTexture(g);
     this.drawItemBloodOfMarquisEmptyTexture(g);
+    this.drawItemBloodlettersPactTexture(g);
+    this.drawItemTransmutationStoneTexture(g);
+    this.drawItemHummingbirdFeatherTexture(g);
     this.drawStairsTexture(g);
 
     for (const theme of Object.values(FLOORS)) {
@@ -5554,6 +5557,156 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(9, 7, 1, 3);
 
     g.generateTexture(TextureKeys.ItemBloodOfMarquisEmpty, w, h);
+  }
+
+  /**
+   * Bloodletter's Pact — rolled parchment contract with a crimson wax seal
+   * and a single blood drip. Parchment tones keep it visually distinct from
+   * the all-crimson Blood-of-Marquis family while the seal + drip tie it to
+   * the same "deal in blood" theme.
+   */
+  private drawItemBloodlettersPactTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    g.clear();
+
+    const OUT = 0x2a1408;
+    const PARCH = 0xd8c090;
+    const PARCH_SHADOW = 0xb09860;
+    const PARCH_HI = 0xf0e0b8;
+    const WAX_DARK = 0x701018;
+    const WAX = 0xc8284a;
+    const WAX_HI = 0xff5060;
+
+    // Scroll silhouette
+    g.fillStyle(OUT, 1);
+    g.fillRect(2, 1, 10, 11);
+    // Parchment face
+    g.fillStyle(PARCH, 1);
+    g.fillRect(3, 2, 8, 9);
+    // Rolled caps (top + bottom read darker, like curled paper)
+    g.fillStyle(PARCH_SHADOW, 1);
+    g.fillRect(3, 2, 8, 1);
+    g.fillRect(3, 10, 8, 1);
+    // Left light edge
+    g.fillStyle(PARCH_HI, 1);
+    g.fillRect(3, 3, 1, 7);
+    // Contract script lines
+    g.fillStyle(PARCH_SHADOW, 1);
+    g.fillRect(5, 4, 5, 1);
+    g.fillRect(5, 6, 4, 1);
+
+    // Crimson wax seal, bottom-center, overlapping the lower roll
+    g.fillStyle(OUT, 1);
+    g.fillCircle(7, 9, 3.4);
+    g.fillStyle(WAX_DARK, 1);
+    g.fillCircle(7, 9, 2.7);
+    g.fillStyle(WAX, 1);
+    g.fillCircle(7, 9, 1.9);
+    g.fillStyle(WAX_HI, 1);
+    g.fillRect(6, 8, 1, 1);
+
+    // Single blood drip below the seal
+    g.fillStyle(WAX, 1);
+    g.fillRect(7, 12, 1, 2);
+
+    g.generateTexture(TextureKeys.ItemBloodlettersPact, w, h);
+  }
+
+  /**
+   * Transmutation Stone — faceted violet-grey stone with a molten gold core
+   * (coins going in) and a single sparkle. The gold-in-stone contrast is the
+   * transmutation read; silhouette stays a simple orb so it scans at 14 px.
+   */
+  private drawItemTransmutationStoneTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    g.clear();
+
+    const OUT = 0x1a1028;
+    const STONE_DARK = 0x504468;
+    const STONE = 0x8878a8;
+    const STONE_HI = 0xc0b0e0;
+    const GOLD_DARK = 0xb08818;
+    const GOLD = 0xffd84a;
+    const SPARKLE = 0xffffff;
+
+    // Soft gold halo — sells "arcane conversion engine"
+    g.fillStyle(GOLD, 0.1);
+    g.fillCircle(7, 7, 6.5);
+
+    // Stone body, 4-tone
+    g.fillStyle(OUT, 1);
+    g.fillCircle(7, 7, 5.5);
+    g.fillStyle(STONE_DARK, 1);
+    g.fillCircle(7, 7, 4.6);
+    g.fillStyle(STONE, 1);
+    g.fillCircle(6.5, 6.5, 3.5);
+    // Facet highlight, top-left
+    g.fillStyle(STONE_HI, 1);
+    g.fillRect(5, 4, 2, 1);
+    g.fillRect(4, 5, 1, 2);
+
+    // Molten gold core
+    g.fillStyle(GOLD_DARK, 1);
+    g.fillCircle(7, 7, 1.9);
+    g.fillStyle(GOLD, 1);
+    g.fillCircle(7, 7, 1.2);
+
+    // Sparkle pixel off the rim
+    g.fillStyle(SPARKLE, 1);
+    g.fillRect(10, 3, 1, 1);
+
+    g.generateTexture(TextureKeys.ItemTransmutationStone, w, h);
+  }
+
+  /**
+   * Hummingbird Feather — diagonal teal feather with a magenta tip-blush and
+   * a pale quill line, bottom-left to top-right. Teal + magenta is the
+   * classic hummingbird iridescence pair and stays clear of the gold/crimson
+   * item families.
+   */
+  private drawItemHummingbirdFeatherTexture(g: Phaser.GameObjects.Graphics): void {
+    const w = 14;
+    const h = 14;
+    g.clear();
+
+    const OUT = 0x081820;
+    const TEAL_DARK = 0x107878;
+    const TEAL = 0x20c0b0;
+    const TEAL_HI = 0x80f0e0;
+    const MAGENTA = 0xe060c0;
+    const QUILL = 0xf0f0e8;
+
+    // Feather silhouette — two triangles spanning the diagonal, barbs above
+    // and below the quill line from (3,11) to (10,4)
+    g.fillStyle(OUT, 1);
+    g.fillTriangle(2, 12, 11, 1, 12, 6);
+    g.fillTriangle(2, 12, 11, 1, 6, 2);
+
+    // Lower barbs (lit side)
+    g.fillStyle(TEAL, 1);
+    g.fillTriangle(3, 11, 10, 2, 11, 6);
+    // Upper barbs (shaded side)
+    g.fillStyle(TEAL_DARK, 1);
+    g.fillTriangle(3, 11, 10, 2, 7, 3);
+
+    // Iridescent magenta blush at the tip
+    g.fillStyle(MAGENTA, 1);
+    g.fillRect(9, 2, 2, 2);
+
+    // Sheen ticks on the lit side
+    g.fillStyle(TEAL_HI, 1);
+    g.fillRect(5, 8, 2, 1);
+    g.fillRect(7, 6, 2, 1);
+
+    // Quill line down the spine
+    g.fillStyle(QUILL, 1);
+    for (let i = 0; i < 8; i++) {
+      g.fillRect(3 + i, 11 - i, 1, 1);
+    }
+
+    g.generateTexture(TextureKeys.ItemHummingbirdFeather, w, h);
   }
 
   /**

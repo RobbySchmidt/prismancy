@@ -17,6 +17,13 @@ import { EventBus } from '../utils/EventBus';
  */
 export class ItemSystem {
   private readonly picked = new Set<string>();
+  /** True once any picked item carries `suppressHeartDrops` (Bloodletter's
+   * Pact). Read by DropSystem to remap room-clear heart rolls to coins. */
+  private heartDropsSuppressed = false;
+  /** Product of all picked items' `coinDropMult`. Mirrored into the scene
+   * registry (`coinDropMultiplier`) by GameScene so BaseEnemy.die can read
+   * it without an ItemSystem reference. */
+  private coinDropMultiplier = 1;
 
   constructor(
     private readonly stats: StatsSystem,
@@ -49,6 +56,7 @@ export class ItemSystem {
     if (item.active !== undefined) {
       this.activeItemSystem?.equip(item);
     }
+    this.applyDropProfile(item);
     this.picked.add(item.id);
     // Trophy/collection: log the discovery in MetaProgress. Idempotent —
     // re-picking an already-discovered item is a no-op there. Hydrate
@@ -100,7 +108,25 @@ export class ItemSystem {
       if (item.active !== undefined) {
         this.activeItemSystem?.equip(item);
       }
+      this.applyDropProfile(item);
       this.picked.add(item.id);
     }
+  }
+
+  /** Shared between pickUp + hydrate: fold the item's drop-profile fields
+   * (Bloodletter's Pact) into the run-wide aggregates. Guarded against
+   * double-application on a re-pick of the same id. */
+  private applyDropProfile(item: ItemDefinition): void {
+    if (this.picked.has(item.id)) return;
+    if (item.suppressHeartDrops) this.heartDropsSuppressed = true;
+    if (item.coinDropMult !== undefined) this.coinDropMultiplier *= item.coinDropMult;
+  }
+
+  isHeartDropSuppressed(): boolean {
+    return this.heartDropsSuppressed;
+  }
+
+  getCoinDropMultiplier(): number {
+    return this.coinDropMultiplier;
   }
 }

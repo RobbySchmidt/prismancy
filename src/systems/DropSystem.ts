@@ -15,6 +15,10 @@ export interface DropSystemHost {
   } | null;
   getCurrentRoomCenter(): { x: number; y: number } | null;
   spawnPickup(kind: PickupKind, x: number, y: number): BasePickup | null;
+  /** True while a Bloodletter's-Pact-style item is held — heart rolls are
+   * then remapped to coins at spawn time. The remap happens AFTER the RNG
+   * pick so drop determinism per (seed, room) is unaffected. */
+  isHeartDropSuppressed(): boolean;
 }
 
 /**
@@ -56,6 +60,14 @@ export class DropSystem {
     const center = this.host.getCurrentRoomCenter();
     if (!center) return;
 
-    this.host.spawnPickup(entry.pickup, center.x, center.y);
+    // Bloodletter's Pact: hearts bleed into coins. Remap post-roll so the
+    // (seed, room) RNG sequence — and thus every other drop — stays
+    // identical with or without the item.
+    const kind =
+      entry.pickup === PickupKind.Heart && this.host.isHeartDropSuppressed()
+        ? PickupKind.Coin
+        : entry.pickup;
+
+    this.host.spawnPickup(kind, center.x, center.y);
   };
 }

@@ -107,9 +107,15 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     EventBus.emit('enemy:killed', { x: this.x, y: this.y });
     // Roll the per-enemy coin drop. Bosses set chance=0, so this is a no-op
     // for them — boss rewards go through the dedicated `boss:killed` flow.
+    // `coinDropMultiplier` (registry, maintained by GameScene from the
+    // ItemSystem aggregate) scales the chance — Bloodletter's Pact trades
+    // heart drops for a fatter coin stream. Same registry pattern as
+    // `enemyHpMultiplier` in the constructor.
+    const coinMult =
+      (this.scene.registry.get('coinDropMultiplier') as number | undefined) ?? 1;
     if (
       this.definition.coinDropChance > 0 &&
-      Math.random() < this.definition.coinDropChance
+      Math.random() < this.definition.coinDropChance * coinMult
     ) {
       EventBus.emit('enemy:droppedCoin', { x: this.x, y: this.y });
     }

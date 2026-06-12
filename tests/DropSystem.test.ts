@@ -32,6 +32,7 @@ function makeHost(opts: {
   room?: FakeRoom | undefined;
   center?: { x: number; y: number } | null;
   spawn?: SpawnSpy;
+  heartsSuppressed?: boolean;
 }): DropSystemHost {
   const room = opts.room;
   const center = opts.center === undefined ? { x: 480, y: 288 } : opts.center;
@@ -41,6 +42,7 @@ function makeHost(opts: {
     }),
     getCurrentRoomCenter: () => center,
     spawnPickup: opts.spawn ?? vi.fn(() => null),
+    isHeartDropSuppressed: () => opts.heartsSuppressed ?? false,
   };
 }
 
@@ -58,7 +60,7 @@ describe('DropSystem', () => {
     sys.attach();
     expect(onMock).toHaveBeenCalledTimes(1);
     expect(onMock.mock.calls[0]?.[0]).toBe('floor:roomCleared');
-    const handler = onMock.mock.calls[0]?.[1];
+    const handler: unknown = onMock.mock.calls[0]?.[1];
     expect(typeof handler).toBe('function');
 
     sys.detach();
@@ -167,5 +169,72 @@ describe('DropSystem', () => {
     expect(spawn).toHaveBeenCalledTimes(1);
     const kind = spawn.mock.calls[0]?.[0];
     expect(kind === PickupKind.BrownCrate || kind === PickupKind.GoldCrate).toBe(true);
+  });
+
+  it("remaps heart rolls to coins while a Bloodletter's-Pact item is held", () => {
+    const spawn: SpawnSpy = vi.fn(() => null);
+    const host = makeHost({
+      room: { kind: RoomKind.Normal },
+      spawn,
+      heartsSuppressed: true,
+    });
+    // Heart-only table so every successful roll exercises the remap.
+    const table: DropTable = {
+      chance: 1,
+      entries: [{ pickup: PickupKind.Heart, weight: 1 }],
+    };
+    const sys = new DropSystem(host, 'pact-seed', table);
+    sys.attach();
+    const handler = onMock.mock.calls[0]?.[1] as (p: { roomId: string }) => void;
+
+    handler({ roomId: 'r-1-1' });
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(spawn.mock.calls[0]?.[0]).toBe(PickupKind.Coin);
+  });
+
+  it('heart remap keeps every non-heart drop identical (RNG sequence untouched)', () => {
+    // Same seed + room with and without suppression: when the roll lands on
+    // a non-heart entry, both hosts must produce the exact same pickup.
+    const table: DropTable = {
+      chance: 1,
+      entries: [
+        { pickup: PickupKind.Coin, weight: 5 },
+        { pickup: PickupKind.Key, weight: 1.5 },
+        { pickup: PickupKind.Heart, weight: 2 },
+      ],
+    };
+    for (let i = 0; i < 30; i++) {
+      onMock.mockClear();
+      const spawnPlain: SpawnSpy = vi.fn(() => null);
+      const spawnPact: SpawnSpy = vi.fn(() => null);
+      const plain = new DropSystem(
+        makeHost({ room: { kind: RoomKind.Normal }, spawn: spawnPlain }),
+        'remap-seed',
+        table,
+      );
+      const pact = new DropSystem(
+        makeHost({
+          room: { kind: RoomKind.Normal },
+          spawn: spawnPact,
+          heartsSuppressed: true,
+        }),
+        'remap-seed',
+        table,
+      );
+      plain.attach();
+      const handlerPlain = onMock.mock.calls.at(-1)?.[1] as (p: { roomId: string }) => void;
+      pact.attach();
+      const handlerPact = onMock.mock.calls.at(-1)?.[1] as (p: { roomId: string }) => void;
+
+      handlerPlain({ roomId: `r-${i}-7` });
+      handlerPact({ roomId: `r-${i}-7` });
+      const plainKind = spawnPlain.mock.calls[0]?.[0];
+      const pactKind = spawnPact.mock.calls[0]?.[0];
+      if (plainKind === PickupKind.Heart) {
+        expect(pactKind).toBe(PickupKind.Coin);
+      } else {
+        expect(pactKind).toBe(plainKind);
+      }
+    }
   });
 });

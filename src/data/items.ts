@@ -263,6 +263,61 @@ export const ITEMS = {
     effects: [{ stat: 'burnDamageFactor', add: 0.3 }],
     missileTint: 0xff7030,
   },
+  // --- Trade-Items (Gungeon-style sidegrades, 2026-06-12) -------------------
+  bloodlettersPact: {
+    id: 'bloodlettersPact',
+    displayName: "Bloodletter's Pact",
+    description: 'Foes no longer drop hearts. They bleed coins instead.',
+    textureKey: TextureKeys.ItemBloodlettersPact,
+    pools: [ItemPool.Treasure],
+    // Pure drop-profile trade — deliberately no stat effects. Healing moves
+    // into the shop (heart slot, 3 coins), funded by the fatter coin
+    // stream: room-clear heart rolls become coins (DropSystem remap) and
+    // every enemy's coinDropChance is multiplied by 1.6 (BaseEnemy.die via
+    // the `coinDropMultiplier` registry slot). Boss-reward hearts, shop
+    // hearts and crate contents stay untouched — the pact reroutes
+    // healing, it doesn't delete it.
+    effects: [],
+    suppressHeartDrops: true,
+    coinDropMult: 1.6,
+  },
+  transmutationStone: {
+    id: 'transmutationStone',
+    displayName: 'Transmutation Stone',
+    description: '[Q] transmutes 5 coins into a key — or 20 into a random item.',
+    textureKey: TextureKeys.ItemTransmutationStone,
+    // Shop-only on purpose: buying a coin→key engine WITH coins is itself
+    // the trade. Equipping it also occupies the single [Q] slot (replaces
+    // Blood of Marquis) — economy utility vs. combat active.
+    // The 20-coin item roll is deliberately a WORSE deal than a shop item
+    // (8-15 coins, chosen vs. random) — the premium buys availability
+    // anywhere. Strong emergent pairing with Bloodletter's Pact (+60%
+    // coins) → economy-engine build.
+    pools: [ItemPool.Shop],
+    shopPrice: 8,
+    effects: [],
+    active: {
+      kind: ActiveItemKind.TransmuteCoinsToKey,
+      coinCost: 5,
+      itemCost: 20,
+    },
+  },
+  hummingbirdFeather: {
+    id: 'hummingbirdFeather',
+    displayName: 'Hummingbird Feather',
+    description: 'Rhythmic casts in one direction quicken the wand. Turning breaks the beat.',
+    textureKey: TextureKeys.ItemHummingbirdFeather,
+    pools: [ItemPool.Treasure],
+    // Wingbeat ramp: +5% fireRate per consecutive cast in the SAME
+    // direction, capped at +40% (reached after 8 beats). Direction switch
+    // or a dropped cadence resets to base — the power lives in committing
+    // to a firing axis, which is exactly the tunnel-vision risk the player
+    // pays for it. Ramp state lives on Player.applyFireRateRamp.
+    effects: [
+      { stat: 'fireRateRampPerCast', add: 0.05 },
+      { stat: 'fireRateRampMax', add: 0.4 },
+    ],
+  },
   // --- Active-Item — Blood of Marquis ---------------------------------------
   bloodOfMarquis: {
     id: 'bloodOfMarquis',
