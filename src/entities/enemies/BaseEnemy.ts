@@ -160,16 +160,27 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     if (this.isElite) return;
     this.isElite = true;
     this.eliteBurstPool = pool;
-    this.hp = Math.max(1, Math.round(this.hp * ELITE_HP_MULT));
+    // Per-floor elite HP multiplier (registry-mirrored from
+    // `FloorTheme.eliteHpMult` in GameScene.init, fallback ELITE_HP_MULT):
+    // Onyx runs ×4.5 instead of ×6 — the high authored Onyx mob HP ×2.0
+    // floor mult ×6 compounded into way too fat champions (user-flagged
+    // 2026-06-12, "mindestens 20% weniger").
+    const eliteMult =
+      (this.scene.registry.get('eliteHpMultiplier') as number | undefined) ?? ELITE_HP_MULT;
+    this.hp = Math.max(1, Math.round(this.hp * eliteMult));
     this.setScale(this.scale * ELITE_SCALE_MULT);
     this.nextEliteBurstAt = this.scene.time.now + ELITE_BURST_INITIAL_DELAY_MS;
     // Per-instance definition copy with a buffed moveSpeed — every subclass
     // AI reads `this.definition.moveSpeed` per frame, so the copy speeds
     // them all up without touching the shared ENEMIES entry. Rooted mobs
-    // (moveSpeed 0) are unaffected.
+    // (moveSpeed 0) are unaffected. `knockbackFactor: 0` makes champions
+    // knockback-IMMUNE (same reasoning as bosses): a solo champion that
+    // can be corner-pushed by sustained fire is no encounter at all
+    // (user-flagged with the candelabra champion).
     this.definition = {
       ...this.definition,
       moveSpeed: Math.round(this.definition.moveSpeed * ELITE_MOVE_SPEED_MULT),
+      knockbackFactor: 0,
     };
 
     this.eliteAura = this.scene.add
@@ -247,8 +258,15 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     this.emitMinibossHp();
     this.flashHit();
     if (knockback) {
-      this.setVelocity(knockback.x, knockback.y);
-      this.knockbackUntil = this.scene.time.now + KNOCKBACK_DURATION_MS;
+      // `knockbackFactor` scales the shove (default 1). 0 = fully immune:
+      // no velocity AND no AI-lock — otherwise a sustained-fire stream
+      // would still stun-lock an "immune" enemy via knockbackUntil even
+      // though it never moves. Champions are pinned to 0 in promoteToElite.
+      const factor = this.definition.knockbackFactor ?? 1;
+      if (factor > 0) {
+        this.setVelocity(knockback.x * factor, knockback.y * factor);
+        this.knockbackUntil = this.scene.time.now + KNOCKBACK_DURATION_MS;
+      }
     }
     if (this.hp <= 0) {
       this.die();

@@ -40,6 +40,8 @@ export const FLOORS = {
     enemyHpMultiplier: 1.0,
     /** Baseline — floor 1 bosses keep pure DPS-ratio scaling. */
     bossHpMultiplier: 1.0,
+    /** Default champion HP mult (= ELITE_HP_MULT). */
+    eliteHpMult: 6,
     // Run-length pass (2026-06-12): progressive room counts 10/12/14 replace
     // the old flat 8. Floor 1 stays the snappiest as the run's on-ramp.
     roomCount: 10,
@@ -78,6 +80,7 @@ export const FLOORS = {
     // bosses melted faster than the (fully DPS-scaled) miniboss. Applied
     // ON TOP of the DPS-ratio scaling in BossEnemy.
     bossHpMultiplier: 1.25,
+    eliteHpMult: 6,
     roomCount: 12,
     eliteRoomCount: 2,
     minibossIds: ['miniboss-mire-lurker'],
@@ -118,6 +121,11 @@ export const FLOORS = {
     // (user-flag: Marquis + Prismarch combined felt shorter than the
     // Doppelgänger fight).
     bossHpMultiplier: 1.5,
+    /** ×5.1 statt ×6 (−15%): Onyx-Mobs sind mit hoher HP authored UND
+     * tragen den ×2.0-Floor-Mult — die volle ×6 stapelte Champions fetter
+     * als den Miniboss. Tuning-Verlauf: ×4.5 (−25%) war im Playtest zu
+     * weich, ×5.1 ist der User-Pick (2026-06-12). */
+    eliteHpMult: 5.1,
     roomCount: 14,
     eliteRoomCount: 2,
     minibossIds: ['miniboss-doppelganger'],

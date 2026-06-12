@@ -100,6 +100,14 @@ export interface FloorTheme {
    */
   bossHpMultiplier?: number;
   /**
+   * Per-floor multiplier a champion (elite-promoted mob) applies to its
+   * already-floor-multiplied HP. Unset falls back to `ELITE_HP_MULT` (6).
+   * Onyx runs lower (4.5): its mobs are authored with high HP AND carry
+   * the ×2.0 floor mult, so the full ×6 compounded into champions fatter
+   * than the miniboss (user-flagged 2026-06-12).
+   */
+  eliteHpMult?: number;
+  /**
    * Rooms the generator targets for this floor. Unset falls back to
    * `DUNGEON_TARGET_ROOM_COUNT`. Progressive per floor (10/12/14) since the
    * 2026-06-12 run-length pass.

@@ -5,6 +5,7 @@ import {
   BURN_TICK_COUNT,
   CAMERA_ZOOM,
   DUNGEON_TARGET_ROOM_COUNT,
+  ELITE_HP_MULT,
   ENEMY_PROJECTILE_DAMAGE,
   MINIBOSS_ITEM_DROP_CHANCE,
   MINIBOSS_REWARD_COIN_COUNT,
@@ -487,6 +488,9 @@ export class GameScene extends Phaser.Scene {
     // DPS-ratio scale — Sapphire ×1.25, Onyx ×1.5 (2026-06-12 bump pass,
     // late-run bosses melted faster than the miniboss).
     this.registry.set('bossFloorHpMultiplier', theme.bossHpMultiplier ?? 1.0);
+    // Champion HP multiplier read by BaseEnemy.promoteToElite — Onyx runs
+    // ×4.5 instead of the default ×6 (champions compounded too fat there).
+    this.registry.set('eliteHpMultiplier', theme.eliteHpMult ?? ELITE_HP_MULT);
   }
 
   create(): void {

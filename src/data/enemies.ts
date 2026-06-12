@@ -24,6 +24,15 @@ export interface EnemyDefinition {
    */
   coinDropChance: number;
   /**
+   * Multiplier on incoming knockback velocity (default 1). Below 1 = the
+   * enemy resists shoves; 0 = immune (no velocity AND no AI-lock — the
+   * knockback stun window is skipped entirely). Used for slow tanks like
+   * the Possessed Candelabra that were corner-pushable under sustained
+   * fire (user-flagged 2026-06-12). Champions get 0 via their
+   * promote-time definition copy regardless of this value.
+   */
+  knockbackFactor?: number;
+  /**
    * Miniboss tier (Thornwood Shambler / Mire Lurker / Doppelgänger). Drives
    * the small silver miniboss HP bar in the UIScene: BaseEnemy emits
    * `miniboss:spawned` / `miniboss:hpChanged` / `miniboss:gone` when set.
@@ -168,6 +177,10 @@ export const ENEMIES = {
     hitboxRadius: 13,
     floor: 'onyx-mansion',
     coinDropChance: 0.65,
+    /** Heavy iron stand — barely shoveable. At the default factor the slow
+     * walker was juggled across the room by sustained fire and corner-
+     * pushable (user-flagged, especially as a champion). */
+    knockbackFactor: 0.25,
   },
   'cursed-mirror': {
     id: 'cursed-mirror',
