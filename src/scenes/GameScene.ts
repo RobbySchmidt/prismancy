@@ -3,7 +3,9 @@ import {
   BASE_PLAYER_STATS,
   BURN_TICK_COUNT,
   CAMERA_ZOOM,
+  DUNGEON_TARGET_ROOM_COUNT,
   ENEMY_PROJECTILE_DAMAGE,
+  MINIBOSS_SPAWN_CHANCE,
   GAME_HEIGHT,
   GAME_WIDTH,
   KNOCKBACK_FORCE_ENEMY,
@@ -459,6 +461,12 @@ export class GameScene extends Phaser.Scene {
     this.layout = DungeonGenerator.generate({
       seed: this.dungeonSeed,
       floorIndex: this.floorIndex,
+      // Run-length pass (2026-06-12): per-floor progressive room counts
+      // (10/12/14) plus elite-room tagging and the chance-gated miniboss
+      // room. A floor without miniboss candidates never rolls one.
+      targetRoomCount: theme.roomCount ?? DUNGEON_TARGET_ROOM_COUNT,
+      eliteRoomCount: theme.eliteRoomCount ?? 0,
+      minibossChance: (theme.minibossIds?.length ?? 0) > 0 ? MINIBOSS_SPAWN_CHANCE : 0,
     });
     this.registry.set('floorLayout', this.layout);
 
@@ -545,30 +553,6 @@ export class GameScene extends Phaser.Scene {
     if (floorTrack) getMusicManager().playTrack(this, floorTrack);
 
     this.enterRoom(this.layout.startId, null);
-
-    // **TEMPORARY** Playtest scaffolding for the three 2026-06-12 trade
-    // items: spawn all three pedestals side by side in the start room so
-    // they can be tested without pool-luck. Remove after the playtest —
-    // grep for **TEMPORARY** finds this block.
-    if (import.meta.env.DEV) {
-      const testCenter = this.currentRoom.getCenter();
-      const testItems = [
-        ITEMS.bloodlettersPact,
-        ITEMS.transmutationStone,
-        ITEMS.hummingbirdFeather,
-      ];
-      testItems.forEach((def, i) => {
-        const pickup = new ItemPickup(
-          this,
-          testCenter.x + (i - 1) * 96,
-          testCenter.y - TILE_SIZE,
-          def,
-          this.itemSystem,
-        );
-        pickup.setSpawnProtection(700);
-        this.pickups.add(pickup);
-      });
-    }
 
     // Hold-R-to-restart: dedicated key (separate from InputManager so
     // movement keys don't get tangled with the restart hold) plus a small
@@ -759,6 +743,38 @@ export class GameScene extends Phaser.Scene {
           this.inventory.addCoins(Math.max(0, Math.floor(n)));
           // eslint-disable-next-line no-console
           console.log(`[__wiz.giveCoins] +${n} coins → ${this.inventory.getCoins()}.`);
+        },
+        /** Force-spawn a champion (elite-promoted random floor mob) in the
+         * current room. Usage: `__wiz.spawnElite()`. */
+        spawnElite: () => {
+          if (!this.currentRoom) return;
+          const roster = FLOORS[this.currentFloorId].enemyRoster as readonly {
+            id: EnemyId;
+            weight: number;
+          }[];
+          const pick = new RNG(`${Date.now()}`).pickWeighted(roster);
+          const center = this.currentRoom.getCenter();
+          const enemy = this.spawnEnemyAt(pick.id, center.x, center.y - TILE_SIZE);
+          enemy?.promoteToElite(this.enemyProjectilePool);
+          // eslint-disable-next-line no-console
+          console.log(`[__wiz.spawnElite] Champion ${pick.id} spawned.`);
+        },
+        /** Force-spawn the floor's miniboss (or a specific id) in the
+         * current room. Usage: `__wiz.spawnMiniboss()` or
+         * `__wiz.spawnMiniboss('miniboss-mire-lurker')`. */
+        spawnMiniboss: (id?: string) => {
+          if (!this.currentRoom) return;
+          const fallback = FLOORS[this.currentFloorId].minibossIds?.[0];
+          const minibossId = (id ?? fallback) as EnemyId | undefined;
+          if (!minibossId) {
+            // eslint-disable-next-line no-console
+            console.warn('[__wiz.spawnMiniboss] No miniboss candidate for this floor.');
+            return;
+          }
+          const center = this.currentRoom.getCenter();
+          this.spawnEnemyAt(minibossId, center.x, center.y - TILE_SIZE);
+          // eslint-disable-next-line no-console
+          console.log(`[__wiz.spawnMiniboss] ${minibossId} spawned.`);
         },
         /** Spawn Lord Onyx in the current room, regardless of seal state.
          * Replaces any existing boss. Useful for boss-pattern tuning
@@ -1390,6 +1406,15 @@ export class GameScene extends Phaser.Scene {
       this.spawnBossForRoom();
     }
 
+    // Miniboss room: dedicated spawn path — the descriptor carries
+    // `enemySpawnCount = 0` so the generic spawner above stays a no-op.
+    // The miniboss joins the normal `enemies` group, so room-clear
+    // detection, door locking and the kill flow all work unchanged.
+    if (desc.miniboss && !desc.cleared) {
+      this.spawnMinibossForRoom(desc, spawnPos);
+      this.player.health.grantInvincibility(ROOM_ENTRY_GRACE_MS, this.time.now);
+    }
+
     // Restore pickups left behind on a previous visit. The player↔pickup
     // overlap registered above watches the group dynamically, so re-spawned
     // pickups are picked up the moment the player walks over them. Clear
@@ -1469,7 +1494,14 @@ export class GameScene extends Phaser.Scene {
     // they always have `enemySpawnCount = 0` (the boss is spawned separately
     // via `spawnBossForRoom`), so without this guard the doors would pop open
     // the moment the player walks in instead of staying shut until kill.
-    if (!desc.cleared && desc.enemySpawnCount === 0 && desc.kind !== RoomKind.Boss) {
+    if (
+      !desc.cleared &&
+      desc.enemySpawnCount === 0 &&
+      desc.kind !== RoomKind.Boss &&
+      // Miniboss rooms also carry enemySpawnCount = 0 (dedicated spawn
+      // path) — without this exclusion the doors would pop open on entry.
+      !desc.miniboss
+    ) {
       this.markCurrentRoomCleared();
     }
   }
@@ -1546,8 +1578,13 @@ export class GameScene extends Phaser.Scene {
     // them outright. For cleared boss rooms we capture the item id / gem
     // floor id so re-entry rebuilds the exact same pedestal / gem.
     const leavingDesc = this.layout.rooms.get(this.currentRoomId);
+    // Miniboss rooms share the boss-room exception: their treasure-pedestal
+    // reward has no kind-based re-spawn path, so an uncollected pedestal
+    // must round-trip through the snapshot or it would vanish on re-entry.
     const captureBossRewards =
-      leavingDesc?.kind === RoomKind.Boss && leavingDesc.cleared === true;
+      leavingDesc !== undefined &&
+      leavingDesc.cleared === true &&
+      (leavingDesc.kind === RoomKind.Boss || leavingDesc.miniboss === true);
     if (leavingDesc) {
       const snapshots: PickupSnapshot[] = [];
       for (const child of this.pickups.getChildren()) {
@@ -1630,7 +1667,7 @@ export class GameScene extends Phaser.Scene {
     // enforced both during forced spawns and weighted-pick fills.
     const spawnedById = new Map<EnemyId, number>();
 
-    const spawnAt = (id: EnemyId): void => {
+    const spawnAt = (id: EnemyId): BaseEnemy => {
       let x = 0;
       let y = 0;
       // Try multiple positions until we find one outside the safe radius
@@ -1642,9 +1679,20 @@ export class GameScene extends Phaser.Scene {
         const dy = y - playerSpawn.y;
         if (dx * dx + dy * dy >= minDistSq) break;
       }
-      this.enemies.add(createEnemy(id, ctx, x, y));
+      const enemy = createEnemy(id, ctx, x, y);
+      this.enemies.add(enemy);
       spawnedById.set(id, (spawnedById.get(id) ?? 0) + 1);
+      return enemy;
     };
+
+    // Elite room: ONE champion replaces the whole pack — weighted pick from
+    // the same floor roster (species is stable per seed+room), promoted to
+    // elite (HP ×6, bigger sprite, gold aura, radial burst).
+    if (desc.elite) {
+      const pick = rng.pickWeighted(roster);
+      spawnAt(pick.id).promoteToElite(this.enemyProjectilePool);
+      return;
+    }
 
     // Force-spawn `minPerRoom` instances of any roster entry that requests
     // them (e.g. mansion's Cursed Mirror). These count against the room's
@@ -1788,7 +1836,7 @@ export class GameScene extends Phaser.Scene {
       label: string;
       colorNum: number;
       colorStr: string;
-      bosses: readonly { id: string; name: string }[];
+      bosses: readonly { id: string; name: string; miniboss?: boolean }[];
     }[] = [
       {
         label: 'EMERALD FOREST',
@@ -1799,6 +1847,7 @@ export class GameScene extends Phaser.Scene {
           { id: 'boss-mossy-behemoth', name: 'Mossy Behemoth' },
           { id: 'boss-pixie-queen', name: 'Pixie Queen' },
           { id: 'boss-forest-heart', name: 'Forest Heart' },
+          { id: 'miniboss-thornwood-shambler', name: 'Thornwood Shambler · MINI', miniboss: true },
         ],
       },
       {
@@ -1810,6 +1859,7 @@ export class GameScene extends Phaser.Scene {
           { id: 'boss-bloomheart', name: 'Bloomheart' },
           { id: 'boss-damselfly-empress', name: 'Damselfly Empress' },
           { id: 'boss-bog-colossus', name: 'Bog Colossus' },
+          { id: 'miniboss-mire-lurker', name: 'Mire Lurker · MINI', miniboss: true },
         ],
       },
       {
@@ -1819,6 +1869,7 @@ export class GameScene extends Phaser.Scene {
         bosses: [
           { id: 'boss-marquis-of-mirages', name: 'Marquis of Mirages' },
           { id: 'boss-lord-onyx', name: 'The Prismarch' },
+          { id: 'miniboss-doppelganger', name: 'Doppelgänger · MINI', miniboss: true },
         ],
       },
     ];
@@ -1896,7 +1947,14 @@ export class GameScene extends Phaser.Scene {
         row.on('pointerout', () => row.setFillStyle(0x261232, 0.9));
         row.on('pointerdown', () => {
           this.closeBossSpawnMenu();
-          this.devSpawnBoss(boss.id);
+          // Minibosses don't run through the boss machinery (no boss bar,
+          // no no-hit tracking) — they spawn through the regular enemy
+          // factory like a real miniboss room does.
+          if (boss.miniboss) {
+            this.devSpawnMiniboss(boss.id as EnemyId);
+          } else {
+            this.devSpawnBoss(boss.id);
+          }
         });
         container.add(row);
 
@@ -1904,7 +1962,9 @@ export class GameScene extends Phaser.Scene {
           .text(0, rowY, boss.name, {
             fontFamily: 'monospace',
             fontSize: '13px',
-            color: '#e9d5ff',
+            // Miniboss rows read slightly dimmer so the tier difference is
+            // visible at a glance inside each floor section.
+            color: boss.miniboss ? '#bda8cf' : '#e9d5ff',
           })
           .setOrigin(0.5);
         container.add(label);
@@ -1920,6 +1980,26 @@ export class GameScene extends Phaser.Scene {
     if (!this.bossSpawnMenu) return;
     this.bossSpawnMenu.destroy();
     this.bossSpawnMenu = null;
+  }
+
+  /** **TEMPORARY** Spawn-picker path for minibosses: clear the room, spawn
+   * the miniboss through the regular factory (no boss bar / no-hit
+   * tracking — same as a real miniboss room). */
+  private devSpawnMiniboss(id: EnemyId): void {
+    if (!this.currentRoom) {
+      // eslint-disable-next-line no-console
+      console.warn('[devSpawnMiniboss] No active room.');
+      return;
+    }
+    if (this.activeBoss) {
+      this.activeBoss.destroy();
+      this.activeBoss = null;
+    }
+    this.enemies.clear(true, true);
+    const center = this.currentRoom.getCenter();
+    this.spawnEnemyAt(id, center.x, center.y - TILE_SIZE);
+    // eslint-disable-next-line no-console
+    console.log(`[devSpawnMiniboss] ${id} spawned.`);
   }
 
   private devSpawnBoss(bossId: string): void {
@@ -3442,7 +3522,78 @@ export class GameScene extends Phaser.Scene {
         ),
       );
     }
+    // Staged rewards (2026-06-12): elite rooms pay a guaranteed pickup,
+    // miniboss rooms a treasure-pool pedestal — risk ladder reads
+    // mob room < elite < miniboss < boss.
+    if (desc.elite) this.spawnEliteClearReward(desc);
+    if (desc.miniboss) {
+      const center = this.currentRoom.getCenter();
+      this.spawnTreasureItemAt(center.x, center.y, desc);
+    }
+
     EventBus.emit('floor:roomCleared', { roomId: this.currentRoomId });
+  }
+
+  /**
+   * Guaranteed elite-room clear reward — seeded weighted roll between a
+   * heart, a key, and a small coin spray. Spawned at room center with
+   * spawn protection so the payout is readable before it's hoovered up.
+   */
+  private spawnEliteClearReward(desc: RoomDescriptor): void {
+    const center = this.currentRoom.getCenter();
+    const rng = new RNG(`${this.dungeonSeed}-elite-reward-${desc.id}`);
+    const reward = rng.pickWeighted([
+      { kind: 'heart', weight: 4 },
+      { kind: 'key', weight: 2.5 },
+      { kind: 'coins', weight: 3.5 },
+    ] as const);
+    if (reward.kind === 'coins') {
+      for (let i = 0; i < 3; i++) {
+        this.spawnPickup(PickupKind.Coin, center.x + (i - 1) * 36, center.y)?.setSpawnProtection(700);
+      }
+      return;
+    }
+    this.spawnPickup(
+      reward.kind === 'heart' ? PickupKind.Heart : PickupKind.Key,
+      center.x,
+      center.y,
+    )?.setSpawnProtection(700);
+  }
+
+  /**
+   * Spawn the floor's miniboss (seeded pick from `FloorTheme.minibossIds`)
+   * at a safe distance from the player spawn. Minibosses are regular
+   * `BaseEnemy` subclasses constructed through the factory — they live in
+   * the normal enemies group, so doors / room-clear / kill flow need no
+   * special casing; only the spawn entry point and the clear reward
+   * (treasure pedestal, see `markCurrentRoomCleared`) differ.
+   */
+  private spawnMinibossForRoom(
+    desc: RoomDescriptor,
+    playerSpawn: { x: number; y: number },
+  ): void {
+    const theme = FLOORS[this.currentFloorId];
+    const ids = (theme.minibossIds ?? []) as readonly EnemyId[];
+    if (ids.length === 0) return;
+    const rng = new RNG(`${this.dungeonSeed}-miniboss-${desc.id}`);
+    const id = rng.pick(ids);
+
+    // Spawn across the room from the player: room center, pushed away from
+    // the entry side so the miniboss never materialises on top of the
+    // wizard even in cramped layouts.
+    const center = this.currentRoom.getCenter();
+    let x = center.x;
+    let y = center.y;
+    const dx = center.x - playerSpawn.x;
+    const dy = center.y - playerSpawn.y;
+    const d = Math.hypot(dx, dy);
+    if (d < SAFE_SPAWN_DISTANCE && d > 1) {
+      x = center.x + (dx / d) * SAFE_SPAWN_DISTANCE;
+      y = center.y + (dy / d) * SAFE_SPAWN_DISTANCE;
+      x = Phaser.Math.Clamp(x, 2 * TILE_SIZE, (ROOM_WIDTH_TILES - 2) * TILE_SIZE);
+      y = Phaser.Math.Clamp(y, 2 * TILE_SIZE, (ROOM_HEIGHT_TILES - 2) * TILE_SIZE);
+    }
+    this.spawnEnemyAt(id, x, y);
   }
 
   /**

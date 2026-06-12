@@ -115,6 +115,10 @@ export class PreloadScene extends Phaser.Scene {
     this.drawWraithTexture(g);
     this.drawPossessedCandelabraTexture(g);
     this.drawCursedMirrorTexture(g);
+    this.drawMinibossThornwoodShamblerTexture(g);
+    this.drawMinibossMireLurkerTexture(g);
+    // Doppelgänger = the player's own sprite layout in mansion colours.
+    this.drawWizardTexture(g, this.DOPPELGANGER_WIZARD_PALETTE, TextureKeys.MinibossDoppelganger);
     this.drawMansionMissileTexture(g);
     this.drawFlameMissileTexture(g);
     this.drawWaxPuddleTexture(g);
@@ -559,6 +563,36 @@ export class PreloadScene extends Phaser.Scene {
     BOOT_HI: 0x6a3a14,
     EYE: 0x300008,
     TIP_SPARKLE: 0xffffff,
+  } as const;
+
+  /**
+   * Doppelgänger palette (Onyx miniboss, 2026-06-12) — the player wizard's
+   * exact pixel layout recoloured into the mansion's deep purple-black +
+   * amethyst language. Ashen skin, shadowy beard, gold buckle as the one
+   * mansion-gold accent, and GLOWING AMETHYST EYES — the tell that this is
+   * not your reflection. Reuses `drawWizardTexture`, so any future change
+   * to the player silhouette automatically updates the mimic.
+   */
+  private readonly DOPPELGANGER_WIZARD_PALETTE = {
+    OUT: 0x0a0612,
+    HAT: 0x241430,
+    HAT_DARK: 0x120820,
+    HAT_HI: 0x3c2454,
+    SKIN: 0x9a90a8,
+    SKIN_SHADOW: 0x6a6078,
+    ROBE: 0x2c1a3c,
+    ROBE_HI: 0x482c60,
+    ROBE_SHADOW: 0x180c28,
+    BEARD: 0x554a66,
+    BEARD_SHADOW: 0x382e48,
+    BUCKLE: 0xc8a040,
+    WAND: 0x3a3048,
+    TIP: 0xc864ff,
+    SHADOW: 0x140e1e,
+    BOOT: 0x120a18,
+    BOOT_HI: 0x2c1c34,
+    EYE: 0xc864ff,
+    TIP_SPARKLE: 0xe8c8ff,
   } as const;
 
   /**
@@ -5998,6 +6032,121 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(cx + 2, cy - 11, 1, 1);
 
     g.generateTexture(TextureKeys.Wraith, size, size);
+  }
+
+  /**
+   * Thornwood Shambler (Emerald miniboss) — a hulking mossy treant filling
+   * most of the 64-px frame so it reads a clear size tier above the floor
+   * mobs. Gnarled trunk body, root legs, thorny shoulder stubs, glowing
+   * emerald eyes.
+   */
+  private drawMinibossThornwoodShamblerTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = TILE_SIZE;
+    g.clear();
+    const cx = size / 2;
+    const cy = size / 2 + 2;
+
+    this.groundShadow(g, cx, cy + 24, 22, 6, 0.45);
+
+    const BARK_DARK = 0x2a1c10;
+    const BARK = 0x4a3018;
+    const BARK_HI = 0x6a4828;
+    const MOSS = 0x2d6a34;
+    const MOSS_HI = 0x4a9a50;
+    const GLOW = 0x6effa0;
+
+    // Root legs — two splayed stumps
+    g.fillStyle(BARK_DARK, 1);
+    g.fillTriangle(cx - 16, cy + 24, cx - 4, cy + 10, cx - 12, cy + 6);
+    g.fillTriangle(cx + 16, cy + 24, cx + 4, cy + 10, cx + 12, cy + 6);
+
+    // Trunk body — broad tapered mass
+    g.fillStyle(BARK_DARK, 1);
+    g.fillEllipse(cx, cy - 2, 40, 42);
+    g.fillStyle(BARK, 1);
+    g.fillEllipse(cx, cy - 2, 34, 36);
+    g.fillStyle(BARK_HI, 1);
+    g.fillEllipse(cx - 5, cy - 7, 14, 18);
+
+    // Thorny shoulder stubs
+    g.fillStyle(BARK_DARK, 1);
+    g.fillTriangle(cx - 20, cy - 8, cx - 12, cy - 16, cx - 14, cy - 2);
+    g.fillTriangle(cx + 20, cy - 8, cx + 12, cy - 16, cx + 14, cy - 2);
+    g.fillTriangle(cx - 6, cy - 22, cx + 2, cy - 20, cx - 2, cy - 30);
+    g.fillTriangle(cx + 4, cy - 21, cx + 12, cy - 18, cx + 10, cy - 28);
+
+    // Moss crown draped over the top
+    g.fillStyle(MOSS, 1);
+    g.fillEllipse(cx, cy - 16, 26, 12);
+    g.fillStyle(MOSS_HI, 1);
+    g.fillEllipse(cx - 6, cy - 18, 10, 6);
+
+    // Bark grooves
+    g.fillStyle(BARK_DARK, 1);
+    g.fillRect(cx - 2, cy - 8, 2, 16);
+    g.fillRect(cx + 7, cy - 4, 2, 12);
+    g.fillRect(cx - 11, cy, 2, 10);
+
+    // Glowing eyes — deep-set emerald pair
+    g.fillStyle(GLOW, 1);
+    g.fillRect(cx - 7, cy - 10, 3, 3);
+    g.fillRect(cx + 4, cy - 10, 3, 3);
+    g.fillStyle(0xeafff0, 1);
+    g.fillRect(cx - 7, cy - 10, 1, 1);
+    g.fillRect(cx + 4, cy - 10, 1, 1);
+
+    g.generateTexture(TextureKeys.MinibossThornwoodShambler, size, size);
+  }
+
+  /**
+   * Mire Lurker (Sapphire miniboss) — a low humped swamp shape: slick
+   * back ridge with fin spines, algae drips, two cyan eyes near the
+   * waterline. Wide + flat so the submerged glide reads as a wake.
+   */
+  private drawMinibossMireLurkerTexture(g: Phaser.GameObjects.Graphics): void {
+    const size = TILE_SIZE;
+    g.clear();
+    const cx = size / 2;
+    const cy = size / 2 + 10;
+
+    this.groundShadow(g, cx, cy + 14, 24, 6, 0.45);
+
+    const HIDE_DARK = 0x0a2030;
+    const HIDE = 0x14405a;
+    const HIDE_HI = 0x2d6a88;
+    const FIN = 0x0e3048;
+    const ALGAE = 0x1d5a44;
+    const GLOW = 0x4ad8ff;
+
+    // Humped body — wide low dome
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillEllipse(cx, cy, 48, 30);
+    g.fillStyle(HIDE, 1);
+    g.fillEllipse(cx, cy + 1, 42, 24);
+    g.fillStyle(HIDE_HI, 1);
+    g.fillEllipse(cx - 8, cy - 4, 18, 10);
+
+    // Back ridge fins — three spines along the hump
+    g.fillStyle(FIN, 1);
+    g.fillTriangle(cx - 14, cy - 8, cx - 4, cy - 8, cx - 10, cy - 20);
+    g.fillTriangle(cx - 2, cy - 10, cx + 8, cy - 10, cx + 2, cy - 24);
+    g.fillTriangle(cx + 10, cy - 7, cx + 18, cy - 7, cx + 14, cy - 17);
+
+    // Algae drape trailing off the flanks
+    g.fillStyle(ALGAE, 1);
+    g.fillRect(cx - 20, cy + 4, 3, 9);
+    g.fillRect(cx + 14, cy + 6, 3, 7);
+    g.fillRect(cx - 6, cy + 10, 2, 6);
+
+    // Cyan eyes low at the front (waterline stare)
+    g.fillStyle(GLOW, 1);
+    g.fillRect(cx - 10, cy + 2, 3, 3);
+    g.fillRect(cx + 7, cy + 2, 3, 3);
+    g.fillStyle(0xeaffff, 1);
+    g.fillRect(cx - 10, cy + 2, 1, 1);
+    g.fillRect(cx + 7, cy + 2, 1, 1);
+
+    g.generateTexture(TextureKeys.MinibossMireLurker, size, size);
   }
 
   /**

@@ -90,6 +90,24 @@ export interface FloorTheme {
    * fight regardless of player damage build. Defaults to 1.0 if unset.
    */
   enemyHpMultiplier?: number;
+  /**
+   * Rooms the generator targets for this floor. Unset falls back to
+   * `DUNGEON_TARGET_ROOM_COUNT`. Progressive per floor (10/12/14) since the
+   * 2026-06-12 run-length pass.
+   */
+  roomCount?: number;
+  /**
+   * How many normal rooms get the `elite` tag (single champion enemy
+   * instead of the usual mob pack). Default 0 = no elite rooms.
+   */
+  eliteRoomCount?: number;
+  /**
+   * Miniboss candidates for this floor (stable enemy ids). When non-empty,
+   * each generated layout has a `MINIBOSS_SPAWN_CHANCE` roll to tag ONE
+   * normal room as a miniboss room; the spawner picks from this list
+   * seeded per room. Empty/unset = floor never rolls miniboss rooms.
+   */
+  minibossIds?: readonly string[];
 }
 
 export const RoomKind = {
@@ -136,6 +154,19 @@ export interface RoomDescriptor {
   decorationSeed: string;
   /** How many enemies to spawn the first time the player enters. 0 for start/boss. */
   enemySpawnCount: number;
+  /**
+   * Elite room: spawns a single champion (elite-promoted floor mob) instead
+   * of the usual pack. Cleared elite rooms drop a guaranteed reward pickup.
+   * Only ever set on `RoomKind.Normal` rooms.
+   */
+  elite?: boolean;
+  /**
+   * Miniboss room: spawns one miniboss from the floor theme's
+   * `minibossIds` (dedicated spawn path — `enemySpawnCount` is 0). Cleared
+   * miniboss rooms spawn a treasure-pool item pedestal. At most one per
+   * floor, chance-gated. Only ever set on `RoomKind.Normal` rooms.
+   */
+  miniboss?: boolean;
   visited: boolean;
   cleared: boolean;
   /** Pickups left behind on the floor when the player last left this room. */

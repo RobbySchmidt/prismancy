@@ -12,15 +12,18 @@ import { CursedMirror } from './CursedMirror';
 import { LordOnyx } from './LordOnyx';
 import { Damselfly } from './Damselfly';
 import { DamselflyEmpress } from './DamselflyEmpress';
+import { Doppelganger } from './Doppelganger';
 import { ForestHeart } from './ForestHeart';
 import { ForestSprite } from './ForestSprite';
 import { MarquisOfMirages } from './MarquisOfMirages';
+import { MireLurker } from './MireLurker';
 import { MossyBehemoth } from './MossyBehemoth';
 import { MossySlime } from './MossySlime';
 import { PixieDancer } from './PixieDancer';
 import { PixieQueen } from './PixieQueen';
 import { PossessedCandelabra } from './PossessedCandelabra';
 import { SnapperBloom } from './SnapperBloom';
+import { ThornwoodShambler } from './ThornwoodShambler';
 import { ToadSovereign } from './ToadSovereign';
 import { VineLord } from './VineLord';
 import { VineSprout } from './VineSprout';
@@ -76,6 +79,12 @@ export function createEnemy(
       );
     case 'cursed-mirror':
       return new CursedMirror(ctx.scene, x, y, ctx.target, ctx.enemyProjectilePool);
+    case 'miniboss-thornwood-shambler':
+      return new ThornwoodShambler(ctx.scene, x, y, ctx.target, ctx.enemyProjectilePool);
+    case 'miniboss-mire-lurker':
+      return new MireLurker(ctx.scene, x, y, ctx.target, ctx.enemyProjectilePool);
+    case 'miniboss-doppelganger':
+      return new Doppelganger(ctx.scene, x, y, ctx.target, ctx.enemyProjectilePool);
     case 'boss-vine-lord':
     case 'boss-mossy-behemoth':
     case 'boss-pixie-queen':
@@ -102,16 +111,19 @@ export {
   CursedMirror,
   Damselfly,
   DamselflyEmpress,
+  Doppelganger,
   ForestHeart,
   ForestSprite,
   LordOnyx,
   MarquisOfMirages,
+  MireLurker,
   MossyBehemoth,
   MossySlime,
   PixieDancer,
   PixieQueen,
   PossessedCandelabra,
   SnapperBloom,
+  ThornwoodShambler,
   ToadSovereign,
   VineLord,
   VineSprout,

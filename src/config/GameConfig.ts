@@ -176,10 +176,93 @@ export const ITEM_FLOAT_OFFSET = 8;
 
 /** Side length of the room slot grid the random walk operates on. */
 export const DUNGEON_GRID_SIZE = 5;
-/** Target number of rooms per floor. */
+/** Fallback room count when a floor theme doesn't set its own
+ * `roomCount`. Real floors override progressively (Emerald 10 / Sapphire
+ * 12 / Onyx 14 — run-length pass 2026-06-12, was a flat 8 before). */
 export const DUNGEON_TARGET_ROOM_COUNT = 8;
 /** Hard upper bound on random-walk iterations to avoid pathological loops. */
 export const DUNGEON_GENERATOR_MAX_ITERATIONS = 5000;
+
+// --- Elite rooms & minibosses (run-length pass, 2026-06-12) -----------------
+
+/** HP multiplier a champion (elite-promoted floor mob) gets ON TOP of the
+ * per-floor mob HP multiplier. */
+export const ELITE_HP_MULT = 6;
+/** Extra visual scale for champions (multiplies the enemy's current scale,
+ * so per-class visual scales are preserved). Hitbox grows with it — a
+ * champion is deliberately a bigger target. */
+export const ELITE_SCALE_MULT = 1.5;
+/** Interval of the champion's universal radial thorn burst. The burst is
+ * what makes ANY promoted mob roster pick threatening — a tanky chaser
+ * alone would just be a kite-and-shoot snoozefest. */
+export const ELITE_BURST_INTERVAL_MS = 3000;
+/** First burst fires this long after the room is entered, so the player
+ * has a beat to read the big glowing enemy before bullets fly. */
+export const ELITE_BURST_INITIAL_DELAY_MS = 1600;
+/** Thorns per champion radial burst. */
+export const ELITE_BURST_THORN_COUNT = 6;
+/** Guaranteed coins a champion bursts on death (on top of the normal
+ * coinDropChance roll). Elite rooms must visibly pay out. */
+export const ELITE_DEATH_COIN_BURST = 3;
+/** Chance that a floor with a non-empty miniboss roster rolls ONE miniboss
+ * room into its layout. Deliberately well under 1.0 — minibosses are a
+ * "sometimes" encounter (user decision 2026-06-12), not a fixture. */
+export const MINIBOSS_SPAWN_CHANCE = 0.35;
+
+// Thornwood Shambler (Emerald miniboss) — slow walker, aimed 3-fan volleys
+// with every Nth volley swapped for a telegraphed radial.
+export const SHAMBLER_VOLLEY_INTERVAL_MS = 2200;
+export const SHAMBLER_INITIAL_DELAY_MS = 1400;
+export const SHAMBLER_RADIAL_EVERY_N = 3;
+export const SHAMBLER_RADIAL_TELEGRAPH_MS = 420;
+export const SHAMBLER_FAN_SPREAD_DEG = 14;
+export const SHAMBLER_RADIAL_THORNS = 8;
+
+// Mire Lurker (Sapphire miniboss) — submerges (intangible, repositions fast),
+// emerges with a telegraphed radial, then trades aimed shots while surfaced.
+export const LURKER_SUBMERGE_MS = 1600;
+export const LURKER_SURFACE_IDLE_MS = 2400;
+export const LURKER_EMERGE_TELEGRAPH_MS = 450;
+export const LURKER_SURFACE_SHOT_INTERVAL_MS = 800;
+export const LURKER_EMERGE_RADIAL_THORNS = 6;
+export const LURKER_SUBMERGED_ALPHA = 0.35;
+export const LURKER_FIRST_SUBMERGE_DELAY_MS = 1500;
+
+// Doppelgänger (Onyx miniboss — replaced the Headless Knight 2026-06-12,
+// user request) — a dark mirror of the player wizard. Kites at player-like
+// distance, then telegraphs and casts a Marquis-style volley of three
+// sequential homing missiles. The attack interval is deliberately generous
+// ("genügend Pausenzeit") because homing pressure stacks fast.
+export const DOPPELGANGER_ATTACK_INTERVAL_MS = 3800;
+export const DOPPELGANGER_TELEGRAPH_MS = 500;
+export const DOPPELGANGER_VOLLEY_COUNT = 3;
+export const DOPPELGANGER_VOLLEY_SPACING_MS = 320;
+/** Same turn-rate family as Cursed Mirror / Marquis mirror-special (110°/s)
+ * — sharp 90° cuts dodge it, running straight gets caught. */
+export const DOPPELGANGER_HOMING_TURN_RATE_DEG = 110;
+export const DOPPELGANGER_HOMING_LIFETIME_MS = 2200;
+/** Preferred distance to the player — mirrors how a human kites. */
+export const DOPPELGANGER_KITE_DISTANCE = 200;
+/** Deadband around the kite distance inside which it only strafes. */
+export const DOPPELGANGER_KITE_BAND = 35;
+/** Initial aim spread between the three volley missiles (±deg) so they
+ * converge from different vectors instead of a single line — one sharp
+ * cut no longer dodges all three at once. */
+export const DOPPELGANGER_VOLLEY_SPREAD_DEG = 14;
+/** Straight (non-homing) filler cast between volleys — the mimic shoots
+ * back at the player's own cadence instead of idling. Difficulty pass
+ * 2026-06-12: user-flagged "zu einfach", the passive windows were free
+ * damage. */
+export const DOPPELGANGER_FILLER_INTERVAL_MS = 1100;
+/** Short flanking blink right before each volley (fade-out → reposition →
+ * fade-in → telegraph). Marquis-lite: forces re-acquisition, the homing
+ * volley arrives from a fresh angle. */
+export const DOPPELGANGER_BLINK_FADE_MS = 170;
+/** Soft enrage below half HP: shorter volley interval + faster strafing.
+ * Deliberately NOT a phase system — same patterns, one gear up. */
+export const DOPPELGANGER_ENRAGE_HP_FRACTION = 0.5;
+export const DOPPELGANGER_ENRAGED_ATTACK_INTERVAL_MS = 2800;
+export const DOPPELGANGER_ENRAGED_SPEED_MULT = 1.3;
 
 /** Door tile coordinates within a room (centered on each wall). */
 export const DOOR_TILE = {
@@ -948,6 +1031,9 @@ export const TextureKeys = {
   ItemBloodlettersPact: 'tex-item-bloodletters-pact',
   ItemTransmutationStone: 'tex-item-transmutation-stone',
   ItemHummingbirdFeather: 'tex-item-hummingbird-feather',
+  MinibossThornwoodShambler: 'tex-miniboss-thornwood-shambler',
+  MinibossMireLurker: 'tex-miniboss-mire-lurker',
+  MinibossDoppelganger: 'tex-miniboss-doppelganger',
   BossMossyBehemoth: 'tex-boss-mossy-behemoth',
   BossPixieQueen: 'tex-boss-pixie-queen',
   BossForestHeart: 'tex-boss-forest-heart',

@@ -38,6 +38,11 @@ export const FLOORS = {
       { id: 'vine-sprout', weight: 2 },
     ] satisfies readonly EnemyRosterEntry[],
     enemyHpMultiplier: 1.0,
+    // Run-length pass (2026-06-12): progressive room counts 10/12/14 replace
+    // the old flat 8. Floor 1 stays the snappiest as the run's on-ramp.
+    roomCount: 10,
+    eliteRoomCount: 1,
+    minibossIds: ['miniboss-thornwood-shambler'],
   },
   'sapphire-swamp': {
     id: 'sapphire-swamp',
@@ -67,6 +72,9 @@ export const FLOORS = {
       { id: 'bog-tortoise', weight: 1 },
     ] satisfies readonly EnemyRosterEntry[],
     enemyHpMultiplier: 1.5,
+    roomCount: 12,
+    eliteRoomCount: 2,
+    minibossIds: ['miniboss-mire-lurker'],
   },
   'onyx-mansion': {
     id: 'onyx-mansion',
@@ -100,6 +108,9 @@ export const FLOORS = {
       { id: 'cursed-mirror', weight: 2, minPerRoom: 1 },
     ] satisfies readonly EnemyRosterEntry[],
     enemyHpMultiplier: 2.0,
+    roomCount: 14,
+    eliteRoomCount: 2,
+    minibossIds: ['miniboss-doppelganger'],
   },
 } as const satisfies Record<string, FloorTheme>;
 

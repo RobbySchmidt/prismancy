@@ -2,6 +2,13 @@ import Phaser from 'phaser';
 import {
   BURN_TICK_INTERVAL_MS,
   BURN_TINT,
+  ELITE_BURST_INITIAL_DELAY_MS,
+  ELITE_BURST_INTERVAL_MS,
+  ELITE_BURST_THORN_COUNT,
+  ELITE_DEATH_COIN_BURST,
+  ELITE_HP_MULT,
+  ELITE_SCALE_MULT,
+  ENEMY_PROJECTILE_SPEED,
   HIT_FLASH_DURATION_MS,
   HIT_FLASH_TINT_ENEMY,
   KNOCKBACK_DURATION_MS,
@@ -11,6 +18,7 @@ import { DepthLayers } from '../../config/DepthLayers';
 import { type Vector2 } from '../../types';
 import { EventBus } from '../../utils/EventBus';
 import { type EnemyDefinition } from '../../data/enemies';
+import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 
 /**
  * Abstract base for enemies. Owns the universal stuff (HP, hitbox, hit
@@ -56,8 +64,87 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
     if (!this.active || this.hp <= 0) return;
+    if (this.eliteAura) {
+      this.eliteAura.setPosition(this.x, this.y + this.displayHeight * 0.3);
+    }
+    // The champion burst keeps firing through knockback on purpose — a
+    // promoted mob shouldn't be silenceable by sustained knockback hits.
+    this.tickEliteBurst(time);
     if (time < this.knockbackUntil) return; // knockback locks AI briefly
     this.tickAI(time, delta);
+  }
+
+  // --- Champion promotion (elite rooms, 2026-06-12) --------------------------
+
+  private isElite = false;
+  private eliteBurstPool: EnemyProjectilePool | null = null;
+  private nextEliteBurstAt = 0;
+  private eliteAura: Phaser.GameObjects.Arc | null = null;
+
+  /**
+   * Promote this mob into an elite-room champion: HP × `ELITE_HP_MULT` (on
+   * top of the floor's mob multiplier already applied in the constructor),
+   * bigger sprite (hitbox grows with it — a champion is deliberately a
+   * bigger target), pulsing gold aura, and a universal radial thorn burst
+   * every `ELITE_BURST_INTERVAL_MS`. The burst is what makes ANY roster
+   * pick threatening — a tanky chaser alone would just be kited to death.
+   */
+  promoteToElite(pool: EnemyProjectilePool): void {
+    if (this.isElite) return;
+    this.isElite = true;
+    this.eliteBurstPool = pool;
+    this.hp = Math.max(1, Math.round(this.hp * ELITE_HP_MULT));
+    this.setScale(this.scale * ELITE_SCALE_MULT);
+    this.nextEliteBurstAt = this.scene.time.now + ELITE_BURST_INITIAL_DELAY_MS;
+
+    this.eliteAura = this.scene.add
+      .circle(this.x, this.y, this.displayWidth * 0.55, 0xffd84a, 0.18)
+      .setDepth(DepthLayers.FloorDecoration);
+    this.scene.tweens.add({
+      targets: this.eliteAura,
+      alpha: { from: 0.1, to: 0.24 },
+      scale: { from: 0.92, to: 1.08 },
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+    });
+  }
+
+  private tickEliteBurst(time: number): void {
+    if (!this.isElite || !this.eliteBurstPool) return;
+    if (time < this.nextEliteBurstAt) return;
+    this.nextEliteBurstAt = time + ELITE_BURST_INTERVAL_MS;
+    EventBus.emit('enemy:charge');
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    const cx = body ? body.center.x : this.x;
+    const cy = body ? body.center.y : this.y;
+    // Random base rotation per burst so the safe lanes shift every volley.
+    const baseAngle = Math.random() * Math.PI * 2;
+    for (let i = 0; i < ELITE_BURST_THORN_COUNT; i++) {
+      const angle = baseAngle + (Math.PI * 2 * i) / ELITE_BURST_THORN_COUNT;
+      this.eliteBurstPool.fire(
+        cx,
+        cy,
+        Math.cos(angle) * ENEMY_PROJECTILE_SPEED,
+        Math.sin(angle) * ENEMY_PROJECTILE_SPEED,
+      );
+    }
+  }
+
+  private destroyEliteAura(): void {
+    if (!this.eliteAura) return;
+    this.scene.tweens.killTweensOf(this.eliteAura);
+    this.eliteAura.destroy();
+    this.eliteAura = null;
+  }
+
+  override destroy(fromScene?: boolean): void {
+    // Aura is a loose scene object (not a child) — clean it on BOTH the
+    // death path and the room-teardown path, same pattern as the
+    // Bloomheart spore cleanup.
+    this.destroyEliteAura();
+    super.destroy(fromScene);
   }
 
   /**
@@ -119,6 +206,17 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     ) {
       EventBus.emit('enemy:droppedCoin', { x: this.x, y: this.y });
     }
+    // Champions burst a guaranteed coin spray on top of the normal roll —
+    // elite rooms have to visibly pay out (staged-rewards decision).
+    if (this.isElite) {
+      for (let i = 0; i < ELITE_DEATH_COIN_BURST; i++) {
+        EventBus.emit('enemy:droppedCoin', {
+          x: this.x + (i - (ELITE_DEATH_COIN_BURST - 1) / 2) * 22,
+          y: this.y + (Math.random() - 0.5) * 18,
+        });
+      }
+    }
+    this.destroyEliteAura();
     this.disableBody(true, false);
 
     // Sparkle burst — small glow particles flying outward.

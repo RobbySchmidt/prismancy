@@ -61,6 +61,17 @@ export interface GenerateOptions {
    * special-room doors require a key.
    */
   floorIndex?: number;
+  /**
+   * How many normal rooms to tag as elite rooms (single champion enemy).
+   * Capped by the number of available normal rooms. Default 0.
+   */
+  eliteRoomCount?: number;
+  /**
+   * Chance (0..1) that ONE normal room is tagged as a miniboss room.
+   * Rolled once per layout with the layout's seeded RNG so the same seed
+   * always produces the same answer. Default 0 (no miniboss rooms).
+   */
+  minibossChance?: number;
 }
 
 /**
@@ -316,6 +327,40 @@ export class DungeonGenerator {
       shopRoom.enemySpawnCount = 0;
       DungeonGenerator.markSpecialDoors(rooms, shopRoom, DoorKind.Shop, locked);
       specialUsed.add(shopRoom.id);
+    }
+
+    // --- Elite & miniboss tagging ---
+    // Runs AFTER special placement so only plain Normal combat rooms are
+    // candidates (never start/boss/treasure/shop). Door textures stay
+    // normal on purpose — elite/miniboss rooms read as a surprise when
+    // entered, Isaac-style, not as a marked special room.
+    const taggable = rng.shuffle(
+      [...rooms.values()].filter(
+        (r) => r.kind === RoomKind.Normal && r.enemySpawnCount > 0,
+      ),
+    );
+    let cursor = 0;
+    const eliteTarget = options.eliteRoomCount ?? 0;
+    for (; cursor < Math.min(eliteTarget, taggable.length); cursor++) {
+      const room = taggable[cursor];
+      if (!room) break;
+      room.elite = true;
+      // A single champion replaces the whole pack — the spawner branches on
+      // the flag, but the count is kept truthful for anything that reads it.
+      room.enemySpawnCount = 1;
+    }
+    const minibossChance = options.minibossChance ?? 0;
+    // Roll the chance unconditionally (not only when a candidate room is
+    // left) so the same seed yields the same RNG sequence regardless of how
+    // many rooms the elite pass consumed.
+    const rollMiniboss = minibossChance > 0 && rng.chance(minibossChance);
+    const minibossRoom = rollMiniboss ? taggable[cursor] : undefined;
+    if (minibossRoom) {
+      const room = minibossRoom;
+      room.miniboss = true;
+      // Miniboss spawns through its own path in GameScene.enterRoom; the
+      // generic mob spawner must stay a no-op for this room.
+      room.enemySpawnCount = 0;
     }
 
     return { rooms, startId, bossId, gridSize };

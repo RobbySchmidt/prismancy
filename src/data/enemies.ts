@@ -177,6 +177,51 @@ export const ENEMIES = {
     floor: 'onyx-mansion',
     coinDropChance: 0.6,
   },
+  // --- Minibosses (chance-spawned, one candidate per floor — 2026-06-12) ----
+  // HP is authored so the EFFECTIVE pool after the floor's mob multiplier
+  // lands at roughly half a boss: 28×1.0 / 26×1.5 / 27×2.0 ≈ 28/39/54.
+  // Unlike bosses they do NOT get DPS-ratio scaling — a stacked build is
+  // allowed to shred a miniboss; it's a sometimes-encounter, not a gate.
+  'miniboss-thornwood-shambler': {
+    id: 'miniboss-thornwood-shambler',
+    textureKey: TextureKeys.MinibossThornwoodShambler,
+    displayName: 'Thornwood Shambler',
+    hp: 28,
+    contactDamage: 1,
+    /** Slow relentless walk — pressure comes from the volleys, not the chase. */
+    moveSpeed: 45,
+    hitboxRadius: 18,
+    floor: 'emerald-forest',
+    /** Guaranteed coin on top of the room-clear treasure pedestal. */
+    coinDropChance: 1,
+  },
+  'miniboss-mire-lurker': {
+    id: 'miniboss-mire-lurker',
+    textureKey: TextureKeys.MinibossMireLurker,
+    displayName: 'Mire Lurker',
+    hp: 26,
+    contactDamage: 1,
+    /** Speed while submerged (intangible repositioning); surfaced = rooted. */
+    moveSpeed: 130,
+    hitboxRadius: 16,
+    floor: 'sapphire-swamp',
+    coinDropChance: 1,
+  },
+  'miniboss-doppelganger': {
+    id: 'miniboss-doppelganger',
+    textureKey: TextureKeys.MinibossDoppelganger,
+    displayName: 'Doppelgänger',
+    /** 30 (×2.0 Onyx mob mult = 60 effective) — bumped from 27 in the
+     * 2026-06-12 difficulty pass together with filler casts + blink. */
+    hp: 30,
+    contactDamage: 1,
+    /** Kiting drift speed — close to the wizard's own movement feel. */
+    moveSpeed: 70,
+    /** Player-like body (the wizard's is 11) — it IS the player's shadow. */
+    hitboxRadius: 12,
+    floor: 'onyx-mansion',
+    coinDropChance: 1,
+  },
   'boss-vine-lord': {
     id: 'boss-vine-lord',
     /**
