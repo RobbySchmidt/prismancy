@@ -1195,11 +1195,18 @@ export const STARTING_COINS = 0;
  * `SHOP_SLOT_COUNT` slots get evenly spaced around the room center along the
  * X axis, `SHOP_SLOT_SPACING` px apart.
  */
+/**
+ * Price pass 2026-06-12 (user-flagged "ich kann die ganze Zeit alles
+ * kaufen"): the run-length pass made the economy much richer (10/12/14
+ * rooms, champion coin bursts, miniboss coin spray, bumped
+ * coinDropChances) — everything got ~+50%. Heart 3→5, Key 5→8, items
+ * see their per-item `shopPrice` bumps in data/items.ts.
+ */
 export const SHOP_PRICES = {
-  heart: 3,
-  key: 5,
+  heart: 5,
+  key: 8,
 } as const;
-export const SHOP_DEFAULT_ITEM_PRICE = 15;
+export const SHOP_DEFAULT_ITEM_PRICE = 22;
 export const SHOP_SLOT_COUNT = 4;
 export const SHOP_SLOT_SPACING = 96;
 /**

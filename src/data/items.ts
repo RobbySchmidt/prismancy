@@ -20,7 +20,7 @@ export const ITEMS = {
       { stat: 'damage', add: 1 },
       { stat: 'missileScale', add: 0.15 },
     ],
-    shopPrice: 15,
+    shopPrice: 22,
   },
   hotTea: {
     id: 'hotTea',
@@ -30,7 +30,7 @@ export const ITEMS = {
     pools: [ItemPool.Treasure, ItemPool.Shop],
     effects: [{ stat: 'fireRate', mult: 1.3 }],
     missileTint: 0xff8a3a, // warm orange
-    shopPrice: 12,
+    shopPrice: 18,
   },
   wizardSneakers: {
     id: 'wizardSneakers',
@@ -39,7 +39,7 @@ export const ITEMS = {
     textureKey: TextureKeys.ItemWizardSneakers,
     pools: [ItemPool.Treasure, ItemPool.Shop],
     effects: [{ stat: 'moveSpeed', add: 25 }],
-    shopPrice: 12,
+    shopPrice: 18,
   },
   telescopicWand: {
     id: 'telescopicWand',
@@ -74,7 +74,7 @@ export const ITEMS = {
       { stat: 'damage', add: 0.5 },
       { stat: 'moveSpeed', add: 10 },
     ],
-    shopPrice: 8,
+    shopPrice: 12,
   },
   pixieDust: {
     id: 'pixieDust',
@@ -143,7 +143,7 @@ export const ITEMS = {
     /** 2 HP = one full heart (HP_PER_HEART). The spyglass spots danger
      * before it lands — translates to a vitality bump. */
     maxHealthBonus: 2,
-    shopPrice: 14,
+    shopPrice: 20,
   },
   lilyDiadem: {
     id: 'lilyDiadem',
@@ -225,7 +225,7 @@ export const ITEMS = {
     textureKey: TextureKeys.ItemMagicShard,
     pools: [ItemPool.Shop],
     effects: [{ stat: 'piercingCount', add: 2 }],
-    shopPrice: 15,
+    shopPrice: 22,
   },
   wizardGlasses: {
     id: 'wizardGlasses',
@@ -288,22 +288,23 @@ export const ITEMS = {
   transmutationStone: {
     id: 'transmutationStone',
     displayName: 'Transmutation Stone',
-    description: '[Q] transmutes 5 coins into a key — or 20 into a random item.',
+    description: '[Q] transmutes 5 coins into a key — or 30 into a random item.',
     textureKey: TextureKeys.ItemTransmutationStone,
     // Shop-only on purpose: buying a coin→key engine WITH coins is itself
     // the trade. Equipping it also occupies the single [Q] slot (replaces
     // Blood of Marquis) — economy utility vs. combat active.
-    // The 20-coin item roll is deliberately a WORSE deal than a shop item
-    // (8-15 coins, chosen vs. random) — the premium buys availability
-    // anywhere. Strong emergent pairing with Bloodletter's Pact (+60%
-    // coins) → economy-engine build.
+    // The 30-coin item roll is deliberately a WORSE deal than a shop item
+    // (12-22 coins, chosen vs. random) — the premium buys availability
+    // anywhere. itemCost was 20 before the 2026-06-12 shop price pass;
+    // bumped alongside so the "premium over a chosen shop item" framing
+    // survives the pass.
     pools: [ItemPool.Shop],
-    shopPrice: 8,
+    shopPrice: 12,
     effects: [],
     active: {
       kind: ActiveItemKind.TransmuteCoinsToKey,
       coinCost: 5,
-      itemCost: 20,
+      itemCost: 30,
     },
   },
   hummingbirdFeather: {
