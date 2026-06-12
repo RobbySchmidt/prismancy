@@ -194,13 +194,28 @@ export const ELITE_HP_MULT = 6;
 export const ELITE_SCALE_MULT = 1.5;
 /** Interval of the champion's universal radial thorn burst. The burst is
  * what makes ANY promoted mob roster pick threatening — a tanky chaser
- * alone would just be a kite-and-shoot snoozefest. */
-export const ELITE_BURST_INTERVAL_MS = 3000;
+ * alone would just be a kite-and-shoot snoozefest. Was 3000 — tightened in
+ * the 2026-06-12 aggression pass: a champion always spawns ALONE (elite
+ * branch early-returns before the pack fill), so it carries the whole
+ * room's threat budget by itself. */
+export const ELITE_BURST_INTERVAL_MS = 2200;
 /** First burst fires this long after the room is entered, so the player
  * has a beat to read the big glowing enemy before bullets fly. */
 export const ELITE_BURST_INITIAL_DELAY_MS = 1600;
 /** Thorns per champion radial burst. */
 export const ELITE_BURST_THORN_COUNT = 6;
+/** Delay before the burst's SECOND wave (Gungeon-style dual radial, same
+ * pattern family as Bog Colossus phase 1). The second wave is rotated a
+ * half-step so standing in a lane of wave 1 doesn't survive wave 2. */
+export const ELITE_BURST_SECOND_WAVE_DELAY_MS = 350;
+/** Champion move-speed multiplier (aggression pass 2026-06-12) — applied
+ * via a per-instance definition copy in promoteToElite, so the shared
+ * ENEMIES entry stays untouched. Makes melee-chaser picks threatening:
+ * a solo champion you can simply outwalk is no encounter. */
+export const ELITE_MOVE_SPEED_MULT = 1.3;
+/** Champion aura color — RED (was gold 0xffd84a): reads as danger and
+ * keeps gold reserved for the boss/miniboss HUD framing + coin payouts. */
+export const ELITE_AURA_COLOR = 0xe02838;
 /** Guaranteed coins a champion bursts on death (on top of the normal
  * coinDropChance roll). Elite rooms must visibly pay out. */
 export const ELITE_DEATH_COIN_BURST = 3;
@@ -208,6 +223,14 @@ export const ELITE_DEATH_COIN_BURST = 3;
  * room into its layout. Deliberately well under 1.0 — minibosses are a
  * "sometimes" encounter (user decision 2026-06-12), not a fixture. */
 export const MINIBOSS_SPAWN_CHANCE = 0.35;
+/** Chance that a miniboss clear pays a treasure-pool item pedestal instead
+ * of the pickup bundle (heart + key + coin spray). A guaranteed item read
+ * as too rich next to the boss reward (user decision 2026-06-12) — the
+ * rare pedestal keeps a jackpot moment without flattening the risk
+ * ladder mob < elite < miniboss < boss. */
+export const MINIBOSS_ITEM_DROP_CHANCE = 0.25;
+/** Coins in the miniboss pickup-bundle spray (the 75% non-item payout). */
+export const MINIBOSS_REWARD_COIN_COUNT = 3;
 
 // Thornwood Shambler (Emerald miniboss) — slow walker, aimed 3-fan volleys
 // with every Nth volley swapped for a telegraphed radial.

@@ -23,6 +23,13 @@ export interface EnemyDefinition {
    * roll fires from BaseEnemy.die() before the death tween.
    */
   coinDropChance: number;
+  /**
+   * Miniboss tier (Thornwood Shambler / Mire Lurker / Doppelgänger). Drives
+   * the small silver miniboss HP bar in the UIScene: BaseEnemy emits
+   * `miniboss:spawned` / `miniboss:hpChanged` / `miniboss:gone` when set.
+   * Distinct from the `boss-` machinery (no boss bar, no no-hit tracking).
+   */
+  miniboss?: boolean;
 }
 
 /**
@@ -192,8 +199,9 @@ export const ENEMIES = {
     moveSpeed: 45,
     hitboxRadius: 18,
     floor: 'emerald-forest',
-    /** Guaranteed coin on top of the room-clear treasure pedestal. */
+    /** Guaranteed coin on top of the room-clear reward. */
     coinDropChance: 1,
+    miniboss: true,
   },
   'miniboss-mire-lurker': {
     id: 'miniboss-mire-lurker',
@@ -206,6 +214,7 @@ export const ENEMIES = {
     hitboxRadius: 16,
     floor: 'sapphire-swamp',
     coinDropChance: 1,
+    miniboss: true,
   },
   'miniboss-doppelganger': {
     id: 'miniboss-doppelganger',
@@ -221,6 +230,7 @@ export const ENEMIES = {
     hitboxRadius: 12,
     floor: 'onyx-mansion',
     coinDropChance: 1,
+    miniboss: true,
   },
   'boss-vine-lord': {
     id: 'boss-vine-lord',

@@ -48,6 +48,18 @@ export interface GameEvents {
   'shop:purchased': { kind: PickupKind; price: number };
   'shop:rejected': { price: number };
   'crate:opened': { kind: PickupKind; goldCrate: boolean };
+  /** A miniboss (Thornwood Shambler / Mire Lurker / Doppelgänger) entered
+   * the field. Drives the small silver miniboss HP bar — deliberately
+   * separate from the `boss:*` family so the two bars can't shadow each
+   * other and the boss machinery (no-hit tracking, music switch, reward
+   * flow) stays untouched. Emitted from BaseEnemy when
+   * `definition.miniboss` is set. */
+  'miniboss:spawned': { name: string; maxHp: number };
+  'miniboss:hpChanged': { current: number; max: number };
+  /** The miniboss left the field — killed OR despawned without dying
+   * (room teardown, dev-menu room clear). The bar only needs "hide", so
+   * one event covers both paths. */
+  'miniboss:gone': void;
   'boss:spawned': { name: string; maxHp: number };
   'boss:hpChanged': { current: number; max: number };
   'boss:killed': {

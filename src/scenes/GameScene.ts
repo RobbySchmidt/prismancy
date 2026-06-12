@@ -5,6 +5,8 @@ import {
   CAMERA_ZOOM,
   DUNGEON_TARGET_ROOM_COUNT,
   ENEMY_PROJECTILE_DAMAGE,
+  MINIBOSS_ITEM_DROP_CHANCE,
+  MINIBOSS_REWARD_COIN_COUNT,
   MINIBOSS_SPAWN_CHANCE,
   GAME_HEIGHT,
   GAME_WIDTH,
@@ -485,12 +487,20 @@ export class GameScene extends Phaser.Scene {
     // (see `enterRoom`), so we go through `this.enemies` lazily.
     this.missilePool.setHomingTargetGetter((x, y) => this.findNearestEnemyTo(x, y));
     this.enemyProjectilePool = new EnemyProjectilePool(this);
-    // Per-floor default thorn texture so Sapphire-Swamp mobs + bosses
-    // shoot blue thorns instead of emerald-green ones. Bosses with their
-    // own bullet textures (Marquis BloodProjectile, Mirror MansionMissile,
-    // Candelabra FlameMissile) override per-call and bypass this default.
+    // Per-floor default bullet texture: Sapphire shoots blue thorns,
+    // Onyx the round red BloodProjectile (every Onyx mob/boss passes its
+    // own texture per-call, so the default only surfaces via generic
+    // firers like the elite champion burst — and the arrow-y emerald
+    // thorn read as off-theme there, user-flagged 2026-06-12). Shooters
+    // with their own bullet textures (Marquis BloodProjectile, Mirror
+    // MansionMissile, Candelabra FlameMissile) override per-call and
+    // bypass this default.
     this.enemyProjectilePool.setDefaultTextureKey(
-      this.currentFloorId === 'sapphire-swamp' ? TextureKeys.SapphireThorn : TextureKeys.Thorn,
+      this.currentFloorId === 'sapphire-swamp'
+        ? TextureKeys.SapphireThorn
+        : this.currentFloorId === 'onyx-mansion'
+          ? TextureKeys.BloodProjectile
+          : TextureKeys.Thorn,
     );
     this.waxPuddleGroup = new WaxPuddleGroup(this);
     this.mirrorPortals = this.physics.add.group({
@@ -3523,13 +3533,10 @@ export class GameScene extends Phaser.Scene {
       );
     }
     // Staged rewards (2026-06-12): elite rooms pay a guaranteed pickup,
-    // miniboss rooms a treasure-pool pedestal — risk ladder reads
-    // mob room < elite < miniboss < boss.
+    // miniboss rooms a chance-gated pedestal or a pickup bundle — risk
+    // ladder reads mob room < elite < miniboss < boss.
     if (desc.elite) this.spawnEliteClearReward(desc);
-    if (desc.miniboss) {
-      const center = this.currentRoom.getCenter();
-      this.spawnTreasureItemAt(center.x, center.y, desc);
-    }
+    if (desc.miniboss) this.spawnMinibossClearReward(desc);
 
     EventBus.emit('floor:roomCleared', { roomId: this.currentRoomId });
   }
@@ -3558,6 +3565,33 @@ export class GameScene extends Phaser.Scene {
       center.x,
       center.y,
     )?.setSpawnProtection(700);
+  }
+
+  /**
+   * Miniboss clear reward — seeded roll: `MINIBOSS_ITEM_DROP_CHANCE` on a
+   * treasure-pool item pedestal (jackpot moment), otherwise a pickup
+   * bundle (heart + key + coin spray) that out-pays the elite reward's
+   * single pickup. A GUARANTEED item read as too rich next to the boss
+   * reward (user decision 2026-06-12). Uncollected payouts survive
+   * leave/re-entry: the pedestal via the `desc.miniboss` boss-room
+   * snapshot exception, the pickups via `pendingPickups`.
+   */
+  private spawnMinibossClearReward(desc: RoomDescriptor): void {
+    const center = this.currentRoom.getCenter();
+    const rng = new RNG(`${this.dungeonSeed}-miniboss-reward-${desc.id}`);
+    if (rng.chance(MINIBOSS_ITEM_DROP_CHANCE)) {
+      this.spawnTreasureItemAt(center.x, center.y, desc);
+      return;
+    }
+    this.spawnPickup(PickupKind.Heart, center.x - TILE_SIZE, center.y)?.setSpawnProtection(700);
+    this.spawnPickup(PickupKind.Key, center.x + TILE_SIZE, center.y)?.setSpawnProtection(700);
+    for (let i = 0; i < MINIBOSS_REWARD_COIN_COUNT; i++) {
+      this.spawnPickup(
+        PickupKind.Coin,
+        center.x + (i - (MINIBOSS_REWARD_COIN_COUNT - 1) / 2) * 36,
+        center.y + TILE_SIZE,
+      )?.setSpawnProtection(700);
+    }
   }
 
   /**

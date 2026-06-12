@@ -12,6 +12,7 @@ import { type FloorLayout } from '../dungeon/DungeonGenerator';
 import { type Direction, type RoomDescriptor } from '../types';
 import { ActiveItemSlot } from '../ui/ActiveItemSlot';
 import { BossHealthBar } from '../ui/BossHealthBar';
+import { MinibossHealthBar } from '../ui/MinibossHealthBar';
 import { CurrencyDisplay } from '../ui/CurrencyDisplay';
 import { ExpandedMap } from '../ui/ExpandedMap';
 import { HealthDisplay } from '../ui/HealthDisplay';
@@ -118,6 +119,7 @@ export class UIScene extends Phaser.Scene {
     new ActiveItemSlot(this);
 
     new BossHealthBar(this);
+    new MinibossHealthBar(this);
 
     this.buildMapOverlay();
     this.registerMapModeKeys();

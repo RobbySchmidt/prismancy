@@ -2,11 +2,14 @@ import Phaser from 'phaser';
 import {
   BURN_TICK_INTERVAL_MS,
   BURN_TINT,
+  ELITE_AURA_COLOR,
   ELITE_BURST_INITIAL_DELAY_MS,
   ELITE_BURST_INTERVAL_MS,
+  ELITE_BURST_SECOND_WAVE_DELAY_MS,
   ELITE_BURST_THORN_COUNT,
   ELITE_DEATH_COIN_BURST,
   ELITE_HP_MULT,
+  ELITE_MOVE_SPEED_MULT,
   ELITE_SCALE_MULT,
   ENEMY_PROJECTILE_SPEED,
   HIT_FLASH_DURATION_MS,
@@ -26,7 +29,14 @@ import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
  * implement: `tickAI(time, delta)` for movement / behaviour each frame.
  */
 export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
-  readonly definition: EnemyDefinition;
+  /**
+   * Not readonly for ONE reason: `promoteToElite` swaps in a per-instance
+   * COPY with a scaled moveSpeed (subclass AIs read
+   * `this.definition.moveSpeed` per frame, so the copy buffs them without
+   * touching every tickAI). Never mutate the shared `ENEMIES` entry —
+   * always replace the reference with a spread copy.
+   */
+  definition: EnemyDefinition;
   protected hp: number;
   protected knockbackUntil = 0;
 
@@ -56,6 +66,43 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
       this.height / 2 - radius,
     );
     this.setCollideWorldBounds(true);
+
+    // Miniboss tier: announce to the small silver HP bar in the UIScene.
+    // Captured AFTER the floor mob multiplier so the bar's max matches the
+    // effective HP. (Minibosses never go through promoteToElite, so this
+    // snapshot stays correct for their whole lifetime.)
+    if (definition.miniboss) {
+      this.minibossMaxHp = this.hp;
+      EventBus.emit('miniboss:spawned', {
+        name: definition.displayName,
+        maxHp: this.hp,
+      });
+    }
+  }
+
+  // --- Miniboss HP bar wiring (2026-06-12) -----------------------------------
+
+  private minibossMaxHp = 0;
+  private minibossGoneEmitted = false;
+
+  /** Push the current HP to the miniboss bar (no-op for regular mobs). */
+  private emitMinibossHp(): void {
+    if (!this.definition.miniboss || this.hp <= 0) return;
+    EventBus.emit('miniboss:hpChanged', {
+      current: this.hp,
+      max: this.minibossMaxHp,
+    });
+  }
+
+  /**
+   * Hide the miniboss bar exactly once — fired from `die()` (kill) AND
+   * `destroy()` (despawn without death, e.g. dev-menu room clear). The
+   * flag guards the die→tween→destroy double-path.
+   */
+  private emitMinibossGone(): void {
+    if (!this.definition.miniboss || this.minibossGoneEmitted) return;
+    this.minibossGoneEmitted = true;
+    EventBus.emit('miniboss:gone');
   }
 
   /** Called every frame from preUpdate while the enemy is active. */
@@ -96,9 +143,17 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     this.hp = Math.max(1, Math.round(this.hp * ELITE_HP_MULT));
     this.setScale(this.scale * ELITE_SCALE_MULT);
     this.nextEliteBurstAt = this.scene.time.now + ELITE_BURST_INITIAL_DELAY_MS;
+    // Per-instance definition copy with a buffed moveSpeed — every subclass
+    // AI reads `this.definition.moveSpeed` per frame, so the copy speeds
+    // them all up without touching the shared ENEMIES entry. Rooted mobs
+    // (moveSpeed 0) are unaffected.
+    this.definition = {
+      ...this.definition,
+      moveSpeed: Math.round(this.definition.moveSpeed * ELITE_MOVE_SPEED_MULT),
+    };
 
     this.eliteAura = this.scene.add
-      .circle(this.x, this.y, this.displayWidth * 0.55, 0xffd84a, 0.18)
+      .circle(this.x, this.y, this.displayWidth * 0.55, ELITE_AURA_COLOR, 0.18)
       .setDepth(DepthLayers.FloorDecoration);
     this.scene.tweens.add({
       targets: this.eliteAura,
@@ -116,11 +171,25 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     if (time < this.nextEliteBurstAt) return;
     this.nextEliteBurstAt = time + ELITE_BURST_INTERVAL_MS;
     EventBus.emit('enemy:charge');
+    // Random base rotation per burst so the safe lanes shift every volley.
+    const baseAngle = Math.random() * Math.PI * 2;
+    this.fireEliteRadial(baseAngle);
+    // Gungeon-style dual radial (aggression pass 2026-06-12): second wave
+    // rotated a half-step so wave 1's safe lanes are exactly where wave 2's
+    // thorns fly — the player has to MOVE between waves, not pick a lane.
+    // Deferred callback guards against death/teardown mid-delay (the
+    // Bloomheart freeze pattern).
+    this.scene.time.delayedCall(ELITE_BURST_SECOND_WAVE_DELAY_MS, () => {
+      if (!this.active || !this.scene || this.hp <= 0) return;
+      this.fireEliteRadial(baseAngle + Math.PI / ELITE_BURST_THORN_COUNT);
+    });
+  }
+
+  private fireEliteRadial(baseAngle: number): void {
+    if (!this.eliteBurstPool) return;
     const body = this.body as Phaser.Physics.Arcade.Body | null;
     const cx = body ? body.center.x : this.x;
     const cy = body ? body.center.y : this.y;
-    // Random base rotation per burst so the safe lanes shift every volley.
-    const baseAngle = Math.random() * Math.PI * 2;
     for (let i = 0; i < ELITE_BURST_THORN_COUNT; i++) {
       const angle = baseAngle + (Math.PI * 2 * i) / ELITE_BURST_THORN_COUNT;
       this.eliteBurstPool.fire(
@@ -144,6 +213,7 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     // death path and the room-teardown path, same pattern as the
     // Bloomheart spore cleanup.
     this.destroyEliteAura();
+    this.emitMinibossGone();
     super.destroy(fromScene);
   }
 
@@ -154,6 +224,7 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
   takeDamage(amount: number, knockback?: Vector2): boolean {
     if (amount <= 0 || this.hp <= 0) return false;
     this.hp -= amount;
+    this.emitMinibossHp();
     this.flashHit();
     if (knockback) {
       this.setVelocity(knockback.x, knockback.y);
@@ -191,6 +262,7 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
     // tween — without this clearBurn the tick callback could re-enter
     // die() and double-emit `enemy:killed`).
     this.clearBurn();
+    this.emitMinibossGone();
     EventBus.emit('enemy:killed', { x: this.x, y: this.y });
     // Roll the per-enemy coin drop. Bosses set chance=0, so this is a no-op
     // for them — boss rewards go through the dedicated `boss:killed` flow.
@@ -276,6 +348,7 @@ export abstract class BaseEnemy extends Phaser.Physics.Arcade.Sprite {
       const ev = this.scene.time.delayedCall(BURN_TICK_INTERVAL_MS * (i + 1), () => {
         if (!this.active || this.hp <= 0) return;
         this.hp -= damagePerTick;
+        this.emitMinibossHp();
         this.setTintFill(BURN_TINT);
         this.scene.time.delayedCall(140, () => {
           if (this.active) this.clearTint();
