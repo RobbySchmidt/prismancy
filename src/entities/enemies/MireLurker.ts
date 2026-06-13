@@ -8,6 +8,7 @@ import {
   LURKER_SUBMERGE_MS,
   LURKER_SURFACE_IDLE_MS,
   LURKER_SURFACE_SHOT_INTERVAL_MS,
+  TextureKeys,
 } from '../../config/GameConfig';
 import { ENEMIES } from '../../data/enemies';
 import { EventBus } from '../../utils/EventBus';
@@ -111,6 +112,7 @@ export class MireLurker extends BaseEnemy {
       body.center.y,
       Math.cos(aim) * ENEMY_PROJECTILE_SPEED,
       Math.sin(aim) * ENEMY_PROJECTILE_SPEED,
+      TextureKeys.CasterOrbSapphire,
     );
   }
 
@@ -124,6 +126,7 @@ export class MireLurker extends BaseEnemy {
         body.center.y,
         Math.cos(angle) * ENEMY_PROJECTILE_SPEED,
         Math.sin(angle) * ENEMY_PROJECTILE_SPEED,
+        TextureKeys.CasterOrbSapphire,
       );
     }
   }

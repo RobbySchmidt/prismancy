@@ -1978,7 +1978,7 @@ export class GameScene extends Phaser.Scene {
           { id: 'boss-mossy-behemoth', name: 'Mossy Behemoth' },
           { id: 'boss-pixie-queen', name: 'Pixie Queen' },
           { id: 'boss-forest-heart', name: 'Forest Heart' },
-          { id: 'miniboss-thornwood-shambler', name: 'Thornwood Shambler · MINI', miniboss: true },
+          { id: 'miniboss-thornwood-shambler', name: 'Grovekeeper · MINI', miniboss: true },
         ],
       },
       {
@@ -1990,7 +1990,7 @@ export class GameScene extends Phaser.Scene {
           { id: 'boss-bloomheart', name: 'Bloomheart' },
           { id: 'boss-damselfly-empress', name: 'Damselfly Empress' },
           { id: 'boss-bog-colossus', name: 'Bog Colossus' },
-          { id: 'miniboss-mire-lurker', name: 'Mire Lurker · MINI', miniboss: true },
+          { id: 'miniboss-mire-lurker', name: 'Bog Hag · MINI', miniboss: true },
         ],
       },
       {
@@ -2164,11 +2164,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Shared host adapter for every boss. All four current bosses need a
-   * superset of the same dependencies (`enemyProjectilePool`, `spawnEnemyAt`,
-   * `getPlayer`, `getRoomBounds`, `getTreePositions`). Building a single host
-   * keeps `constructBossById` flat — each `case` just hands the boss its
-   * host-typed view of this object.
+   * Shared host adapter for every boss. All current bosses need a superset of
+   * the same dependencies (`enemyProjectilePool`, `spawnEnemyAt`, `getPlayer`,
+   * `getRoomBounds`, `addMirrorPortal`). Building a single host keeps
+   * `constructBossById` flat — each `case` just hands the boss its host-typed
+   * view of this object.
    */
   private bossHost(): VineLordHost &
     MossyBehemothHost &
@@ -2191,10 +2191,6 @@ export class GameScene extends Phaser.Scene {
         minY: 2 * TILE_SIZE,
         maxY: (ROOM_HEIGHT_TILES - 2) * TILE_SIZE,
       }),
-      getTreePositions: () => {
-        if (!this.currentRoom) return [];
-        return this.currentRoom.treePositions.map((p) => ({ x: p.x, y: p.y }));
-      },
     };
   }
 

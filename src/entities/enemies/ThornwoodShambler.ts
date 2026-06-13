@@ -7,6 +7,7 @@ import {
   SHAMBLER_RADIAL_TELEGRAPH_MS,
   SHAMBLER_RADIAL_THORNS,
   SHAMBLER_VOLLEY_INTERVAL_MS,
+  TextureKeys,
 } from '../../config/GameConfig';
 import { ENEMIES } from '../../data/enemies';
 import { EventBus } from '../../utils/EventBus';
@@ -81,6 +82,7 @@ export class ThornwoodShambler extends BaseEnemy {
         body.center.y,
         Math.cos(aim + offset) * ENEMY_PROJECTILE_SPEED,
         Math.sin(aim + offset) * ENEMY_PROJECTILE_SPEED,
+        TextureKeys.CasterOrbEmerald,
       );
     }
   }
@@ -95,6 +97,7 @@ export class ThornwoodShambler extends BaseEnemy {
         body.center.y,
         Math.cos(angle) * ENEMY_PROJECTILE_SPEED,
         Math.sin(angle) * ENEMY_PROJECTILE_SPEED,
+        TextureKeys.CasterOrbEmerald,
       );
     }
   }

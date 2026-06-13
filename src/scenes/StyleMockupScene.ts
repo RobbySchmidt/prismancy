@@ -14,8 +14,8 @@ import {
 import { FLOORS } from '../data/floors';
 import { RNG } from '../utils/RNG';
 
-type MockupPage = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
-const PAGE_COUNT = 8;
+type MockupPage = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+const PAGE_COUNT = 9;
 
 /**
  * Visual mockup with four pages, switched via TAB:
@@ -130,6 +130,14 @@ export class StyleMockupScene extends Phaser.Scene {
           `Page 8/${PAGE_COUNT} - Shambler (top) + Lurker (bottom), current vs. 3 directions each`,
         );
         this.paintShowcaseMinibossVariants();
+        break;
+      case 8:
+        this.paintHeader(
+          cx,
+          'MINIBOSS REDESIGN — FRESH DIRECTIONS',
+          `Page 9/${PAGE_COUNT} - Emerald (top) + Sapphire (bottom), 3 new directions each`,
+        );
+        this.paintShowcaseMinibossFreshVariants();
         break;
     }
     this.paintFooter(cx);
@@ -5480,6 +5488,578 @@ export class StyleMockupScene extends Phaser.Scene {
     g.fillRect(cx - 41, cy + 36, 1, 3);
     g.fillRect(cx + 36, cy + 37, 1, 3);
     g.fillRect(cx + 1, cy + 40, 1, 3);
+  }
+
+  // ---------------------------------------------------------------------------
+  // PAGE 9 — Fresh miniboss redesigns (no current-name constraint)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Two rows of 4 slots — slot 0 = the LIVE current in-game texture (honest
+   * side-by-side), slots 1-3 = painted fresh directions. Top row = Emerald
+   * miniboss (currently "Thornwood Shambler"), bottom = Sapphire miniboss
+   * (currently "Mire Lurker"). Deliberately ignores the current names so the
+   * figures can lean into whatever reads best on-theme. The picked variant
+   * gets ported to PreloadScene as the real 64×64 texture (same workflow as
+   * Page 8). The Onyx miniboss (Doppelgänger) is intentionally a player-mirror,
+   * so it's left out here.
+   */
+  private paintShowcaseMinibossFreshVariants(): void {
+    const centers = [120, 360, 600, 840];
+    const row1Top = 96;
+    const row2Top = 312;
+
+    const emeraldSlots: Array<{
+      title: string;
+      lines: readonly string[];
+      paint: (cx: number, cy: number) => void;
+    }> = [
+      {
+        title: 'CURRENT',
+        lines: ['Live ingame texture', '(Thornwood Shambler).'],
+        paint: (cx, cy) =>
+          this.paintMinibossCurrent(cx, cy, TextureKeys.MinibossThornwoodShambler, 0x6effa0),
+      },
+      {
+        title: 'A — GROVEKEEPER',
+        lines: ['Antlered stag-druid, moss', 'cloak. Noble forest guardian.'],
+        paint: (cx, cy) => this.drawFreshGrovekeeper(cx, cy),
+      },
+      {
+        title: 'B — GLOOMCAP',
+        lines: ['Giant mushroom brute, spotted', 'cap shield, spore glow.'],
+        paint: (cx, cy) => this.drawFreshGloomcap(cx, cy),
+      },
+      {
+        title: 'C — BRIAR HOUND',
+        lines: ['Quadruped bramble-beast,', 'thorn mane, ember eyes.'],
+        paint: (cx, cy) => this.drawFreshBriarHound(cx, cy),
+      },
+    ];
+
+    const sapphireSlots: typeof emeraldSlots = [
+      {
+        title: 'CURRENT',
+        lines: ['Live ingame texture', '(Mire Lurker).'],
+        paint: (cx, cy) =>
+          this.paintMinibossCurrent(cx, cy, TextureKeys.MinibossMireLurker, 0x4ad8ff),
+      },
+      {
+        title: 'A — BOG HAG',
+        lines: ['Hunched swamp crone with a', 'will-o-wisp lantern. Caster.'],
+        paint: (cx, cy) => this.drawFreshBogHag(cx, cy),
+      },
+      {
+        title: 'B — DROWNED KNIGHT',
+        lines: ['Waterlogged armored revenant,', 'algae-draped, sapphire visor.'],
+        paint: (cx, cy) => this.drawFreshDrownedKnight(cx, cy),
+      },
+      {
+        title: 'C — MARSH GATOR',
+        lines: ['Bipedal crocodilian, armored', 'ridges, glowing maw. Predator.'],
+        paint: (cx, cy) => this.drawFreshMarshGator(cx, cy),
+      },
+    ];
+
+    for (let i = 0; i < 4; i++) {
+      this.paintMinibossSlot(centers[i]!, row1Top, 0x4a9a50, emeraldSlots[i]!);
+      this.paintMinibossSlot(centers[i]!, row2Top, 0x2d6a88, sapphireSlots[i]!);
+    }
+  }
+
+  /**
+   * Emerald A — "Grovekeeper": tall slender druid silhouette, humanoid torso
+   * under a layered moss cloak, crowned with a wide glowing antler rack. Reads
+   * as a noble guardian rather than a lumbering blob.
+   */
+  private drawFreshGrovekeeper(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const CLOAK_DARK = 0x14361c;
+    const CLOAK = 0x215a2c;
+    const CLOAK_HI = 0x3c8a44;
+    const SKIN = 0x6a4a2c;
+    const SKIN_HI = 0x8a6438;
+    const ANTLER = 0xcfe8c0;
+    const GLOW = 0x9effb0;
+
+    // Floor glow under the antlers / robe hem.
+    g.fillStyle(GLOW, 0.1);
+    g.fillEllipse(cx, cy + 46, 60, 14);
+
+    // Layered moss cloak — broad bell hem, narrowing to shoulders.
+    g.fillStyle(CLOAK_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 28, y: cy + 50 },
+        { x: cx - 20, y: cy + 4 },
+        { x: cx - 12, y: cy - 30 },
+        { x: cx + 12, y: cy - 30 },
+        { x: cx + 20, y: cy + 4 },
+        { x: cx + 28, y: cy + 50 },
+      ],
+      true,
+    );
+    g.fillStyle(CLOAK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 22, y: cy + 48 },
+        { x: cx - 15, y: cy + 2 },
+        { x: cx - 9, y: cy - 27 },
+        { x: cx + 9, y: cy - 27 },
+        { x: cx + 15, y: cy + 2 },
+        { x: cx + 22, y: cy + 48 },
+      ],
+      true,
+    );
+    // Ragged moss fringe along the hem.
+    g.fillStyle(CLOAK_HI, 1);
+    for (let i = -3; i <= 3; i++) {
+      g.fillTriangle(cx + i * 7, cy + 46, cx + i * 7 - 3, cy + 38, cx + i * 7 + 3, cy + 38);
+    }
+    // Center seam highlight.
+    g.fillStyle(CLOAK_HI, 0.7);
+    g.fillRect(cx - 1, cy - 24, 2, 60);
+
+    // Face hollow under the antlers — bark-skinned, two glowing eyes.
+    g.fillStyle(SKIN, 1);
+    g.fillEllipse(cx, cy - 34, 16, 18);
+    g.fillStyle(SKIN_HI, 1);
+    g.fillEllipse(cx - 4, cy - 36, 6, 9);
+    g.fillStyle(GLOW, 1);
+    g.fillCircle(cx - 4, cy - 33, 2);
+    g.fillCircle(cx + 4, cy - 33, 2);
+
+    // Wide antler crown — two branching racks.
+    g.lineStyle(3, ANTLER, 1);
+    for (const dir of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(cx + dir * 5, cy - 44);
+      g.lineTo(cx + dir * 18, cy - 56);
+      g.lineTo(cx + dir * 30, cy - 52);
+      g.moveTo(cx + dir * 18, cy - 56);
+      g.lineTo(cx + dir * 22, cy - 68);
+      g.moveTo(cx + dir * 12, cy - 50);
+      g.lineTo(cx + dir * 16, cy - 62);
+      g.strokePath();
+    }
+    // Antler glow tips.
+    g.fillStyle(GLOW, 0.9);
+    g.fillCircle(cx - 30, cy - 52, 2);
+    g.fillCircle(cx + 30, cy - 52, 2);
+    g.fillCircle(cx - 22, cy - 68, 2);
+    g.fillCircle(cx + 22, cy - 68, 2);
+
+    // Staff in one hand (forest scepter).
+    g.lineStyle(3, SKIN, 1);
+    g.beginPath();
+    g.moveTo(cx + 24, cy - 8);
+    g.lineTo(cx + 30, cy + 40);
+    g.strokePath();
+    g.fillStyle(GLOW, 1);
+    g.fillCircle(cx + 24, cy - 12, 4);
+    g.fillStyle(GLOW, 0.35);
+    g.fillCircle(cx + 24, cy - 12, 8);
+  }
+
+  /**
+   * Emerald B — "Gloomcap": squat fungal brute. Huge spotted mushroom cap worn
+   * like a helmet/shield over a stubby bark body, gills underneath, spore-glow
+   * motes. Whimsical-menacing and unmistakably forest.
+   */
+  private drawFreshGloomcap(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const CAP_DARK = 0x4a1d1d;
+    const CAP = 0x8a2d2d;
+    const CAP_HI = 0xbf4a44;
+    const STEM = 0xe6dcc0;
+    const STEM_SHADOW = 0xb8ac88;
+    const GILL = 0x6a5a3a;
+    const GLOW = 0x9effb0;
+
+    // Spore-glow halo behind the cap.
+    g.fillStyle(GLOW, 0.09);
+    g.fillCircle(cx, cy - 12, 50);
+
+    // Stubby legs.
+    g.fillStyle(STEM_SHADOW, 1);
+    g.fillRoundedRect(cx - 20, cy + 30, 14, 20, 4);
+    g.fillRoundedRect(cx + 6, cy + 30, 14, 20, 4);
+
+    // Bark body / stem — broad barrel.
+    g.fillStyle(STEM, 1);
+    g.fillEllipse(cx, cy + 18, 40, 38);
+    g.fillStyle(STEM_SHADOW, 1);
+    g.fillEllipse(cx + 8, cy + 22, 18, 24);
+    // Two beady glowing eyes peeking from under the cap.
+    g.fillStyle(0x1a1208, 1);
+    g.fillCircle(cx - 9, cy + 8, 4);
+    g.fillCircle(cx + 9, cy + 8, 4);
+    g.fillStyle(GLOW, 1);
+    g.fillCircle(cx - 9, cy + 7, 2);
+    g.fillCircle(cx + 9, cy + 7, 2);
+
+    // Gills band under the cap rim.
+    g.fillStyle(GILL, 1);
+    g.fillEllipse(cx, cy - 6, 44, 8);
+
+    // The big cap — dome with overhang.
+    g.fillStyle(CAP_DARK, 1);
+    g.fillEllipse(cx, cy - 16, 56, 34);
+    g.fillStyle(CAP, 1);
+    g.fillEllipse(cx, cy - 20, 50, 30);
+    g.fillStyle(CAP_HI, 1);
+    g.fillEllipse(cx - 12, cy - 28, 18, 12);
+    // Pale warty spots.
+    g.fillStyle(STEM, 0.95);
+    g.fillCircle(cx - 18, cy - 18, 4);
+    g.fillCircle(cx + 6, cy - 30, 5);
+    g.fillCircle(cx + 20, cy - 16, 4);
+    g.fillCircle(cx - 2, cy - 14, 3);
+
+    // Drifting spore motes.
+    g.fillStyle(GLOW, 0.8);
+    g.fillCircle(cx - 34, cy - 32, 2);
+    g.fillCircle(cx + 32, cy - 36, 2);
+    g.fillCircle(cx + 26, cy - 48, 1.5);
+  }
+
+  /**
+   * Emerald C — "Briar Hound": low quadruped predator woven from brambles. Lean
+   * body, raised thorn-mane along the spine, branch-claw legs, ember eyes. Fast
+   * silhouette — reads as a charging beast.
+   */
+  private drawFreshBriarHound(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const VINE_DARK = 0x1c2a12;
+    const VINE = 0x35501f;
+    const VINE_HI = 0x5a8a30;
+    const THORN = 0x243018;
+    const GLOW = 0xff6a3a;
+
+    g.fillStyle(0x6effa0, 0.08);
+    g.fillEllipse(cx, cy + 44, 76, 14);
+
+    // Four branch-claw legs.
+    g.lineStyle(5, VINE_DARK, 1);
+    for (const lx of [-30, -14, 14, 30]) {
+      g.beginPath();
+      g.moveTo(cx + lx, cy + 8);
+      g.lineTo(cx + lx + (lx < 0 ? -4 : 4), cy + 30);
+      g.lineTo(cx + lx + (lx < 0 ? -8 : 8), cy + 44);
+      g.strokePath();
+    }
+
+    // Body — lean, tapering toward the haunches.
+    g.fillStyle(VINE_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 40, y: cy + 4 },
+        { x: cx - 30, y: cy - 14 },
+        { x: cx + 18, y: cy - 16 },
+        { x: cx + 40, y: cy - 6 },
+        { x: cx + 38, y: cy + 12 },
+        { x: cx - 34, y: cy + 14 },
+      ],
+      true,
+    );
+    g.fillStyle(VINE, 1);
+    g.fillPoints(
+      [
+        { x: cx - 34, y: cy + 2 },
+        { x: cx - 26, y: cy - 10 },
+        { x: cx + 16, y: cy - 12 },
+        { x: cx + 32, y: cy - 4 },
+        { x: cx + 30, y: cy + 8 },
+        { x: cx - 30, y: cy + 10 },
+      ],
+      true,
+    );
+    g.fillStyle(VINE_HI, 0.8);
+    g.fillEllipse(cx - 4, cy - 4, 22, 6);
+
+    // Lowered head (charging) at the front-right.
+    g.fillStyle(VINE_DARK, 1);
+    g.fillEllipse(cx + 40, cy + 2, 14, 12);
+    g.fillStyle(GLOW, 1);
+    g.fillCircle(cx + 44, cy - 1, 2.5);
+    // Snarling thorn-teeth.
+    g.fillStyle(0xe8e0c8, 1);
+    g.fillTriangle(cx + 48, cy + 6, cx + 46, cy + 12, cx + 50, cy + 10);
+
+    // Raised thorn mane along the spine.
+    g.fillStyle(THORN, 1);
+    for (let i = 0; i < 7; i++) {
+      const bx = cx - 30 + i * 8;
+      const h = 12 + (i % 2) * 5;
+      g.fillTriangle(bx, cy - 14, bx - 4, cy - 14, bx - 2, cy - 14 - h);
+    }
+    g.fillStyle(VINE_HI, 1);
+    for (let i = 0; i < 7; i++) {
+      const bx = cx - 30 + i * 8;
+      g.fillCircle(bx - 2, cy - 16 - ((i % 2) * 5 + 12) + 12, 1.5);
+    }
+  }
+
+  /**
+   * Sapphire A — "Bog Hag": hunched swamp crone. Tattered hood + robe, bent
+   * spine, bony hand raising a glowing will-o-wisp lantern on a crooked staff.
+   * Reads as a ranged caster, fitting a telegraph-then-fire kit.
+   */
+  private drawFreshBogHag(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const ROBE_DARK = 0x0d2438;
+    const ROBE = 0x1c4a66;
+    const ROBE_HI = 0x2d6a88;
+    const SKIN = 0x6a8a78;
+    const GLOW = 0x8ef0ff;
+    const STAFF = 0x2a1d14;
+
+    g.fillStyle(GLOW, 0.1);
+    g.fillEllipse(cx, cy + 46, 54, 13);
+
+    // Hunched robe — bent-over bell, weighted to one side.
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 26, y: cy + 50 },
+        { x: cx - 24, y: cy + 6 },
+        { x: cx - 16, y: cy - 28 },
+        { x: cx + 6, y: cy - 34 },
+        { x: cx + 18, y: cy - 18 },
+        { x: cx + 24, y: cy + 14 },
+        { x: cx + 22, y: cy + 50 },
+      ],
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillPoints(
+      [
+        { x: cx - 20, y: cy + 48 },
+        { x: cx - 18, y: cy + 4 },
+        { x: cx - 11, y: cy - 25 },
+        { x: cx + 4, y: cy - 30 },
+        { x: cx + 13, y: cy - 16 },
+        { x: cx + 18, y: cy + 12 },
+        { x: cx + 16, y: cy + 48 },
+      ],
+      true,
+    );
+    g.fillStyle(ROBE_HI, 0.7);
+    g.fillEllipse(cx - 8, cy + 8, 8, 30);
+
+    // Hood + shadowed face with a single glinting eye.
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillEllipse(cx - 4, cy - 32, 18, 16);
+    g.fillStyle(0x05121c, 1);
+    g.fillEllipse(cx - 4, cy - 30, 11, 11);
+    g.fillStyle(GLOW, 1);
+    g.fillCircle(cx - 7, cy - 30, 2);
+    // Crooked bony chin/nose poking out.
+    g.fillStyle(SKIN, 1);
+    g.fillTriangle(cx + 4, cy - 30, cx + 12, cy - 26, cx + 3, cy - 23);
+
+    // Crooked staff + will-o-wisp lantern (raised).
+    g.lineStyle(3, STAFF, 1);
+    g.beginPath();
+    g.moveTo(cx + 26, cy - 44);
+    g.lineTo(cx + 22, cy - 10);
+    g.lineTo(cx + 26, cy + 38);
+    g.strokePath();
+    // Lantern orb.
+    g.fillStyle(GLOW, 0.3);
+    g.fillCircle(cx + 26, cy - 48, 13);
+    g.fillStyle(GLOW, 1);
+    g.fillCircle(cx + 26, cy - 48, 6);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillCircle(cx + 24, cy - 50, 2);
+
+    // Bony reaching hand at the hem.
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(cx - 22, cy + 4, 4);
+    g.lineStyle(1.5, SKIN, 1);
+    g.beginPath();
+    g.moveTo(cx - 22, cy + 4);
+    g.lineTo(cx - 28, cy + 2);
+    g.moveTo(cx - 22, cy + 4);
+    g.lineTo(cx - 27, cy + 8);
+    g.strokePath();
+  }
+
+  /**
+   * Sapphire B — "Drowned Knight": waterlogged armored revenant rising from the
+   * muck. Broad pauldrons, slitted helm with a sapphire-glow visor, algae and
+   * weed draped off the plate, a heavy notched blade. Reads as a melee bruiser.
+   */
+  private drawFreshDrownedKnight(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const PLATE_DARK = 0x122636;
+    const PLATE = 0x2a4458;
+    const PLATE_HI = 0x4a6a82;
+    const RUST = 0x3a5a3a;
+    const GLOW = 0x6ad8ff;
+    const BLADE = 0x8aa0b0;
+
+    g.fillStyle(GLOW, 0.1);
+    g.fillEllipse(cx, cy + 48, 58, 14);
+
+    // Legs / greaves rising from muck.
+    g.fillStyle(PLATE_DARK, 1);
+    g.fillRoundedRect(cx - 18, cy + 24, 14, 26, 3);
+    g.fillRoundedRect(cx + 4, cy + 24, 14, 26, 3);
+
+    // Torso cuirass — broad chest tapering to waist.
+    g.fillStyle(PLATE_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 24, y: cy - 14 },
+        { x: cx - 16, y: cy + 26 },
+        { x: cx + 16, y: cy + 26 },
+        { x: cx + 24, y: cy - 14 },
+      ],
+      true,
+    );
+    g.fillStyle(PLATE, 1);
+    g.fillPoints(
+      [
+        { x: cx - 19, y: cy - 11 },
+        { x: cx - 12, y: cy + 22 },
+        { x: cx + 12, y: cy + 22 },
+        { x: cx + 19, y: cy - 11 },
+      ],
+      true,
+    );
+    // Plate seam highlight + a sapphire heart-glow in the chest.
+    g.fillStyle(PLATE_HI, 0.6);
+    g.fillRect(cx - 1, cy - 8, 2, 28);
+    g.fillStyle(GLOW, 0.9);
+    g.fillCircle(cx, cy + 2, 4);
+    g.fillStyle(GLOW, 0.3);
+    g.fillCircle(cx, cy + 2, 9);
+
+    // Broad pauldrons.
+    g.fillStyle(PLATE_DARK, 1);
+    g.fillEllipse(cx - 24, cy - 14, 16, 12);
+    g.fillEllipse(cx + 24, cy - 14, 16, 12);
+    g.fillStyle(PLATE_HI, 0.8);
+    g.fillEllipse(cx - 26, cy - 17, 7, 5);
+
+    // Slitted great-helm with glowing visor.
+    g.fillStyle(PLATE_DARK, 1);
+    g.fillEllipse(cx, cy - 32, 18, 20);
+    g.fillStyle(PLATE, 1);
+    g.fillEllipse(cx, cy - 33, 14, 16);
+    g.fillStyle(0x05121c, 1);
+    g.fillRect(cx - 9, cy - 34, 18, 5);
+    g.fillStyle(GLOW, 1);
+    g.fillRect(cx - 7, cy - 33, 5, 3);
+    g.fillRect(cx + 2, cy - 33, 5, 3);
+
+    // Notched blade planted at the side.
+    g.fillStyle(BLADE, 1);
+    g.fillPoints(
+      [
+        { x: cx + 30, y: cy + 44 },
+        { x: cx + 34, y: cy - 30 },
+        { x: cx + 40, y: cy - 30 },
+        { x: cx + 38, y: cy + 44 },
+      ],
+      true,
+    );
+    g.fillStyle(PLATE_DARK, 1);
+    g.fillRect(cx + 28, cy - 4, 14, 5); // crossguard
+
+    // Algae / weed drapes.
+    g.fillStyle(RUST, 1);
+    g.fillRect(cx - 22, cy + 0, 3, 14);
+    g.fillRect(cx + 18, cy + 4, 3, 12);
+    g.fillRect(cx - 6, cy + 22, 2, 12);
+    g.fillStyle(GLOW, 0.6);
+    g.fillRect(cx - 21, cy + 13, 1, 3);
+    g.fillRect(cx + 19, cy + 15, 1, 3);
+  }
+
+  /**
+   * Sapphire C — "Marsh Gator": bipedal crocodilian predator. Heavy armored
+   * back ridges, long toothy snout with a glowing maw, thick tail counterweight,
+   * clawed stance. Aggressive forward-leaning silhouette.
+   */
+  private drawFreshMarshGator(cx: number, cy: number): void {
+    const g = this.add.graphics();
+    const HIDE_DARK = 0x12321f;
+    const HIDE = 0x245a34;
+    const HIDE_HI = 0x3f8a4a;
+    const BELLY = 0x9ab088;
+    const RIDGE = 0x0d2416;
+    const GLOW = 0x8ef0ff;
+
+    g.fillStyle(0x4ad8ff, 0.08);
+    g.fillEllipse(cx, cy + 46, 70, 14);
+
+    // Thick tail sweeping behind (left).
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 8, y: cy + 12 },
+        { x: cx - 36, y: cy + 8 },
+        { x: cx - 50, y: cy + 24 },
+        { x: cx - 30, y: cy + 26 },
+        { x: cx - 6, y: cy + 28 },
+      ],
+      true,
+    );
+
+    // Legs — bent, clawed.
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillRoundedRect(cx - 12, cy + 26, 13, 22, 3);
+    g.fillRoundedRect(cx + 6, cy + 26, 13, 22, 3);
+    g.fillStyle(BELLY, 1);
+    g.fillTriangle(cx - 12, cy + 48, cx - 16, cy + 48, cx - 12, cy + 42);
+    g.fillTriangle(cx + 19, cy + 48, cx + 23, cy + 48, cx + 19, cy + 42);
+
+    // Torso — barrel chest leaning forward (right).
+    g.fillStyle(HIDE_DARK, 1);
+    g.fillEllipse(cx + 2, cy + 6, 34, 32);
+    g.fillStyle(HIDE, 1);
+    g.fillEllipse(cx + 2, cy + 6, 28, 27);
+    g.fillStyle(BELLY, 1);
+    g.fillEllipse(cx - 4, cy + 16, 12, 16);
+
+    // Armored back ridges (scutes) along the spine.
+    g.fillStyle(RIDGE, 1);
+    for (let i = 0; i < 5; i++) {
+      const rx = cx - 18 + i * 9;
+      const ry = cy - 6 - i * 2;
+      g.fillTriangle(rx, ry, rx - 5, ry + 8, rx + 5, ry + 8);
+    }
+    g.fillStyle(HIDE_HI, 0.8);
+    g.fillEllipse(cx + 6, cy - 2, 16, 6);
+
+    // Head — long snout with glowing maw, raised high-right.
+    g.fillStyle(HIDE, 1);
+    g.fillEllipse(cx + 22, cy - 18, 18, 14);
+    // Snout extending right.
+    g.fillPoints(
+      [
+        { x: cx + 28, y: cy - 24 },
+        { x: cx + 52, y: cy - 18 },
+        { x: cx + 52, y: cy - 12 },
+        { x: cx + 28, y: cy - 10 },
+      ],
+      true,
+    );
+    g.fillStyle(GLOW, 1); // maw line
+    g.fillRect(cx + 30, cy - 16, 22, 2);
+    // Teeth.
+    g.fillStyle(0xe8e0c8, 1);
+    for (let i = 0; i < 5; i++) {
+      g.fillTriangle(cx + 32 + i * 4, cy - 16, cx + 30 + i * 4, cy - 12, cx + 34 + i * 4, cy - 16);
+    }
+    // Eye + nostril glow.
+    g.fillStyle(0x0a1a0a, 1);
+    g.fillCircle(cx + 24, cy - 22, 3);
+    g.fillStyle(GLOW, 1);
+    g.fillCircle(cx + 24, cy - 22, 1.5);
+    g.fillCircle(cx + 50, cy - 16, 1.5);
   }
 }
 

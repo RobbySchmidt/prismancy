@@ -247,7 +247,7 @@ export const MINIBOSS_REWARD_COIN_COUNT = 3;
 
 // Thornwood Shambler (Emerald miniboss) — slow walker, aimed 3-fan volleys
 // with every Nth volley swapped for a telegraphed radial.
-export const SHAMBLER_VOLLEY_INTERVAL_MS = 2200;
+export const SHAMBLER_VOLLEY_INTERVAL_MS = 1850;
 export const SHAMBLER_INITIAL_DELAY_MS = 1400;
 export const SHAMBLER_RADIAL_EVERY_N = 3;
 export const SHAMBLER_RADIAL_TELEGRAPH_MS = 420;
@@ -358,18 +358,44 @@ export const VINE_SPROUT_FIRE_INTERVAL_MS = 1500;
 /** Initial delay before the first shot, so the player has time to react when entering. */
 export const VINE_SPROUT_FIRE_INITIAL_DELAY_MS = 700;
 
-// --- Vine Lord (boss) --------------------------------------------------------
+// --- Vine Lord (boss — "Burrower" rework) ------------------------------------
+// No longer rooted: creeps toward the player, fires aimed fans + telegraphed
+// ground eruptions under the player, and (phase 2) burrows to reposition so
+// it can't simply be kited into a corner.
 
-/** Phase 1: 3-thorn fan cooldown (centre + ±15°). */
-export const VINE_LORD_PHASE1_INTERVAL_MS = 1200;
-/** Half-spread (radians) of the side thorns in phase 1's fan. 15° ≈ 0.2618. */
+/** Half-spread (radians) of the side thorns in the aimed fan. 15° ≈ 0.2618. */
 export const VINE_LORD_FAN_SPREAD_RAD = (15 * Math.PI) / 180;
-/** Phase 2: radial 8-thorn wave cooldown. */
-export const VINE_LORD_PHASE2_WAVE_INTERVAL_MS = 1500;
-/** Phase 2: vine-sprout add spawn cooldown. */
-export const VINE_LORD_PHASE2_ADD_INTERVAL_MS = 4000;
-/** Phase 2: max simultaneously alive vine-sprout adds. */
-export const VINE_LORD_PHASE2_MAX_ADDS = 3;
+/** Number of thorns in the aimed fan (centre + 1 per side). Thinned 5→3 for
+ *  dodge-room (2026-06-13 fairness pass). */
+export const VINE_LORD_FAN_THORNS = 3;
+/** Creep speed (px/s) toward the player — phase-aware. */
+export const VINE_LORD_CREEP_SPEED_P1 = 42;
+export const VINE_LORD_CREEP_SPEED_P2 = 72;
+/** Aimed-fan cooldown (ms) — phase-aware. */
+export const VINE_LORD_FAN_INTERVAL_P1 = 1700;
+export const VINE_LORD_FAN_INTERVAL_P2 = 1250;
+/** Ground-eruption cooldown (ms) — phase-aware. Lengthened for more downtime. */
+export const VINE_LORD_ERUPT_INTERVAL_P1 = 3600;
+export const VINE_LORD_ERUPT_INTERVAL_P2 = 2800;
+/** Telegraph window (ms) the warn-ring pulses before the eruption fires. */
+export const VINE_LORD_ERUPT_TELEGRAPH_MS = 650;
+/** Thorns in the radial burst an eruption releases from the marked spot.
+ *  Thinned 8→6 (2026-06-13) so the ~60° gaps give a clear escape lane. */
+export const VINE_LORD_ERUPT_THORNS = 6;
+/** Visual radius (px) of the eruption warn-ring. */
+export const VINE_LORD_ERUPT_RADIUS = 46;
+/** How far (px) the eruption marker is nudged off the player's exact position
+ *  so the tell never spawns dead-on-top of them (2026-06-13 safe-zone fix). */
+export const VINE_LORD_ERUPT_OFFSET = 44;
+/** Phase 2: cooldown (ms) between burrow-relocate dives. */
+export const VINE_LORD_BURROW_INTERVAL_MS = 5200;
+/** Burrow fade-out / fade-in duration (ms) each way. */
+export const VINE_LORD_BURROW_FADE_MS = 240;
+/** Target distance (px) the boss re-emerges from the player after a burrow. */
+export const VINE_LORD_BURROW_REEMERGE_DIST = 200;
+/** Hard minimum distance (px, 3 tiles) the re-emerge spot must keep from the
+ *  player — burrow used to surface on top of them (2026-06-13 safe-zone fix). */
+export const VINE_LORD_BURROW_MIN_PLAYER_DIST = 3 * 64;
 /** Visual scale for the boss sprite (relative to the Vine Sprout texture). */
 export const VINE_LORD_VISUAL_SCALE = 2.5 * WORLD_SPRITE_SCALE;
 /** Initial delay before the boss starts shooting after spawning. */
@@ -389,20 +415,37 @@ export const PIXIE_FIRE_INTERVAL_MS = 2400;
 /** Initial delay before the first shot so the player can read the spawn before getting peppered. */
 export const PIXIE_FIRE_INITIAL_DELAY_MS = 1200;
 
-// --- Mossy Behemoth (boss) ---------------------------------------------------
+// --- Mossy Behemoth (boss — "Slam" rework) -----------------------------------
+// The hop IS the threat now: every landing erupts a radial shockwave of
+// thorns. Phase 2 chains a 3-hop combo (Toad-Sovereign style) with a denser
+// dual-wave shockwave per landing. No more landing slime-adds — it stands on
+// its movement + shockwave density. Death-split kept as its signature.
 
-/** Phase 1: cooldown (ms) between consecutive hops. */
-export const MOSSY_BEHEMOTH_PHASE1_HOP_INTERVAL_MS = 1400;
-/** Phase 2: shorter cooldown — boss is angrier. */
-export const MOSSY_BEHEMOTH_PHASE2_HOP_INTERVAL_MS = 900;
+/** Initial delay before the first hop after spawn. */
+export const MOSSY_BEHEMOTH_INITIAL_DELAY_MS = 700;
+/** Phase 1: idle pause (ms) between hops. */
+export const MOSSY_BEHEMOTH_P1_IDLE_MS = 720;
+/** Phase 1: cheek-squash telegraph (ms) before the hop launches. */
+export const MOSSY_BEHEMOTH_P1_TELEGRAPH_MS = 340;
 /** Duration (ms) of one hop arc — sets velocity for this long, then halts. */
 export const MOSSY_BEHEMOTH_HOP_DURATION_MS = 320;
+/** Hop velocity (px/s) — phase-aware (was a trickle at moveSpeed 60). */
+export const MOSSY_BEHEMOTH_HOP_SPEED_P1 = 250;
+export const MOSSY_BEHEMOTH_HOP_SPEED_P2 = 300;
+/** Thorns in the radial shockwave fired on each landing — phase-aware.
+ *  Thinned (2026-06-13): P1 8→6, P2 10→8, and the P2 second offset wave was
+ *  dropped entirely (was 10+10 ≈ 20 effective per landing → undodgeable). */
+export const MOSSY_BEHEMOTH_LANDING_THORNS_P1 = 6;
+export const MOSSY_BEHEMOTH_LANDING_THORNS_P2 = 8;
+/** Phase 2: hops per combo. */
+export const MOSSY_BEHEMOTH_P2_HOPS_PER_COMBO = 3;
+/** Phase 2: pause (ms) on each landing before the next combo hop. Lengthened
+ *  240→320 (2026-06-13) for dodge-room between combo landings. */
+export const MOSSY_BEHEMOTH_P2_HOP_GAP_MS = 320;
+/** Phase 2: rest (ms) after a full combo before the next one. */
+export const MOSSY_BEHEMOTH_P2_COMBO_GAP_MS = 880;
 /** Visual scale applied to the boss texture. */
 export const MOSSY_BEHEMOTH_VISUAL_SCALE = 1.6 * WORLD_SPRITE_SCALE;
-/** Initial delay before the first hop after spawn. */
-export const MOSSY_BEHEMOTH_HOP_INITIAL_DELAY_MS = 700;
-/** Phase 2: max simultaneously alive mossy-slime adds spawned on landing. */
-export const MOSSY_BEHEMOTH_PHASE2_MAX_ADDS = 4;
 /** On death: minimum number of adds the boss splits into. */
 export const MOSSY_BEHEMOTH_DEATH_SPLIT_MIN = 2;
 /** On death: maximum number of adds the boss splits into. */
@@ -410,31 +453,45 @@ export const MOSSY_BEHEMOTH_DEATH_SPLIT_MAX = 3;
 /** Phase-change tint flash duration. */
 export const MOSSY_BEHEMOTH_PHASE_FLASH_MS = 200;
 
-// --- Pixie Queen (boss) ------------------------------------------------------
+// --- Pixie Queen (boss — "Strafe" rework) ------------------------------------
+// De-annoyed: she now orbits the player at a readable distance (always
+// visible + hittable) firing aimed spreads, and only teleports occasionally
+// with a clear destination telegraph. No more constant blink-spam or adds.
 
-/** Phase 1: cooldown (ms) between teleports. */
-export const PIXIE_QUEEN_PHASE1_TELEPORT_INTERVAL_MS = 2000;
-/**
- * Phase 2: cooldown (ms) between teleports. Bumped 1400 → 2400 — Phase 2
- * adds Pixie Dancer adds for extra pressure, so the teleport pace doesn't
- * also need to accelerate. At 1400 the queen barely sat still long enough
- * for the player to land hits while juggling adds; at 2400 she's vulnerable
- * for ~2.2 s per cycle, which lets damage actually land.
- */
-export const PIXIE_QUEEN_PHASE2_TELEPORT_INTERVAL_MS = 2400;
-/** Sparkle / fade-out window before teleporting (ms). */
+/** Initial delay before she starts acting after spawn. */
+export const PIXIE_QUEEN_INITIAL_DELAY_MS = 800;
+/** Ideal orbit distance (px) she tries to hold from the player. */
+export const PIXIE_QUEEN_ORBIT_RADIUS = 190;
+/** Strafe (tangential) speed (px/s) around the player — phase-aware. */
+export const PIXIE_QUEEN_STRAFE_SPEED_P1 = 95;
+export const PIXIE_QUEEN_STRAFE_SPEED_P2 = 132;
+/** Gain on the radial correction that pulls her back toward the orbit radius. */
+export const PIXIE_QUEEN_RADIAL_GAIN = 1.5;
+/** Cooldown (ms) between strafe-direction flips (so she isn't perfectly circular). */
+export const PIXIE_QUEEN_STRAFE_FLIP_MS = 2300;
+/** Aimed-spread cooldown (ms) — phase-aware. P2 950→1100 (2026-06-13). */
+export const PIXIE_QUEEN_SHOT_INTERVAL_P1 = 1300;
+export const PIXIE_QUEEN_SHOT_INTERVAL_P2 = 1100;
+/** Thorns per aimed spread — phase-aware. P2 thinned 5→4 (2026-06-13). */
+export const PIXIE_QUEEN_SHOT_THORNS_P1 = 3;
+export const PIXIE_QUEEN_SHOT_THORNS_P2 = 4;
+/** Half-spread (radians) of the aimed spread. 15° ≈ 0.2618. */
+export const PIXIE_QUEEN_SHOT_SPREAD_RAD = (15 * Math.PI) / 180;
+/** Teleport-reposition cooldown (ms) — phase-aware, deliberately rare. */
+export const PIXIE_QUEEN_TELEPORT_INTERVAL_P1 = 6000;
+export const PIXIE_QUEEN_TELEPORT_INTERVAL_P2 = 7000;
+/** Destination-marker telegraph window (ms) before she vanishes. */
+export const PIXIE_QUEEN_TELEPORT_TELEGRAPH_MS = 500;
+/** Sparkle / fade window each way during a teleport (ms). */
 export const PIXIE_QUEEN_TELEPORT_FADE_MS = 200;
-/** Phase 2: cooldown (ms) between Pixie Dancer add spawns. */
-export const PIXIE_QUEEN_PHASE2_ADD_INTERVAL_MS = 3000;
-/** Phase 2: max simultaneously alive Pixie Dancer adds. */
-export const PIXIE_QUEEN_PHASE2_MAX_ADDS = 3;
-/** Initial delay before the first teleport after spawn. */
-export const PIXIE_QUEEN_TELEPORT_INITIAL_DELAY_MS = 800;
+/** Thorns in the radial burst she fires on teleport-landing. Thinned 8→6
+ *  (2026-06-13) so the ring has clear escape gaps on arrival. */
+export const PIXIE_QUEEN_TELEPORT_LAND_THORNS = 6;
 /** Visual scale applied to the boss texture. */
 export const PIXIE_QUEEN_VISUAL_SCALE = 1.4 * WORLD_SPRITE_SCALE;
 /** Phase-change tint flash duration. */
 export const PIXIE_QUEEN_PHASE_FLASH_MS = 200;
-/** Min distance (px) the random fallback teleport keeps from the player. */
+/** Min distance (px) the teleport keeps from the player. */
 export const PIXIE_QUEEN_FALLBACK_MIN_DISTANCE = 3 * 64;
 
 // --- Bog Frog (Floor 2) ------------------------------------------------------
@@ -530,23 +587,68 @@ export const TOAD_SOVEREIGN_PHASE2_LANDING_THORNS = 5;
 // Phase-2 Bog-Frog adds were removed (2026-05-07) — combo-thorn density
 // alone is enough threat; mobs on top read as "unfair piling on".
 
-// --- Bloomheart (boss, Floor 2) ----------------------------------------------
+// --- Bloomheart (boss, Floor 2 — "Stalking Bloom" rework 2026-06-13) ---------
+// No longer rooted: a mobile ranged-zoner carnivore plant. Stalks the player
+// at mid-range (always moving, holds a standoff), and in Phase 2 periodically
+// SINKS into the mire + re-blooms elsewhere (anti-corner relocate). Threat
+// layers: aimed petal-fan + drifting delayed-detonation spores (now in P1 too)
+// + a Phase-2 "Bloom Burst" radial with a rotating safe gap (fair-by-design).
 
 export const BLOOMHEART_VISUAL_SCALE = 1.8 * WORLD_SPRITE_SCALE;
 export const BLOOMHEART_PHASE_FLASH_MS = 200;
 export const BLOOMHEART_INITIAL_DELAY_MS = 900;
-/** Phase 1: 5-thorn wide fan (±30°) on a slow cadence. */
-export const BLOOMHEART_PHASE1_FAN_INTERVAL_MS = 1600;
+
+// Movement: slow stalk toward the player that holds a standoff distance, plus
+// a gentle tangential circle so it's never fully static even at range.
+export const BLOOMHEART_STALK_SPEED_P1 = 40;
+export const BLOOMHEART_STALK_SPEED_P2 = 62;
+/** Mid-range the stalk tries to hold; closes in only when farther than this. */
+export const BLOOMHEART_STALK_STANDOFF = 200;
+/** Fraction of stalk speed spent on the tangential circle (anti-static). */
+export const BLOOMHEART_STALK_CIRCLE_RATIO = 0.5;
+/** Cooldown (ms) between circle-direction flips. */
+export const BLOOMHEART_STALK_FLIP_MS = 2600;
+
+// Petal fan (both phases): aimed 5-thorn wide fan (±30°) with mouth-open tell.
 export const BLOOMHEART_FAN_SPREAD_RAD = (30 * Math.PI) / 180;
-export const BLOOMHEART_PHASE1_TELEGRAPH_MS = 320;
-/** Phase 2: faster fan, plus a delayed-burst spore + adds. */
-export const BLOOMHEART_PHASE2_FAN_INTERVAL_MS = 1200;
-export const BLOOMHEART_PHASE2_SPORE_INTERVAL_MS = 2700;
-/** Spore travel + how long it floats before bursting into thorns. */
+export const BLOOMHEART_FAN_TELEGRAPH_MS = 320;
+export const BLOOMHEART_PHASE1_FAN_INTERVAL_MS = 1700;
+export const BLOOMHEART_PHASE2_FAN_INTERVAL_MS = 1400;
+
+// Spore mine (now BOTH phases — P1 gets a second threat beyond the fan): a
+// drifting glow that detonates into a small radial after its lifetime.
+export const BLOOMHEART_PHASE1_SPORE_INTERVAL_MS = 3800;
+export const BLOOMHEART_PHASE2_SPORE_INTERVAL_MS = 2800;
 export const BLOOMHEART_SPORE_SPEED = 140;
-export const BLOOMHEART_SPORE_LIFETIME_MS = 700;
-/** Number of mini-thorns the spore bursts into when it pops. */
-export const BLOOMHEART_SPORE_BURST_COUNT = 6;
+export const BLOOMHEART_SPORE_LIFETIME_MS = 750;
+/** Mini-thorns the spore bursts into — phase-aware. */
+export const BLOOMHEART_SPORE_BURST_COUNT_P1 = 5;
+export const BLOOMHEART_SPORE_BURST_COUNT_P2 = 6;
+
+// Bloom Burst (Phase 2 signature): radial of petals with a contiguous gap so
+// there's always a reachable escape lane (Forest-Heart fairness principle).
+export const BLOOMHEART_BLOOM_INTERVAL_MS = 5000;
+export const BLOOMHEART_BLOOM_TELEGRAPH_MS = 380;
+export const BLOOMHEART_BLOOM_THORNS = 12;
+/** Contiguous skipped slots = the safe gap (3 of 12 ≈ 90°). */
+export const BLOOMHEART_BLOOM_GAP_SLOTS = 3;
+
+// Sink & Re-Bloom relocate (Phase 2 anti-corner): sink into the mire, surface
+// elsewhere ≥ MIN_PLAYER_DIST away, re-bloom with a gapped burst.
+export const BLOOMHEART_SINK_INTERVAL_MS = 6500;
+export const BLOOMHEART_SINK_FADE_MS = 260;
+/** Target re-emerge distance from the player. */
+export const BLOOMHEART_REBLOOM_DIST = 220;
+/** Hard minimum (px, 3 tiles) the re-emerge spot must keep from the player. */
+export const BLOOMHEART_SINK_MIN_PLAYER_DIST = 3 * 64;
+/**
+ * Movement leash: Bloomheart may never cross past the floor's first vignette
+ * ring (user request 2026-06-13 — she's a central zoner, the player should own
+ * the outer area). The ring is an ellipse with half-axes w*0.28 / h*0.28 (see
+ * RoomAtmosphere.paintFloorVignette layer index 4), so the leash uses the same
+ * fraction of the full room size. Stalk + sink-relocate both respect it.
+ */
+export const BLOOMHEART_LEASH_RING_FRACTION = 0.28;
 
 // --- Damselfly Empress (boss, Floor 2) ---------------------------------------
 
@@ -619,32 +721,38 @@ export const BOG_COLOSSUS_PHASE2_AIMED_SPEED = 220;
 /** Phase 2 walk snipe: faster cadence than Phase 1 between orbit windows. */
 export const BOG_COLOSSUS_PHASE2_WALK_FIRE_INTERVAL_MS = 950;
 
-// --- Forest Heart (boss) -----------------------------------------------------
+// --- Forest Heart (boss — "Drifting Spiral" rework) --------------------------
+// No longer rooted: a floating core that drifts slowly around the room while
+// firing rotating spiral arms the player weaves through. Phase 2 adds a second
+// opposed arm + periodic spin-reversal + faster drift. No more add-spam.
 
-/** Phase 1: cooldown (ms) between radial waves. */
-export const FOREST_HEART_PHASE1_WAVE_INTERVAL_MS = 1800;
-/** Phase 2: faster radial waves. */
-export const FOREST_HEART_PHASE2_WAVE_INTERVAL_MS = 1400;
-/** Phase 2: cooldown (ms) between Forest Sprite add spawns. */
-export const FOREST_HEART_PHASE2_ADD_INTERVAL_MS = 2500;
-/** Number of thorns per radial wave (evenly spaced full circle). */
-export const FOREST_HEART_WAVE_THORN_COUNT = 6;
-/** Initial delay before the first wave after spawn. */
+/** Initial delay before the first spiral shot after spawn. */
 export const FOREST_HEART_FIRE_INITIAL_DELAY_MS = 900;
+/** Drift speed (px/s) toward the current wander target — phase-aware. */
+export const FOREST_HEART_DRIFT_SPEED_P1 = 38;
+export const FOREST_HEART_DRIFT_SPEED_P2 = 62;
+/** How often (ms) a new wander target is picked. */
+export const FOREST_HEART_DRIFT_REPICK_MS = 2600;
+/** Distance (px) to a wander target below which we repick early (arrived). */
+export const FOREST_HEART_DRIFT_ARRIVE_DIST = 40;
+/** Spiral shot cadence (ms between thorns) — phase-aware. */
+export const FOREST_HEART_SPIRAL_INTERVAL_P1 = 150;
+export const FOREST_HEART_SPIRAL_INTERVAL_P2 = 130;
+/** Angle the spiral advances per shot (degrees) — phase-aware. */
+export const FOREST_HEART_SPIRAL_STEP_DEG_P1 = 23;
+export const FOREST_HEART_SPIRAL_STEP_DEG_P2 = 27;
+/** Number of evenly-offset spiral arms — phase-aware. */
+export const FOREST_HEART_SPIRAL_ARMS_P1 = 1;
+export const FOREST_HEART_SPIRAL_ARMS_P2 = 2;
+/** Projectile speed (px/s) for spiral thorns — slower than default so the
+ *  spiral reads as a curve the player can weave through. */
+export const FOREST_HEART_SPIRAL_SPEED = 200;
+/** Phase 2: cooldown (ms) before the spiral reverses spin direction. */
+export const FOREST_HEART_SPIN_REVERSE_MS = 4200;
 /** Visual scale applied to the boss texture. */
 export const FOREST_HEART_VISUAL_SCALE = 1.0 * WORLD_SPRITE_SCALE;
 /** Phase-change tint flash duration. */
 export const FOREST_HEART_PHASE_FLASH_MS = 220;
-/** Phase 1 pulse tween scale low / high bounds. */
-export const FOREST_HEART_PHASE1_PULSE_LOW = 0.95;
-export const FOREST_HEART_PHASE1_PULSE_HIGH = 1.05;
-/** Phase 2 pulse tween scale low / high bounds (more intense). */
-export const FOREST_HEART_PHASE2_PULSE_LOW = 0.9;
-export const FOREST_HEART_PHASE2_PULSE_HIGH = 1.15;
-/** Phase 1 pulse duration (one direction). */
-export const FOREST_HEART_PHASE1_PULSE_DURATION_MS = 1100;
-/** Phase 2 pulse duration (faster). */
-export const FOREST_HEART_PHASE2_PULSE_DURATION_MS = 700;
 
 // --- Onyx Mansion mob tuning -------------------------------------------------
 
@@ -1077,6 +1185,11 @@ export const TextureKeys = {
   PossessedCandelabra: 'tex-enemy-possessed-candelabra',
   CursedMirror: 'tex-enemy-cursed-mirror',
   MansionMissile: 'tex-projectile-mansion-missile',
+  /** Floor-coloured caster orbs (round magic-bolt look, like the Doppelgänger
+   *  / MansionMissile) for the Emerald + Sapphire minibosses — they read as
+   *  casters now, so the arrow-thorn no longer fits. */
+  CasterOrbEmerald: 'tex-projectile-caster-orb-emerald',
+  CasterOrbSapphire: 'tex-projectile-caster-orb-sapphire',
   FlameMissile: 'tex-projectile-flame-missile',
   WaxPuddle: 'tex-hazard-wax-puddle',
   BossCrimsonLord: 'tex-boss-crimson-lord',

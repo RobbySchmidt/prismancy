@@ -2,44 +2,49 @@ import type Phaser from 'phaser';
 import {
   ENEMY_PROJECTILE_SPEED,
   PIXIE_QUEEN_FALLBACK_MIN_DISTANCE,
-  PIXIE_QUEEN_PHASE1_TELEPORT_INTERVAL_MS,
-  PIXIE_QUEEN_PHASE2_ADD_INTERVAL_MS,
-  PIXIE_QUEEN_PHASE2_MAX_ADDS,
-  PIXIE_QUEEN_PHASE2_TELEPORT_INTERVAL_MS,
+  PIXIE_QUEEN_INITIAL_DELAY_MS,
+  PIXIE_QUEEN_ORBIT_RADIUS,
   PIXIE_QUEEN_PHASE_FLASH_MS,
+  PIXIE_QUEEN_RADIAL_GAIN,
+  PIXIE_QUEEN_SHOT_INTERVAL_P1,
+  PIXIE_QUEEN_SHOT_INTERVAL_P2,
+  PIXIE_QUEEN_SHOT_SPREAD_RAD,
+  PIXIE_QUEEN_SHOT_THORNS_P1,
+  PIXIE_QUEEN_SHOT_THORNS_P2,
+  PIXIE_QUEEN_STRAFE_FLIP_MS,
+  PIXIE_QUEEN_STRAFE_SPEED_P1,
+  PIXIE_QUEEN_STRAFE_SPEED_P2,
   PIXIE_QUEEN_TELEPORT_FADE_MS,
-  PIXIE_QUEEN_TELEPORT_INITIAL_DELAY_MS,
+  PIXIE_QUEEN_TELEPORT_INTERVAL_P1,
+  PIXIE_QUEEN_TELEPORT_INTERVAL_P2,
+  PIXIE_QUEEN_TELEPORT_LAND_THORNS,
+  PIXIE_QUEEN_TELEPORT_TELEGRAPH_MS,
   PIXIE_QUEEN_VISUAL_SCALE,
 } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
-import { ENEMIES, type EnemyId } from '../../data/enemies';
-import { safeAddSpawnPosition } from '../../utils/bossSpawn';
+import { ENEMIES } from '../../data/enemies';
 import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
-import { type BaseEnemy } from './BaseEnemy';
 import { BossEnemy, type BossPhaseDefinition } from './BossEnemy';
 
 /**
- * Adapter so PixieQueen can request adds + access the player + tree positions
- * without grabbing GameScene directly. Implemented by GameScene at construction
- * time.
+ * Adapter so PixieQueen can read player + room bounds + projectile pool.
+ * Implemented by GameScene.
  */
 export interface PixieQueenHost {
   enemyProjectilePool: EnemyProjectilePool;
-  spawnEnemyAt(id: EnemyId, x: number, y: number): BaseEnemy | null;
   getPlayer(): Player;
   getRoomBounds(): { minX: number; maxX: number; minY: number; maxY: number };
-  /** Active-room tree positions (canopy decoration anchors) for teleport targets. */
-  getTreePositions(): { x: number; y: number }[];
 }
 
 /**
- * Pixie Queen — Emerald Forest boss. Pulls in the long-pending Pixie-Dancer
- * teleport idea: she vanishes into a tree and re-emerges from another every
- * couple of seconds, firing thorn patterns on landing. Phase 1: 4-thorn plus,
- * 2.0s cadence. Phase 2 (≤ 50% HP): 6-thorn star, 1.4s cadence + Pixie-Dancer
- * adds. Falls back to a random safe position when no trees exist (open arena).
+ * Pixie Queen — Emerald Forest boss, "Strafe" rework. De-annoyed: instead of
+ * the old blink-spam (vanish/reappear every ~2 s, hard to pin down), she now
+ * ORBITS the player at a readable distance — always visible, always hittable —
+ * firing aimed thorn spreads while she strafes. She only TELEPORTS occasionally
+ * to reposition, and always telegraphs the destination with a sparkle marker
+ * first. Phase 2 (≤ 50% HP) strafes faster + fires wider spreads. No more adds.
  */
 export class PixieQueen extends BossEnemy {
   override readonly displayName = 'Pixie Queen';
@@ -48,182 +53,232 @@ export class PixieQueen extends BossEnemy {
   ];
 
   private readonly host: PixieQueenHost;
+  private strafeDir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
+  private nextFlipAt = 0;
+  private nextShotAt: number;
   private nextTeleportAt: number;
-  private nextAddAt = 0;
-  private adds: BaseEnemy[] = [];
+  /** True while a teleport sequence is running — strafe + shots pause. */
+  private teleporting = false;
+  private teleportMarker: Phaser.GameObjects.Arc | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, host: PixieQueenHost) {
     super(scene, x, y, ENEMIES['boss-pixie-queen']);
     this.host = host;
-    this.nextTeleportAt = scene.time.now + PIXIE_QUEEN_TELEPORT_INITIAL_DELAY_MS;
+    const now = scene.time.now;
+    this.nextShotAt = now + PIXIE_QUEEN_INITIAL_DELAY_MS;
+    this.nextFlipAt = now + PIXIE_QUEEN_STRAFE_FLIP_MS;
+    this.nextTeleportAt = now + PIXIE_QUEEN_TELEPORT_INTERVAL_P1;
     this.setScale(PIXIE_QUEEN_VISUAL_SCALE);
 
-    // No arcade-velocity movement — the boss teleports. Body stays active so
-    // overlap callbacks (player contact, missile damage) still fire.
+    // Mobile now — strafe via arcade velocity, collide with the room.
     const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setImmovable(true);
-    body.moves = false;
+    body.setImmovable(false);
+    body.moves = true;
   }
 
   protected tickAI(time: number): void {
+    if (this.teleporting) return;
+
     if (time >= this.nextTeleportAt) {
-      this.startTeleport(time);
+      this.beginTeleport();
+      return;
     }
-    if (this.currentPhase >= 2 && time >= this.nextAddAt) {
-      this.adds = this.adds.filter((a) => a.active);
-      if (this.adds.length < PIXIE_QUEEN_PHASE2_MAX_ADDS) {
-        const bounds = this.host.getRoomBounds();
-        const ax = bounds.minX + Math.random() * (bounds.maxX - bounds.minX);
-        const ay = bounds.minY + Math.random() * (bounds.maxY - bounds.minY);
-        // Player-proximity safety: random anywhere in bounds means the roll
-        // can easily land on the player. Fall back to the farthest room
-        // corner if it does.
-        const player = this.host.getPlayer();
-        const safe = safeAddSpawnPosition({ x: ax, y: ay }, bounds, player.x, player.y);
-        const add = this.host.spawnEnemyAt('pixie-dancer', safe.x, safe.y);
-        if (add) {
-          this.adds.push(add);
-          EventBus.emit('enemy:charge');
-        }
-      }
-      this.nextAddAt = time + PIXIE_QUEEN_PHASE2_ADD_INTERVAL_MS;
+
+    this.tickStrafe(time);
+
+    if (time >= this.nextShotAt) {
+      this.fireAimedSpread();
+      this.nextShotAt =
+        time +
+        (this.currentPhase >= 2 ? PIXIE_QUEEN_SHOT_INTERVAL_P2 : PIXIE_QUEEN_SHOT_INTERVAL_P1);
     }
   }
 
   /**
-   * Pop a sparkle cloud at the current spot, fade out, teleport to a tree
-   * (or random safe spot), fade back in, fire a thorn pattern. The body is
-   * left active throughout — the brief invisibility is purely visual so the
-   * player can still tell where she is between flashes.
-   *
-   * The target is picked AT THE END of the fade-out, not the start, so the
-   * player can't predict-and-walk into the destination during the 200 ms fade
-   * (which used to drop the boss right on top of the player).
+   * Orbit the player: tangential strafe + a radial correction that pulls her
+   * back toward the ideal orbit radius. Combined vector is normalized to the
+   * strafe speed so she circles at constant pace. Flips direction on a timer
+   * and whenever a wall blocks her, so she never grinds against an edge.
    */
-  private startTeleport(time: number): void {
-    this.spawnTeleportSparkles(this.x, this.y);
+  private tickStrafe(time: number): void {
+    const player = this.host.getPlayer();
+    if (!player.active) {
+      this.setVelocity(0, 0);
+      return;
+    }
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    if (
+      time >= this.nextFlipAt ||
+      body.blocked.left ||
+      body.blocked.right ||
+      body.blocked.up ||
+      body.blocked.down
+    ) {
+      this.strafeDir = (this.strafeDir * -1) as 1 | -1;
+      this.nextFlipAt = time + PIXIE_QUEEN_STRAFE_FLIP_MS;
+    }
+
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const radX = dx / dist;
+    const radY = dy / dist;
+    // Tangential unit (perpendicular), spun by strafe direction.
+    const tanX = -radY * this.strafeDir;
+    const tanY = radX * this.strafeDir;
+    // Normalized radius error: + = too far (pull inward), - = too close.
+    const err = (dist - PIXIE_QUEEN_ORBIT_RADIUS) / PIXIE_QUEEN_ORBIT_RADIUS;
+    const radialW = Math.max(-1, Math.min(1, err * PIXIE_QUEEN_RADIAL_GAIN));
+    let vx = tanX + radX * radialW;
+    let vy = tanY + radY * radialW;
+    const vlen = Math.hypot(vx, vy) || 1;
+    const speed =
+      this.currentPhase >= 2 ? PIXIE_QUEEN_STRAFE_SPEED_P2 : PIXIE_QUEEN_STRAFE_SPEED_P1;
+    vx = (vx / vlen) * speed;
+    vy = (vy / vlen) * speed;
+    this.setVelocity(vx, vy);
+  }
+
+  /** Aimed spread of thorns toward the player (centre + symmetric pairs). */
+  private fireAimedSpread(): void {
+    const player = this.host.getPlayer();
+    if (!player.active) return;
+    const count =
+      this.currentPhase >= 2 ? PIXIE_QUEEN_SHOT_THORNS_P2 : PIXIE_QUEEN_SHOT_THORNS_P1;
+    const baseAngle = Math.atan2(player.y - this.y, player.x - this.x);
+    const half = (count - 1) / 2;
+    for (let i = 0; i < count; i++) {
+      const a = baseAngle + (i - half) * PIXIE_QUEEN_SHOT_SPREAD_RAD;
+      this.host.enemyProjectilePool.fire(
+        this.x,
+        this.y,
+        Math.cos(a) * ENEMY_PROJECTILE_SPEED,
+        Math.sin(a) * ENEMY_PROJECTILE_SPEED,
+      );
+    }
+  }
+
+  /**
+   * Teleport-reposition: show a sparkle marker at the destination, hold it
+   * for the telegraph window, then fade out → snap → fade in → radial burst.
+   * The pre-telegraph + slow cadence make this a readable reposition rather
+   * than the old "can't pin her down" blink-spam.
+   */
+  private beginTeleport(): void {
+    this.teleporting = true;
+    this.setVelocity(0, 0);
+    const dest = this.pickTeleportTarget();
+
+    this.teleportMarker = this.scene.add
+      .circle(dest.x, dest.y, 16, 0xff7ac0, 0.18)
+      .setStrokeStyle(2, 0xffa0d8, 0.9)
+      .setDepth(DepthLayers.FloorDecoration + 1);
+    this.scene.tweens.add({
+      targets: this.teleportMarker,
+      scale: { from: 0.5, to: 1.15 },
+      alpha: { from: 0.4, to: 0.95 },
+      duration: PIXIE_QUEEN_TELEPORT_TELEGRAPH_MS,
+      ease: 'Sine.In',
+    });
     EventBus.emit('enemy:charge');
 
-    this.scene.tweens.add({
-      targets: this,
-      alpha: 0,
-      duration: PIXIE_QUEEN_TELEPORT_FADE_MS,
-      ease: 'Sine.In',
-      onComplete: () => {
-        if (!this.active) return;
-        const targetPos = this.pickTeleportTarget();
-        this.setPosition(targetPos.x, targetPos.y);
-        const body = this.body as Phaser.Physics.Arcade.Body | null;
-        body?.reset(targetPos.x, targetPos.y);
-        this.spawnTeleportSparkles(targetPos.x, targetPos.y);
-        this.scene.tweens.add({
-          targets: this,
-          alpha: 1,
-          duration: PIXIE_QUEEN_TELEPORT_FADE_MS,
-          ease: 'Sine.Out',
-          onComplete: () => {
-            if (this.active) this.fireThornPattern();
-          },
-        });
-      },
+    this.scene.time.delayedCall(PIXIE_QUEEN_TELEPORT_TELEGRAPH_MS, () => {
+      if (!this.active) {
+        this.clearTeleportMarker();
+        return;
+      }
+      this.spawnTeleportSparkles(this.x, this.y);
+      this.scene.tweens.add({
+        targets: this,
+        alpha: 0,
+        duration: PIXIE_QUEEN_TELEPORT_FADE_MS,
+        ease: 'Sine.In',
+        onComplete: () => {
+          if (!this.active) {
+            this.clearTeleportMarker();
+            return;
+          }
+          this.setPosition(dest.x, dest.y);
+          const body = this.body as Phaser.Physics.Arcade.Body | null;
+          body?.reset(dest.x, dest.y);
+          this.clearTeleportMarker();
+          this.spawnTeleportSparkles(dest.x, dest.y);
+          this.scene.tweens.add({
+            targets: this,
+            alpha: 1,
+            duration: PIXIE_QUEEN_TELEPORT_FADE_MS,
+            ease: 'Sine.Out',
+            onComplete: () => {
+              this.teleporting = false;
+              this.fireLandingBurst();
+              const now = this.scene.time.now;
+              this.nextTeleportAt =
+                now +
+                (this.currentPhase >= 2
+                  ? PIXIE_QUEEN_TELEPORT_INTERVAL_P2
+                  : PIXIE_QUEEN_TELEPORT_INTERVAL_P1);
+            },
+          });
+        },
+      });
     });
+  }
 
-    const interval =
-      this.currentPhase >= 2
-        ? PIXIE_QUEEN_PHASE2_TELEPORT_INTERVAL_MS
-        : PIXIE_QUEEN_PHASE1_TELEPORT_INTERVAL_MS;
-    this.nextTeleportAt = time + interval;
+  private fireLandingBurst(): void {
+    const count = PIXIE_QUEEN_TELEPORT_LAND_THORNS;
+    const baseOffset = Math.random() * Math.PI * 2;
+    for (let i = 0; i < count; i++) {
+      const a = baseOffset + (i / count) * Math.PI * 2;
+      this.host.enemyProjectilePool.fire(
+        this.x,
+        this.y,
+        Math.cos(a) * ENEMY_PROJECTILE_SPEED,
+        Math.sin(a) * ENEMY_PROJECTILE_SPEED,
+      );
+    }
   }
 
   /**
-   * Pick a tree position at random, avoiding the current one AND any tree
-   * that's too close to the player (the prior version skipped that check
-   * for the tree path, so if the player happened to be parked next to a
-   * tree the queen could materialize directly on top of him for free
-   * contact damage). Falls back to the FARTHEST tree from the player when
-   * no safe candidate exists, then to a perimeter-anchor grid when there
-   * are no trees at all (boss rooms skip `scatterDecorations`, so the queen
-   * has no real trees to teleport between — the anchor grid keeps her
-   * teleport spots varied instead of bouncing between two random points
-   * the bounds-fallback happened to land on).
+   * Pick a perimeter anchor at least FALLBACK_MIN_DISTANCE from the player,
+   * preferring the candidate farthest from them. Keeps her teleport spots
+   * varied + never on top of the player.
    */
   private pickTeleportTarget(): { x: number; y: number } {
-    const trees = this.host.getTreePositions();
     const player = this.host.getPlayer();
-    const minDistSq =
-      PIXIE_QUEEN_FALLBACK_MIN_DISTANCE * PIXIE_QUEEN_FALLBACK_MIN_DISTANCE;
-
-    if (trees.length > 0) {
-      // Reject trees the queen is already at (she'd appear to not move) and
-      // trees within the safe distance of the player.
-      const safe = trees.filter((t) => {
-        if (Math.hypot(t.x - this.x, t.y - this.y) <= 16) return false;
-        const dx = t.x - player.x;
-        const dy = t.y - player.y;
-        return dx * dx + dy * dy >= minDistSq;
-      });
-      if (safe.length > 0) {
-        const pick = safe[Math.floor(Math.random() * safe.length)]!;
-        return { x: pick.x, y: pick.y };
-      }
-      // No safe tree available (player is parked in the middle of a
-      // tree-dense room). Pick the FARTHEST tree as best-effort instead of
-      // re-using the random tree pool — keeps the queen out of the player's
-      // immediate hitbox at the cost of a less random teleport.
-      let farthest = trees[0]!;
-      let farthestSq = -1;
-      for (const t of trees) {
-        const dx = t.x - player.x;
-        const dy = t.y - player.y;
-        const distSq = dx * dx + dy * dy;
-        if (distSq > farthestSq) {
-          farthestSq = distSq;
-          farthest = t;
-        }
-      }
-      return { x: farthest.x, y: farthest.y };
-    }
-
-    // No trees in this room (every boss room skips decoration scatter).
-    // Use a fixed 8-anchor perimeter grid: TL, TM, TR, ML, MR, BL, BM, BR
-    // around the playable bounds. Reject anchors the queen is already on
-    // and anchors within the safe distance of the player. Pick farthest as
-    // the last-resort tier — same shape as the tree path above.
     const bounds = this.host.getRoomBounds();
     const ax = (t: number): number => bounds.minX + (bounds.maxX - bounds.minX) * t;
     const ay = (t: number): number => bounds.minY + (bounds.maxY - bounds.minY) * t;
     const anchors: { x: number; y: number }[] = [
-      { x: ax(0.15), y: ay(0.2) },
-      { x: ax(0.5), y: ay(0.2) },
-      { x: ax(0.85), y: ay(0.2) },
-      { x: ax(0.15), y: ay(0.5) },
-      { x: ax(0.85), y: ay(0.5) },
-      { x: ax(0.15), y: ay(0.8) },
-      { x: ax(0.5), y: ay(0.8) },
-      { x: ax(0.85), y: ay(0.8) },
+      { x: ax(0.18), y: ay(0.22) },
+      { x: ax(0.5), y: ay(0.18) },
+      { x: ax(0.82), y: ay(0.22) },
+      { x: ax(0.18), y: ay(0.5) },
+      { x: ax(0.82), y: ay(0.5) },
+      { x: ax(0.18), y: ay(0.78) },
+      { x: ax(0.5), y: ay(0.82) },
+      { x: ax(0.82), y: ay(0.78) },
     ];
-    const safeAnchors = anchors.filter((a) => {
-      if (Math.hypot(a.x - this.x, a.y - this.y) <= 16) return false;
+    const minDistSq =
+      PIXIE_QUEEN_FALLBACK_MIN_DISTANCE * PIXIE_QUEEN_FALLBACK_MIN_DISTANCE;
+    const safe = anchors.filter((a) => {
       const dx = a.x - player.x;
       const dy = a.y - player.y;
       return dx * dx + dy * dy >= minDistSq;
     });
-    if (safeAnchors.length > 0) {
-      return safeAnchors[Math.floor(Math.random() * safeAnchors.length)]!;
-    }
-    let farthest = anchors[0]!;
-    let farthestSq = -1;
-    for (const a of anchors) {
-      if (Math.hypot(a.x - this.x, a.y - this.y) <= 16) continue;
+    const pool = safe.length > 0 ? safe : anchors;
+    // Prefer the farthest of the eligible anchors.
+    let best = pool[0]!;
+    let bestSq = -1;
+    for (const a of pool) {
       const dx = a.x - player.x;
       const dy = a.y - player.y;
       const distSq = dx * dx + dy * dy;
-      if (distSq > farthestSq) {
-        farthestSq = distSq;
-        farthest = a;
+      if (distSq > bestSq) {
+        bestSq = distSq;
+        best = a;
       }
     }
-    return { x: farthest.x, y: farthest.y };
+    return best;
   }
 
   private spawnTeleportSparkles(cx: number, cy: number): void {
@@ -248,21 +303,11 @@ export class PixieQueen extends BossEnemy {
     }
   }
 
-  /**
-   * Phase 1: 4-thorn plus (cardinal). Phase 2: 6-thorn star (radial sweep).
-   */
-  private fireThornPattern(): void {
-    const count = this.currentPhase >= 2 ? 6 : 4;
-    const baseAngle = this.currentPhase >= 2 ? 0 : 0;
-    for (let i = 0; i < count; i++) {
-      const a = baseAngle + (i / count) * Math.PI * 2;
-      this.host.enemyProjectilePool.fire(
-        this.x,
-        this.y,
-        Math.cos(a) * ENEMY_PROJECTILE_SPEED,
-        Math.sin(a) * ENEMY_PROJECTILE_SPEED,
-      );
-    }
+  private clearTeleportMarker(): void {
+    if (!this.teleportMarker) return;
+    this.scene.tweens.killTweensOf(this.teleportMarker);
+    this.teleportMarker.destroy();
+    this.teleportMarker = null;
   }
 
   protected onPhaseChanged(newPhase: number): void {
@@ -272,8 +317,10 @@ export class PixieQueen extends BossEnemy {
       if (this.active) this.clearTint();
     });
     this.scene.cameras.main.shake(180, 0.005);
-    const now = this.scene.time.now;
-    this.nextTeleportAt = now + 400;
-    this.nextAddAt = now + 1200;
+  }
+
+  protected override die(): void {
+    this.clearTeleportMarker();
+    super.die();
   }
 }

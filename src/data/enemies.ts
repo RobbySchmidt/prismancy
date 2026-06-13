@@ -209,21 +209,31 @@ export const ENEMIES = {
   'miniboss-thornwood-shambler': {
     id: 'miniboss-thornwood-shambler',
     textureKey: TextureKeys.MinibossThornwoodShambler,
-    displayName: 'Thornwood Shambler',
-    hp: 28,
+    /** Reskinned to the antlered "Grovekeeper" druid (Page 9 variant A,
+     * 2026-06-13). Internal id kept to avoid a churny rename. */
+    displayName: 'Grovekeeper',
+    /** Doubled 28→56 (user 2026-06-13 — the floor-1 miniboss wanted more HP).
+     * Minibosses also get full DPS-ratio scaling on top (see BaseEnemy). */
+    hp: 56,
     contactDamage: 1,
-    /** Slow relentless walk — pressure comes from the volleys, not the chase. */
-    moveSpeed: 45,
+    /** Slow relentless walk — pressure comes from the volleys, not the chase.
+     * Nudged 45→52 in the 2026-06-13 "a bit harder" pass (modest, kept kiteable). */
+    moveSpeed: 52,
     hitboxRadius: 18,
     floor: 'emerald-forest',
     /** Guaranteed coin on top of the room-clear reward. */
     coinDropChance: 1,
+    /** Knockback-immune like the champions (2026-06-13) — a solo miniboss
+     * shouldn't be corner-pushable / AI-lockable by sustained fire. */
+    knockbackFactor: 0,
     miniboss: true,
   },
   'miniboss-mire-lurker': {
     id: 'miniboss-mire-lurker',
     textureKey: TextureKeys.MinibossMireLurker,
-    displayName: 'Mire Lurker',
+    /** Reskinned to the "Bog Hag" swamp crone (Page 9 variant A, 2026-06-13).
+     * Internal id kept to avoid a churny rename. */
+    displayName: 'Bog Hag',
     hp: 26,
     contactDamage: 1,
     /** Speed while submerged (intangible repositioning); surfaced = rooted. */
@@ -231,6 +241,8 @@ export const ENEMIES = {
     hitboxRadius: 16,
     floor: 'sapphire-swamp',
     coinDropChance: 1,
+    /** Knockback-immune like the champions (2026-06-13). */
+    knockbackFactor: 0,
     miniboss: true,
   },
   'miniboss-doppelganger': {
@@ -247,6 +259,8 @@ export const ENEMIES = {
     hitboxRadius: 12,
     floor: 'onyx-mansion',
     coinDropChance: 1,
+    /** Knockback-immune like the champions (2026-06-13). */
+    knockbackFactor: 0,
     miniboss: true,
   },
   'boss-vine-lord': {

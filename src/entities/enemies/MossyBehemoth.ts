@@ -1,30 +1,30 @@
 import type Phaser from 'phaser';
 import {
+  ENEMY_PROJECTILE_SPEED,
   MOSSY_BEHEMOTH_DEATH_SPLIT_MAX,
   MOSSY_BEHEMOTH_DEATH_SPLIT_MIN,
   MOSSY_BEHEMOTH_HOP_DURATION_MS,
-  MOSSY_BEHEMOTH_HOP_INITIAL_DELAY_MS,
-  MOSSY_BEHEMOTH_PHASE1_HOP_INTERVAL_MS,
-  MOSSY_BEHEMOTH_PHASE2_HOP_INTERVAL_MS,
-  MOSSY_BEHEMOTH_PHASE2_MAX_ADDS,
+  MOSSY_BEHEMOTH_HOP_SPEED_P1,
+  MOSSY_BEHEMOTH_HOP_SPEED_P2,
+  MOSSY_BEHEMOTH_INITIAL_DELAY_MS,
+  MOSSY_BEHEMOTH_LANDING_THORNS_P1,
+  MOSSY_BEHEMOTH_LANDING_THORNS_P2,
+  MOSSY_BEHEMOTH_P1_IDLE_MS,
+  MOSSY_BEHEMOTH_P1_TELEGRAPH_MS,
+  MOSSY_BEHEMOTH_P2_COMBO_GAP_MS,
+  MOSSY_BEHEMOTH_P2_HOP_GAP_MS,
+  MOSSY_BEHEMOTH_P2_HOPS_PER_COMBO,
   MOSSY_BEHEMOTH_PHASE_FLASH_MS,
   MOSSY_BEHEMOTH_VISUAL_SCALE,
 } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
 import { ENEMIES, type EnemyId } from '../../data/enemies';
-import { safeAddSpawnPosition } from '../../utils/bossSpawn';
 import { EventBus } from '../../utils/EventBus';
 import { type EnemyProjectilePool } from '../projectiles/EnemyProjectilePool';
 import { type Player } from '../Player';
 import { type BaseEnemy } from './BaseEnemy';
 import { BossEnemy, type BossPhaseDefinition } from './BossEnemy';
 
-type HopState = 'wait' | 'hop';
-
-/**
- * Adapter so MossyBehemoth can request adds + access the player without
- * grabbing GameScene directly. Implemented by GameScene at construction time.
- */
 export interface MossyBehemothHost {
   enemyProjectilePool: EnemyProjectilePool;
   spawnEnemyAt(id: EnemyId, x: number, y: number): BaseEnemy | null;
@@ -32,11 +32,16 @@ export interface MossyBehemothHost {
   getRoomBounds(): { minX: number; maxX: number; minY: number; maxY: number };
 }
 
+type Phase1State = 'idle' | 'telegraph' | 'hop';
+type Phase2State = 'comboHop' | 'comboLand' | 'comboGap';
+
 /**
- * Mossy Behemoth — Emerald Forest boss. A scaled-up Mossy Slime that hops
- * around the room. Phase 1: heavy hops in the player's direction every 1.4s.
- * Phase 2 (≤ 50% HP): faster hops + on-landing slime adds. On death: splits
- * into 2-3 mossy-slime adds.
+ * Mossy Behemoth — Emerald Forest boss, "Slam" rework. The hop IS the threat:
+ * every landing erupts a radial shockwave of thorns. Phase 1 is a readable
+ * idle → cheek-squash telegraph → hop → land-shockwave loop. Phase 2 (≤ 50%
+ * HP) chains a 3-hop combo, each landing firing a denser dual-wave shockwave,
+ * then a short rest. The Phase-2 slime-add summoning was dropped — it stands
+ * on its movement + shockwave density now. Death-split kept as its signature.
  */
 export class MossyBehemoth extends BossEnemy {
   override readonly displayName = 'Mossy Behemoth';
@@ -45,92 +50,161 @@ export class MossyBehemoth extends BossEnemy {
   ];
 
   private readonly host: MossyBehemothHost;
-  private hopState: HopState = 'wait';
-  private nextStateChangeAt: number;
-  private adds: BaseEnemy[] = [];
+
+  private p1State: Phase1State = 'idle';
+  private p1NextChangeAt: number;
+
+  private p2State: Phase2State = 'comboGap';
+  private p2NextChangeAt = 0;
+  private p2HopsTaken = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, host: MossyBehemothHost) {
     super(scene, x, y, ENEMIES['boss-mossy-behemoth']);
     this.host = host;
-    this.nextStateChangeAt = scene.time.now + MOSSY_BEHEMOTH_HOP_INITIAL_DELAY_MS;
+    this.p1NextChangeAt = scene.time.now + MOSSY_BEHEMOTH_INITIAL_DELAY_MS;
     this.setScale(MOSSY_BEHEMOTH_VISUAL_SCALE);
   }
 
   protected tickAI(time: number): void {
-    if (time < this.nextStateChangeAt) return;
-    if (this.hopState === 'wait') this.startHop(time);
-    else this.endHop(time);
+    if (this.currentPhase === 1) this.tickPhase1(time);
+    else this.tickPhase2(time);
   }
 
-  private startHop(time: number): void {
+  // --- Phase 1 ---------------------------------------------------------------
+
+  private tickPhase1(time: number): void {
+    if (time < this.p1NextChangeAt) return;
+    switch (this.p1State) {
+      case 'idle':
+        this.p1BeginTelegraph(time);
+        break;
+      case 'telegraph':
+        this.p1Launch(time);
+        break;
+      case 'hop':
+        this.p1Land(time);
+        break;
+    }
+  }
+
+  private p1BeginTelegraph(time: number): void {
+    this.p1State = 'telegraph';
+    this.p1NextChangeAt = time + MOSSY_BEHEMOTH_P1_TELEGRAPH_MS;
+    EventBus.emit('enemy:charge');
+    this.scene.tweens.killTweensOf(this);
+    this.scene.tweens.add({
+      targets: this,
+      scaleX: MOSSY_BEHEMOTH_VISUAL_SCALE * 1.14,
+      scaleY: MOSSY_BEHEMOTH_VISUAL_SCALE * 0.86,
+      duration: MOSSY_BEHEMOTH_P1_TELEGRAPH_MS,
+      ease: 'Sine.Out',
+    });
+  }
+
+  private p1Launch(time: number): void {
+    this.scene.tweens.killTweensOf(this);
+    this.setScale(MOSSY_BEHEMOTH_VISUAL_SCALE);
+    this.launchHopToward(MOSSY_BEHEMOTH_HOP_SPEED_P1);
+    this.p1State = 'hop';
+    this.p1NextChangeAt = time + MOSSY_BEHEMOTH_HOP_DURATION_MS;
+  }
+
+  private p1Land(time: number): void {
+    this.setVelocity(0, 0);
+    this.spawnLandingSparkles();
+    this.fireShockwave(MOSSY_BEHEMOTH_LANDING_THORNS_P1);
+    this.p1State = 'idle';
+    this.p1NextChangeAt = time + MOSSY_BEHEMOTH_P1_IDLE_MS;
+  }
+
+  // --- Phase 2 ---------------------------------------------------------------
+
+  private tickPhase2(time: number): void {
+    if (time < this.p2NextChangeAt) return;
+    switch (this.p2State) {
+      case 'comboGap':
+        this.p2BeginCombo(time);
+        break;
+      case 'comboHop':
+        this.p2Land(time);
+        break;
+      case 'comboLand':
+        this.p2NextHopOrRest(time);
+        break;
+    }
+  }
+
+  private p2BeginCombo(time: number): void {
+    this.p2HopsTaken = 0;
+    this.p2BeginHop(time);
+  }
+
+  private p2BeginHop(time: number): void {
+    this.launchHopToward(MOSSY_BEHEMOTH_HOP_SPEED_P2);
+    this.p2State = 'comboHop';
+    this.p2NextChangeAt = time + MOSSY_BEHEMOTH_HOP_DURATION_MS;
+  }
+
+  private p2Land(time: number): void {
+    this.setVelocity(0, 0);
+    this.p2HopsTaken += 1;
+    this.spawnLandingSparkles();
+    this.fireShockwave(MOSSY_BEHEMOTH_LANDING_THORNS_P2);
+    this.p2State = 'comboLand';
+    this.p2NextChangeAt = time + MOSSY_BEHEMOTH_P2_HOP_GAP_MS;
+  }
+
+  private p2NextHopOrRest(time: number): void {
+    if (this.p2HopsTaken >= MOSSY_BEHEMOTH_P2_HOPS_PER_COMBO) {
+      this.p2State = 'comboGap';
+      this.p2NextChangeAt = time + MOSSY_BEHEMOTH_P2_COMBO_GAP_MS;
+    } else {
+      this.p2BeginHop(time);
+    }
+  }
+
+  // --- Shared ----------------------------------------------------------------
+
+  /** Hop toward the player with jitter so consecutive landings don't stack. */
+  private launchHopToward(speed: number): void {
     const player = this.host.getPlayer();
     if (!player.active) {
-      this.scheduleNextWait(time);
+      this.setVelocity(0, 0);
       return;
     }
     const dx = player.x - this.x;
     const dy = player.y - this.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
+    const len = Math.hypot(dx, dy);
     if (len < 1) {
-      this.scheduleNextWait(time);
+      this.setVelocity(0, 0);
       return;
     }
-    const speed = this.definition.moveSpeed;
-    this.setVelocity((dx / len) * speed, (dy / len) * speed);
-    this.hopState = 'hop';
-    this.nextStateChangeAt = time + MOSSY_BEHEMOTH_HOP_DURATION_MS;
-    // Audio cue for the hop "leap" — Mossy Behemoth has no visual telegraph
-    // (instant velocity change), so this is the only feedback the player gets
-    // that the boss is acting rather than idling.
+    const jitter = (Math.random() - 0.5) * Math.PI * 0.6;
+    const a = Math.atan2(dy, dx) + jitter;
+    this.setVelocity(Math.cos(a) * speed, Math.sin(a) * speed);
     EventBus.emit('enemy:charge');
   }
 
-  private endHop(time: number): void {
-    this.setVelocity(0, 0);
-    this.hopState = 'wait';
-    this.spawnLandingSparkles();
-
-    // Phase 2 landing-add — capped to MAX_ADDS alive at once.
-    if (this.currentPhase >= 2) {
-      this.adds = this.adds.filter((a) => a.active);
-      if (this.adds.length < MOSSY_BEHEMOTH_PHASE2_MAX_ADDS) {
-        // Wrap the natural "spawn next to boss" position with player-proximity
-        // check — boss can hop right onto the player, so without the check
-        // the slime would spawn on top of them.
-        const player = this.host.getPlayer();
-        const candidate = {
-          x: this.x + (Math.random() - 0.5) * 30,
-          y: this.y + (Math.random() - 0.5) * 30,
-        };
-        const safe = safeAddSpawnPosition(
-          candidate,
-          this.host.getRoomBounds(),
-          player.x,
-          player.y,
-        );
-        const add = this.host.spawnEnemyAt('mossy-slime', safe.x, safe.y);
-        if (add) {
-          this.adds.push(add);
-          EventBus.emit('enemy:charge');
-        }
-      }
-    }
-
-    this.scheduleNextWait(time);
-  }
-
-  private scheduleNextWait(time: number): void {
-    const wait =
-      this.currentPhase >= 2
-        ? MOSSY_BEHEMOTH_PHASE2_HOP_INTERVAL_MS
-        : MOSSY_BEHEMOTH_PHASE1_HOP_INTERVAL_MS;
-    this.nextStateChangeAt = time + wait;
-  }
-
   /**
-   * Burst of green sparkles flying outward from the boss's feet on landing.
-   * Purely cosmetic — gives the impact some weight.
+   * Single radial shockwave of thorns on landing, random base rotation so the
+   * safe lanes shift each time. Thinned to 6 (P1) / 8 (P2) thorns — the old
+   * Phase-2 dual-wave (10+10 ≈ 20) left no dodge-room (2026-06-13 fairness).
    */
+  private fireShockwave(count: number): void {
+    const step = (Math.PI * 2) / count;
+    const baseOffset = Math.random() * Math.PI * 2;
+    for (let i = 0; i < count; i++) {
+      const a = baseOffset + i * step;
+      this.host.enemyProjectilePool.fire(
+        this.x,
+        this.y,
+        Math.cos(a) * ENEMY_PROJECTILE_SPEED,
+        Math.sin(a) * ENEMY_PROJECTILE_SPEED,
+      );
+    }
+  }
+
+  /** Burst of green sparkles flying outward from the boss's feet on landing. */
   private spawnLandingSparkles(): void {
     const count = 8;
     const baseAngle = Math.random() * Math.PI * 2;
@@ -155,26 +229,23 @@ export class MossyBehemoth extends BossEnemy {
 
   protected onPhaseChanged(newPhase: number): void {
     if (newPhase !== 2) return;
+    this.scene.tweens.killTweensOf(this);
+    this.setScale(MOSSY_BEHEMOTH_VISUAL_SCALE);
     this.setTintFill(0x9effb0);
     this.scene.time.delayedCall(MOSSY_BEHEMOTH_PHASE_FLASH_MS, () => {
       if (this.active) this.clearTint();
     });
     this.scene.cameras.main.shake(180, 0.005);
-    // Next hop fires shortly after the transition.
-    this.nextStateChangeAt = this.scene.time.now + 400;
-    this.hopState = 'wait';
+    // Drop straight into a fresh combo shortly after the flash.
+    this.p2State = 'comboGap';
+    this.p2NextChangeAt = this.scene.time.now + 420;
+    this.p2HopsTaken = 0;
   }
 
   /**
-   * Death-split: spawn 2-3 mossy-slime adds before the base class disables
-   * the body + tweens out + emits `boss:killed`. The adds become regular
-   * enemies the player has to clean up (or can ignore — they despawn on room
-   * teardown). The boss's own room-clear / reward flow is unaffected because
-   * `boss:killed` flips `markCurrentRoomCleared` which opens the doors.
-   *
-   * `delayedCall(0, ...)` defers the spawns by one tick so we don't mutate
-   * the enemies group from inside an in-progress physics callback that may
-   * have triggered our death.
+   * Death-split: spawn 2-3 mossy-slime adds before the base class tween-out.
+   * `delayedCall(0)` defers the spawns one tick so we don't mutate the
+   * enemies group from inside the physics callback that triggered death.
    */
   protected override die(): void {
     const splitCount =

@@ -120,6 +120,8 @@ export class PreloadScene extends Phaser.Scene {
     // Doppelgänger = the player's own sprite layout in mansion colours.
     this.drawWizardTexture(g, this.DOPPELGANGER_WIZARD_PALETTE, TextureKeys.MinibossDoppelganger);
     this.drawMansionMissileTexture(g);
+    this.drawCasterOrbTexture(g, TextureKeys.CasterOrbEmerald, 0x6effa0, 0x3ad86a, 0xc8ffd8);
+    this.drawCasterOrbTexture(g, TextureKeys.CasterOrbSapphire, 0x4ad8ff, 0x2d9ad8, 0xc8f4ff);
     this.drawFlameMissileTexture(g);
     this.drawWaxPuddleTexture(g);
     // BossCrimsonLord + BossSapphireMarquis: dead-code from the pre-Marquis-
@@ -6047,111 +6049,188 @@ export class PreloadScene extends Phaser.Scene {
    * mobs. Gnarled trunk body, root legs, thorny shoulder stubs, glowing
    * emerald eyes.
    */
+  /**
+   * Grovekeeper (Emerald miniboss) — antlered stag-druid: layered moss cloak
+   * bell, bark-skinned face hollow with glowing eyes, a wide branching antler
+   * crown, and a forest scepter with a glow tip. Reads as a caster guardian
+   * (ported from StyleMockupScene Page 9 variant A, 2026-06-13). The internal
+   * `MinibossThornwoodShambler` texture key + draw-fn name are kept to avoid a
+   * churny rename (same approach as the Prismarch); only the art + the data
+   * displayName changed.
+   */
   private drawMinibossThornwoodShamblerTexture(g: Phaser.GameObjects.Graphics): void {
     const size = TILE_SIZE;
     g.clear();
     const cx = size / 2;
-    const cy = size / 2 + 2;
+    const cy = size / 2 + 4;
 
-    this.groundShadow(g, cx, cy + 24, 22, 6, 0.45);
+    this.groundShadow(g, cx, cy + 24, 20, 6, 0.45);
 
-    const BARK_DARK = 0x2a1c10;
-    const BARK = 0x4a3018;
-    const BARK_HI = 0x6a4828;
-    const MOSS = 0x2d6a34;
-    const MOSS_HI = 0x4a9a50;
-    const GLOW = 0x6effa0;
+    const CLOAK_DARK = 0x14361c;
+    const CLOAK = 0x215a2c;
+    const CLOAK_HI = 0x3c8a44;
+    const SKIN = 0x6a4a2c;
+    const SKIN_HI = 0x8a6438;
+    const ANTLER = 0xcfe8c0;
+    const GLOW = 0x9effb0;
 
-    // Root legs — two splayed stumps
-    g.fillStyle(BARK_DARK, 1);
-    g.fillTriangle(cx - 16, cy + 24, cx - 4, cy + 10, cx - 12, cy + 6);
-    g.fillTriangle(cx + 16, cy + 24, cx + 4, cy + 10, cx + 12, cy + 6);
+    // Layered moss cloak — broad bell hem narrowing to the shoulders.
+    g.fillStyle(CLOAK_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 16, y: cy + 22 },
+        { x: cx - 11, y: cy + 2 },
+        { x: cx - 7, y: cy - 12 },
+        { x: cx + 7, y: cy - 12 },
+        { x: cx + 11, y: cy + 2 },
+        { x: cx + 16, y: cy + 22 },
+      ],
+      true,
+    );
+    g.fillStyle(CLOAK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 12, y: cy + 20 },
+        { x: cx - 8, y: cy + 1 },
+        { x: cx - 5, y: cy - 10 },
+        { x: cx + 5, y: cy - 10 },
+        { x: cx + 8, y: cy + 1 },
+        { x: cx + 12, y: cy + 20 },
+      ],
+      true,
+    );
+    // Ragged moss fringe along the hem.
+    g.fillStyle(CLOAK_HI, 1);
+    for (let i = -2; i <= 2; i++) {
+      g.fillTriangle(cx + i * 6, cy + 20, cx + i * 6 - 3, cy + 14, cx + i * 6 + 3, cy + 14);
+    }
+    // Centre seam highlight.
+    g.fillStyle(CLOAK_HI, 0.7);
+    g.fillRect(cx - 1, cy - 8, 2, 26);
 
-    // Trunk body — broad tapered mass
-    g.fillStyle(BARK_DARK, 1);
-    g.fillEllipse(cx, cy - 2, 40, 42);
-    g.fillStyle(BARK, 1);
-    g.fillEllipse(cx, cy - 2, 34, 36);
-    g.fillStyle(BARK_HI, 1);
-    g.fillEllipse(cx - 5, cy - 7, 14, 18);
-
-    // Thorny shoulder stubs
-    g.fillStyle(BARK_DARK, 1);
-    g.fillTriangle(cx - 20, cy - 8, cx - 12, cy - 16, cx - 14, cy - 2);
-    g.fillTriangle(cx + 20, cy - 8, cx + 12, cy - 16, cx + 14, cy - 2);
-    g.fillTriangle(cx - 6, cy - 22, cx + 2, cy - 20, cx - 2, cy - 30);
-    g.fillTriangle(cx + 4, cy - 21, cx + 12, cy - 18, cx + 10, cy - 28);
-
-    // Moss crown draped over the top
-    g.fillStyle(MOSS, 1);
-    g.fillEllipse(cx, cy - 16, 26, 12);
-    g.fillStyle(MOSS_HI, 1);
-    g.fillEllipse(cx - 6, cy - 18, 10, 6);
-
-    // Bark grooves
-    g.fillStyle(BARK_DARK, 1);
-    g.fillRect(cx - 2, cy - 8, 2, 16);
-    g.fillRect(cx + 7, cy - 4, 2, 12);
-    g.fillRect(cx - 11, cy, 2, 10);
-
-    // Glowing eyes — deep-set emerald pair
+    // Bark-skinned face hollow under the antlers.
+    g.fillStyle(SKIN, 1);
+    g.fillEllipse(cx, cy - 15, 11, 13);
+    g.fillStyle(SKIN_HI, 1);
+    g.fillEllipse(cx - 3, cy - 17, 4, 6);
     g.fillStyle(GLOW, 1);
-    g.fillRect(cx - 7, cy - 10, 3, 3);
-    g.fillRect(cx + 4, cy - 10, 3, 3);
-    g.fillStyle(0xeafff0, 1);
-    g.fillRect(cx - 7, cy - 10, 1, 1);
-    g.fillRect(cx + 4, cy - 10, 1, 1);
+    g.fillRect(cx - 4, cy - 15, 2, 2);
+    g.fillRect(cx + 2, cy - 15, 2, 2);
+
+    // Wide antler crown — two branching racks.
+    g.lineStyle(2, ANTLER, 1);
+    for (const dir of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(cx + dir * 3, cy - 22);
+      g.lineTo(cx + dir * 10, cy - 28);
+      g.lineTo(cx + dir * 16, cy - 26);
+      g.moveTo(cx + dir * 10, cy - 28);
+      g.lineTo(cx + dir * 12, cy - 32);
+      g.moveTo(cx + dir * 6, cy - 24);
+      g.lineTo(cx + dir * 9, cy - 30);
+      g.strokePath();
+    }
+    g.fillStyle(GLOW, 0.9);
+    g.fillCircle(cx - 16, cy - 26, 1.5);
+    g.fillCircle(cx + 16, cy - 26, 1.5);
+    g.fillCircle(cx - 12, cy - 32, 1.5);
+    g.fillCircle(cx + 12, cy - 32, 1.5);
+
+    // Forest scepter with a glow tip.
+    g.lineStyle(2, SKIN, 1);
+    g.beginPath();
+    g.moveTo(cx + 13, cy - 6);
+    g.lineTo(cx + 16, cy + 18);
+    g.strokePath();
+    g.fillStyle(GLOW, 0.35);
+    g.fillCircle(cx + 13, cy - 8, 6);
+    g.fillStyle(GLOW, 1);
+    g.fillCircle(cx + 13, cy - 8, 3);
 
     g.generateTexture(TextureKeys.MinibossThornwoodShambler, size, size);
   }
 
   /**
-   * Mire Lurker (Sapphire miniboss) — a low humped swamp shape: slick
-   * back ridge with fin spines, algae drips, two cyan eyes near the
-   * waterline. Wide + flat so the submerged glide reads as a wake.
+   * Bog Hag (Sapphire miniboss) — hunched swamp crone: tattered hood + robe
+   * leaning to one side, shadowed face with a single glinting eye + a bony
+   * nose, and a crooked staff raising a will-o-wisp lantern. Reads as a
+   * ranged caster (ported from StyleMockupScene Page 9 variant A, 2026-06-13).
+   * The internal `MinibossMireLurker` key + draw-fn name are kept (no churny
+   * rename); only the art + the data displayName changed.
    */
   private drawMinibossMireLurkerTexture(g: Phaser.GameObjects.Graphics): void {
     const size = TILE_SIZE;
     g.clear();
     const cx = size / 2;
-    const cy = size / 2 + 10;
+    const cy = size / 2 + 4;
 
-    this.groundShadow(g, cx, cy + 14, 24, 6, 0.45);
+    this.groundShadow(g, cx, cy + 22, 20, 6, 0.45);
 
-    const HIDE_DARK = 0x0a2030;
-    const HIDE = 0x14405a;
-    const HIDE_HI = 0x2d6a88;
-    const FIN = 0x0e3048;
-    const ALGAE = 0x1d5a44;
-    const GLOW = 0x4ad8ff;
+    const ROBE_DARK = 0x0d2438;
+    const ROBE = 0x1c4a66;
+    const ROBE_HI = 0x2d6a88;
+    const SKIN = 0x6a8a78;
+    const GLOW = 0x8ef0ff;
+    const STAFF = 0x2a1d14;
 
-    // Humped body — wide low dome
-    g.fillStyle(HIDE_DARK, 1);
-    g.fillEllipse(cx, cy, 48, 30);
-    g.fillStyle(HIDE, 1);
-    g.fillEllipse(cx, cy + 1, 42, 24);
-    g.fillStyle(HIDE_HI, 1);
-    g.fillEllipse(cx - 8, cy - 4, 18, 10);
+    // Hunched robe — bent-over bell weighted to one side.
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillPoints(
+      [
+        { x: cx - 14, y: cy + 22 },
+        { x: cx - 13, y: cy + 2 },
+        { x: cx - 9, y: cy - 14 },
+        { x: cx + 3, y: cy - 18 },
+        { x: cx + 10, y: cy - 8 },
+        { x: cx + 13, y: cy + 6 },
+        { x: cx + 12, y: cy + 22 },
+      ],
+      true,
+    );
+    g.fillStyle(ROBE, 1);
+    g.fillPoints(
+      [
+        { x: cx - 10, y: cy + 20 },
+        { x: cx - 9, y: cy + 1 },
+        { x: cx - 5, y: cy - 12 },
+        { x: cx + 2, y: cy - 15 },
+        { x: cx + 7, y: cy - 7 },
+        { x: cx + 9, y: cy + 5 },
+        { x: cx + 8, y: cy + 20 },
+      ],
+      true,
+    );
+    g.fillStyle(ROBE_HI, 0.7);
+    g.fillEllipse(cx - 4, cy + 4, 5, 16);
 
-    // Back ridge fins — three spines along the hump
-    g.fillStyle(FIN, 1);
-    g.fillTriangle(cx - 14, cy - 8, cx - 4, cy - 8, cx - 10, cy - 20);
-    g.fillTriangle(cx - 2, cy - 10, cx + 8, cy - 10, cx + 2, cy - 24);
-    g.fillTriangle(cx + 10, cy - 7, cx + 18, cy - 7, cx + 14, cy - 17);
-
-    // Algae drape trailing off the flanks
-    g.fillStyle(ALGAE, 1);
-    g.fillRect(cx - 20, cy + 4, 3, 9);
-    g.fillRect(cx + 14, cy + 6, 3, 7);
-    g.fillRect(cx - 6, cy + 10, 2, 6);
-
-    // Cyan eyes low at the front (waterline stare)
+    // Hood + shadowed face with a single glinting eye.
+    g.fillStyle(ROBE_DARK, 1);
+    g.fillEllipse(cx - 2, cy - 16, 13, 12);
+    g.fillStyle(0x05121c, 1);
+    g.fillEllipse(cx - 2, cy - 15, 8, 8);
     g.fillStyle(GLOW, 1);
-    g.fillRect(cx - 10, cy + 2, 3, 3);
-    g.fillRect(cx + 7, cy + 2, 3, 3);
-    g.fillStyle(0xeaffff, 1);
-    g.fillRect(cx - 10, cy + 2, 1, 1);
-    g.fillRect(cx + 7, cy + 2, 1, 1);
+    g.fillRect(cx - 5, cy - 16, 2, 2);
+    // Crooked bony nose poking out.
+    g.fillStyle(SKIN, 1);
+    g.fillTriangle(cx + 3, cy - 16, cx + 9, cy - 13, cx + 3, cy - 11);
+
+    // Crooked staff + raised will-o-wisp lantern.
+    g.lineStyle(2, STAFF, 1);
+    g.beginPath();
+    g.moveTo(cx + 15, cy - 18);
+    g.lineTo(cx + 13, cy - 2);
+    g.lineTo(cx + 15, cy + 18);
+    g.strokePath();
+    g.fillStyle(GLOW, 0.32);
+    g.fillCircle(cx + 15, cy - 21, 7);
+    g.fillStyle(GLOW, 1);
+    g.fillCircle(cx + 15, cy - 21, 3.5);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillCircle(cx + 14, cy - 22, 1);
+
+    // Bony reaching hand at the hem.
+    g.fillStyle(SKIN, 1);
+    g.fillCircle(cx - 13, cy + 2, 2.5);
 
     g.generateTexture(TextureKeys.MinibossMireLurker, size, size);
   }
@@ -6294,6 +6373,33 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(c - 1, c - 1, 1, 1);
 
     g.generateTexture(TextureKeys.MansionMissile, size, size);
+  }
+
+  /**
+   * Generic round caster-orb projectile (halo → mid glow → bright core +
+   * sparkle), same silhouette as the MansionMissile but recoloured per floor.
+   * Used by the Emerald + Sapphire minibosses now that they read as casters.
+   */
+  private drawCasterOrbTexture(
+    g: Phaser.GameObjects.Graphics,
+    key: string,
+    halo: number,
+    mid: number,
+    core: number,
+  ): void {
+    const size = 16;
+    g.clear();
+    const c = size / 2;
+    g.fillStyle(halo, 0.32);
+    g.fillCircle(c, c, 7);
+    g.fillStyle(mid, 0.85);
+    g.fillCircle(c, c, 4.5);
+    g.fillStyle(core, 1);
+    g.fillCircle(c, c, 3);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(c - 2, c - 2, 2, 1);
+    g.fillRect(c - 1, c - 1, 1, 1);
+    g.generateTexture(key, size, size);
   }
 
   /**
