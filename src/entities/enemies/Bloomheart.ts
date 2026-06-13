@@ -15,8 +15,10 @@ import {
   BLOOMHEART_PHASE_FLASH_MS,
   BLOOMHEART_REBLOOM_DIST,
   BLOOMHEART_SINK_FADE_MS,
+  BLOOMHEART_SINK_HEADING_CONE_RAD,
   BLOOMHEART_SINK_INTERVAL_MS,
   BLOOMHEART_SINK_MIN_PLAYER_DIST,
+  BLOOMHEART_SINK_PLAYER_MOVING_EPS,
   BLOOMHEART_SPORE_BURST_COUNT_P1,
   BLOOMHEART_SPORE_BURST_COUNT_P2,
   BLOOMHEART_SPORE_LIFETIME_MS,
@@ -490,13 +492,36 @@ export class Bloomheart extends BossEnemy {
       );
       candidates.push({ x: clampX(leashed.x), y: clampY(leashed.y) });
     }
-    const safe = candidates.filter((c) => {
+    // First gate: respect the hard min distance.
+    const minDistSafe = candidates.filter((c) => {
       const dx = c.x - player.x;
       const dy = c.y - player.y;
       return dx * dx + dy * dy >= minDistSq;
     });
-    if (safe.length > 0) {
-      return safe[Math.floor(Math.random() * safe.length)]!;
+
+    // Second gate: if the player is MOVING, drop candidates in the cone
+    // they're heading toward — otherwise she re-blooms in the player's path
+    // and sandwiches them with the bloom burst (user-flagged, same as the
+    // Vine Lord burrow). Skipped when standing still (no "path").
+    const pbody = player.body as Phaser.Physics.Arcade.Body | null;
+    const pvx = pbody?.velocity.x ?? 0;
+    const pvy = pbody?.velocity.y ?? 0;
+    const playerSpeed = Math.hypot(pvx, pvy);
+    const moving = playerSpeed >= BLOOMHEART_SINK_PLAYER_MOVING_EPS;
+    const coneCos = Math.cos(BLOOMHEART_SINK_HEADING_CONE_RAD);
+    const inHeadingCone = (c: { x: number; y: number }): boolean => {
+      if (!moving) return false;
+      const dx = c.x - player.x;
+      const dy = c.y - player.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-3) return true;
+      return (dx / len) * (pvx / playerSpeed) + (dy / len) * (pvy / playerSpeed) > coneCos;
+    };
+    const pathSafe = minDistSafe.filter((c) => !inHeadingCone(c));
+
+    const pool = pathSafe.length > 0 ? pathSafe : minDistSafe;
+    if (pool.length > 0) {
+      return pool[Math.floor(Math.random() * pool.length)]!;
     }
     let best = candidates[0]!;
     let bestSq = -1;

@@ -20,6 +20,7 @@ import {
   PIXIE_QUEEN_TELEPORT_LAND_THORNS,
   PIXIE_QUEEN_TELEPORT_TELEGRAPH_MS,
   PIXIE_QUEEN_VISUAL_SCALE,
+  TextureKeys,
 } from '../../config/GameConfig';
 import { DepthLayers } from '../../config/DepthLayers';
 import { ENEMIES } from '../../data/enemies';
@@ -154,6 +155,7 @@ export class PixieQueen extends BossEnemy {
         this.y,
         Math.cos(a) * ENEMY_PROJECTILE_SPEED,
         Math.sin(a) * ENEMY_PROJECTILE_SPEED,
+        TextureKeys.PixieOrb,
       );
     }
   }
@@ -234,6 +236,7 @@ export class PixieQueen extends BossEnemy {
         this.y,
         Math.cos(a) * ENEMY_PROJECTILE_SPEED,
         Math.sin(a) * ENEMY_PROJECTILE_SPEED,
+        TextureKeys.PixieOrb,
       );
     }
   }

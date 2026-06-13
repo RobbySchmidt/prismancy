@@ -649,6 +649,12 @@ export const BLOOMHEART_SINK_FADE_MS = 260;
 export const BLOOMHEART_REBLOOM_DIST = 220;
 /** Hard minimum (px, 3 tiles) the re-emerge spot must keep from the player. */
 export const BLOOMHEART_SINK_MIN_PLAYER_DIST = 3 * 64;
+/** Re-bloom must avoid the cone the player is MOVING toward, so she never
+ *  surfaces in the player's path + sandwiches them with the bloom burst
+ *  (same fairness fix as the Vine Lord burrow). Half-angle (rad, ~60°). */
+export const BLOOMHEART_SINK_HEADING_CONE_RAD = Math.PI / 3;
+/** Min player speed (px/s) before the heading-cone exclusion applies. */
+export const BLOOMHEART_SINK_PLAYER_MOVING_EPS = 30;
 /**
  * Movement leash: Bloomheart may never cross past the floor's first vignette
  * ring (user request 2026-06-13 — she's a central zoner, the player should own
@@ -1198,6 +1204,9 @@ export const TextureKeys = {
    *  casters now, so the arrow-thorn no longer fits. */
   CasterOrbEmerald: 'tex-projectile-caster-orb-emerald',
   CasterOrbSapphire: 'tex-projectile-caster-orb-sapphire',
+  /** Pink round bolt fired by the Pixie Queen — round fairy magic fits her
+   *  far better than the default arrow-thorn (user request). */
+  PixieOrb: 'tex-projectile-pixie-orb',
   FlameMissile: 'tex-projectile-flame-missile',
   WaxPuddle: 'tex-hazard-wax-puddle',
   BossCrimsonLord: 'tex-boss-crimson-lord',

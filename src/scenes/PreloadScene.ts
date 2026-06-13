@@ -122,6 +122,7 @@ export class PreloadScene extends Phaser.Scene {
     this.drawMansionMissileTexture(g);
     this.drawCasterOrbTexture(g, TextureKeys.CasterOrbEmerald, 0x6effa0, 0x3ad86a, 0xc8ffd8);
     this.drawCasterOrbTexture(g, TextureKeys.CasterOrbSapphire, 0x4ad8ff, 0x2d9ad8, 0xc8f4ff);
+    this.drawCasterOrbTexture(g, TextureKeys.PixieOrb, 0xff8ad0, 0xff4f9e, 0xffd6ec);
     this.drawFlameMissileTexture(g);
     this.drawWaxPuddleTexture(g);
     // BossCrimsonLord + BossSapphireMarquis: dead-code from the pre-Marquis-
