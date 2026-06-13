@@ -1441,7 +1441,6 @@ export const SceneKeys = {
   End: 'EndScene',
   Pause: 'PauseScene',
   Stats: 'StatsScene',
-  StyleMockup: 'StyleMockupScene',
   SoundSettings: 'SoundSettingsScene',
   Controls: 'ControlsScene',
 } as const;

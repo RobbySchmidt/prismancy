@@ -256,6 +256,10 @@ export class PreloadScene extends Phaser.Scene {
   ): void {
     g.fillStyle(0x000000, alpha);
     g.fillEllipse(cx, cy, rx * 2, ry * 2);
+    // Keep the pixel-grid helpers referenced — they remain available for
+    // future pixel-art sprites even though the flat-vector repaint no longer
+    // calls them directly.
+    void this.px;
   }
 
   // ---------------------------------------------------------------------------
@@ -337,6 +341,8 @@ export class PreloadScene extends Phaser.Scene {
     void HAT;
     void palette.SHADOW;
     void palette.BOOT_HI;
+    void SKIN_SHADOW;
+    void ROBE_SHADOW;
 
     const cx = size / 2;        // 32
     const top = 10;             // figure top y (hat tip) — shifted down vs.
@@ -347,165 +353,124 @@ export class PreloadScene extends Phaser.Scene {
                                  // unchanged). User-flagged 2026-05-07.
     const figBot = 53;          // boots bottom y
 
-    // 1) ROBE — bell silhouette, rounded shoulders, slight hem flare.
+    // FLAT-VECTOR REPAINT — bold dark outline + single flat tone per region
+    // + one soft highlight per major form. Same silhouette + signature
+    // features (bell robe, gold belt, pointed hat, wand with glowing tip).
+
+    // Ground shadow under the boots (kept for visual ground parity).
+    g.fillStyle(palette.SHADOW, 0.45);
+    g.fillEllipse(cx, figBot, 14, 2);
+
+    // 1) ROBE — bell silhouette. Outline then inset flat fill.
     const robe: Array<{ x: number; y: number }> = [
-      { x: cx - 5, y: top + 20 },     // L shoulder
-      { x: cx + 5, y: top + 20 },     // R shoulder
-      { x: cx + 8, y: top + 28 },     // R side mid
-      { x: cx + 11, y: top + 36 },    // R hem corner
-      { x: cx + 9, y: top + 39 },     // R hem inner
-      { x: cx, y: top + 40 },         // hem center
-      { x: cx - 9, y: top + 39 },     // L hem inner
-      { x: cx - 11, y: top + 36 },    // L hem corner
-      { x: cx - 8, y: top + 28 },     // L side mid
+      { x: cx - 6, y: top + 19 },     // L shoulder
+      { x: cx + 6, y: top + 19 },     // R shoulder
+      { x: cx + 11, y: top + 38 },    // R hem corner
+      { x: cx, y: top + 41 },         // hem center
+      { x: cx - 11, y: top + 38 },    // L hem corner
     ];
     g.fillStyle(OUT, 1);
     g.fillPoints(robe, true);
-    g.fillStyle(ROBE_SHADOW, 1);
+    g.fillStyle(ROBE, 1);
     g.fillPoints(
-      robe.map((p) => ({ x: p.x, y: p.y + 1 })),
+      [
+        { x: cx - 5, y: top + 20 },
+        { x: cx + 5, y: top + 20 },
+        { x: cx + 9, y: top + 37 },
+        { x: cx, y: top + 39.5 },
+        { x: cx - 9, y: top + 37 },
+      ],
       true,
     );
-    // Mid-tone fills.
-    g.fillStyle(ROBE, 1);
-    g.fillEllipse(cx, top + 28, 14, 16);
-    g.fillEllipse(cx, top + 35, 19, 7);
-    // Left-edge highlight rim.
-    g.fillStyle(ROBE_HI, 0.65);
-    g.fillEllipse(cx - 3, top + 27, 2.5, 9);
+    // Single soft highlight, upper-left.
+    g.fillStyle(ROBE_HI, 0.7);
+    g.fillEllipse(cx - 3, top + 25, 3, 7);
 
-    // 2) BELT with buckle — cinches the bell silhouette.
+    // 2) BELT with buckle.
     g.fillStyle(OUT, 1);
-    g.fillRect(cx - 8, top + 30, 16, 3);
-    g.fillStyle(BOOT, 1);
-    g.fillRect(cx - 7, top + 31, 14, 1);
+    g.fillRoundedRect(cx - 8, top + 30, 16, 4, 1.5);
     g.fillStyle(BUCKLE, 1);
     g.fillRect(cx - 2, top + 31, 4, 2);
-    g.fillStyle(OUT, 1);
-    g.fillRect(cx - 1, top + 32, 2, 1);
 
-    // 3) GOLD HEM TRIM — slim accent above the hem corner.
-    g.fillStyle(BUCKLE, 0.85);
-    g.fillRect(cx - 10, top + 38, 20, 1);
-
-    // 4) BOOTS peeking out at the hem.
+    // 3) BOOTS peeking out at the hem.
     g.fillStyle(OUT, 1);
     g.fillEllipse(cx - 3, top + 42, 5, 3);
     g.fillEllipse(cx + 3, top + 42, 5, 3);
     g.fillStyle(BOOT, 1);
-    g.fillEllipse(cx - 3, top + 42, 3.5, 2);
-    g.fillEllipse(cx + 3, top + 42, 3.5, 2);
+    g.fillEllipse(cx - 3, top + 41.5, 3.5, 2);
+    g.fillEllipse(cx + 3, top + 41.5, 3.5, 2);
 
-    // Ground shadow under the boots — matches the Spellblade's
-    // `figBot`-anchored shadow so both playable characters have the same
-    // visual ground reference. Without this the wizard's visible bottom
-    // is at the boots (y=44) while the spellblade's is at the shadow
-    // (y=53), and the same body-center hitbox reads as "hovering" on the
-    // spellblade vs. "at ground" on the wizard. Same dimensions / alpha
-    // as the spellblade variant for visual parity. User-flagged
-    // 2026-05-09 ("der kreis beim wizard höher aussieht vom boden aus").
-    g.fillStyle(palette.SHADOW, 0.45);
-    g.fillEllipse(cx, figBot, 14, 2);
-
-    // 5) BEARD — soft rounded tuft below the face.
-    const beard: Array<{ x: number; y: number }> = [
-      { x: cx - 3, y: top + 14 },
-      { x: cx + 3, y: top + 14 },
-      { x: cx + 5, y: top + 18 },
-      { x: cx + 2, y: top + 21 },
-      { x: cx, y: top + 22 },
-      { x: cx - 2, y: top + 21 },
-      { x: cx - 5, y: top + 18 },
-    ];
+    // 4) BEARD — soft rounded tuft (outline + flat fill).
     g.fillStyle(OUT, 1);
-    g.fillPoints(beard, true);
+    g.fillEllipse(cx, top + 17, 10, 9);
     g.fillStyle(BEARD, 1);
-    g.fillPoints(
-      beard.map((p) => ({ x: p.x, y: p.y + 1 })),
-      true,
-    );
-    g.fillStyle(BEARD_SHADOW, 0.55);
-    g.fillEllipse(cx + 2, top + 19, 2, 3);
+    g.fillEllipse(cx, top + 17, 8, 7);
+    g.fillStyle(BEARD_SHADOW, 0.5);
+    g.fillEllipse(cx + 2, top + 19, 2.5, 3);
 
-    // 6) FACE strip above the beard.
+    // 5) FACE — flat skin band, cute eyes (dark dot + catch-light).
     g.fillStyle(OUT, 1);
-    g.fillEllipse(cx, top + 12, 8, 5);
+    g.fillEllipse(cx, top + 12, 9, 6);
     g.fillStyle(SKIN, 1);
-    g.fillEllipse(cx, top + 12, 6.5, 3.7);
-    g.fillStyle(SKIN_SHADOW, 0.7);
-    g.fillRect(cx - 3, top + 14, 5, 1);
-    // Eyes.
+    g.fillEllipse(cx, top + 12, 7, 4.4);
     g.fillStyle(EYE, 1);
-    g.fillRect(cx - 2, top + 11, 1, 2);
-    g.fillRect(cx + 2, top + 11, 1, 2);
+    g.fillCircle(cx - 2, top + 11.5, 1.1);
+    g.fillCircle(cx + 2, top + 11.5, 1.1);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillRect(cx - 2, top + 11, 1, 1);
+    g.fillRect(cx + 2, top + 11, 1, 1);
 
-    // 7) HAT — pointed cone with soft brim.
+    // 6) HAT — pointed cone + soft brim. Outline then flat fill.
     const hat: Array<{ x: number; y: number }> = [
-      { x: cx, y: top + 0 },          // tip
-      { x: cx + 1, y: top + 3 },
-      { x: cx + 3, y: top + 7 },
-      { x: cx + 5, y: top + 10 },
-      { x: cx + 8, y: top + 12 },     // brim corner R
-      { x: cx + 5, y: top + 13 },     // under R
-      { x: cx, y: top + 12 },         // under center
-      { x: cx - 5, y: top + 13 },     // under L
-      { x: cx - 8, y: top + 12 },     // brim corner L
-      { x: cx - 5, y: top + 10 },
-      { x: cx - 3, y: top + 7 },
-      { x: cx - 1, y: top + 3 },
+      { x: cx, y: top - 1 },          // tip
+      { x: cx + 9, y: top + 12 },     // brim corner R
+      { x: cx, y: top + 11 },         // under center
+      { x: cx - 9, y: top + 12 },     // brim corner L
     ];
     g.fillStyle(OUT, 1);
     g.fillPoints(hat, true);
     g.fillStyle(HAT_DARK, 1);
     g.fillPoints(
-      hat.map((p) => ({ x: p.x, y: p.y + 1 })),
+      [
+        { x: cx, y: top + 1 },
+        { x: cx + 7.5, y: top + 11 },
+        { x: cx, y: top + 10 },
+        { x: cx - 7.5, y: top + 11 },
+      ],
       true,
     );
-    g.fillStyle(HAT, 1);
-    g.fillTriangle(
-      cx - 0.5, top + 2,
-      cx + 3, top + 9,
-      cx - 4, top + 11,
-    );
+    // Single highlight stripe down the left of the cone.
     g.fillStyle(HAT_HI, 0.7);
-    g.fillTriangle(
-      cx - 1, top + 3,
-      cx + 0.5, top + 3,
-      cx - 3, top + 9,
-    );
+    g.fillTriangle(cx - 1, top + 2, cx + 0.5, top + 2, cx - 3.5, top + 9);
     // Gold tip orb above the hat point.
     g.fillStyle(OUT, 1);
-    g.fillCircle(cx, top - 2, 1.7);
+    g.fillCircle(cx, top - 2, 1.9);
     g.fillStyle(BUCKLE, 1);
     g.fillCircle(cx, top - 2, 1.2);
-    // Brim shadow under hat.
-    g.fillStyle(OUT, 0.55);
-    g.fillEllipse(cx, top + 14, 12, 1.3);
 
-    // 8) WAND held forward in front of the body, less-extreme tilt — tip
-    // points up-right above the shoulder. Hand grips at chest level.
+    // 7) WAND — clean shaft, outline + flat fill, glowing tip orb.
     g.fillStyle(OUT, 1);
-    g.fillTriangle(cx + 2, top + 30, cx + 11, top + 16, cx + 12, top + 19);
+    g.fillTriangle(cx + 2, top + 30, cx + 11, top + 16, cx + 12.5, top + 19);
     g.fillStyle(WAND, 1);
-    g.fillTriangle(cx + 2, top + 31, cx + 10, top + 17, cx + 11, top + 19);
+    g.fillTriangle(cx + 3, top + 30.5, cx + 10.5, top + 17, cx + 11.5, top + 19);
 
-    // 9) HAND on the wand — no full sleeve, the arm is implied (D's idiom).
+    // 8) HAND on the wand — flat circle + outline.
     g.fillStyle(OUT, 1);
-    g.fillCircle(cx + 6, top + 26, 1.7);
+    g.fillCircle(cx + 6, top + 26, 2);
     g.fillStyle(SKIN, 1);
     g.fillCircle(cx + 6, top + 26, 1.3);
 
-    // 10) WAND TIP — gold orb + soft halo + catchlight pixel.
-    g.fillStyle(TIP_SPARKLE, 0.5);
-    g.fillCircle(cx + 11, top + 17, 4);
+    // 9) WAND TIP — soft halo + outlined orb + catch-light.
+    g.fillStyle(TIP_SPARKLE, 0.45);
+    g.fillCircle(cx + 11, top + 16, 4);
     g.fillStyle(OUT, 1);
-    g.fillCircle(cx + 11, top + 17, 1.9);
+    g.fillCircle(cx + 11, top + 16, 2.4);
     g.fillStyle(TIP, 1);
-    g.fillCircle(cx + 11, top + 17, 1.4);
+    g.fillCircle(cx + 11, top + 16, 1.5);
     g.fillStyle(TIP_SPARKLE, 1);
-    g.fillRect(cx + 10, top + 16, 1, 1);
+    g.fillRect(cx + 10, top + 15, 1, 1);
 
-    // 11) Ground shadow under the boots.
+    // 10) Ground shadow under the boots.
     this.groundShadow(g, cx, figBot + 2, 9, 1.4, 0.45);
 
     g.generateTexture(textureKey, size, size);
@@ -750,231 +715,193 @@ export class PreloadScene extends Phaser.Scene {
     void HELM_SHADOW;
     void CAPE_SHADOW;
     void BODY_SHADOW;
+    void HELM_TRIM;
+    void POMMEL_DARK;
+    void POMMEL_HI;
+    void BOOT_HI;
 
     const cx = size / 2;
     const top = 10;
     const figBot = 53;
 
-    // 1) CAPE — tattered, draped behind the body. Asymmetric so it reads
-    //    as windblown rather than a stiff sheet. Outline first, then mid
-    //    fill, then highlight rim on the player-facing edge.
+    // FLAT-VECTOR REPAINT — bold outline + single flat tone per region + one
+    // soft highlight per major form. Keeps the validated B silhouette: dark
+    // cape with hem-streamers, steel breastplate with pauldron cups + center
+    // seam, silver helm with violet visor + two eye-glows, gold belt, angled
+    // onyx longsword (gold crossguard + pommel).
+
+    // Ground shadow.
+    g.fillStyle(SHADOW, 0.45);
+    g.fillEllipse(cx, figBot, 14, 2);
+
+    // 1) CAPE — asymmetric windblown silhouette, outline + flat fill.
     const cape: Array<{ x: number; y: number }> = [
-      { x: cx - 7, y: top + 16 },     // L shoulder anchor
-      { x: cx + 7, y: top + 16 },     // R shoulder anchor
-      { x: cx + 11, y: top + 24 },    // R bulge
-      { x: cx + 13, y: top + 32 },    // R hem max
-      { x: cx + 9, y: top + 38 },     // R hem corner
-      { x: cx, y: top + 36 },         // hem center
-      { x: cx - 9, y: top + 38 },     // L hem corner
-      { x: cx - 13, y: top + 32 },    // L hem max
-      { x: cx - 10, y: top + 24 },    // L bulge
+      { x: cx - 7, y: top + 16 },
+      { x: cx + 7, y: top + 16 },
+      { x: cx + 13, y: top + 32 },
+      { x: cx + 9, y: top + 38 },
+      { x: cx, y: top + 36 },
+      { x: cx - 9, y: top + 38 },
+      { x: cx - 13, y: top + 32 },
     ];
     g.fillStyle(CAPE_OUT, 1);
     g.fillPoints(cape, true);
     g.fillStyle(CAPE, 1);
     g.fillPoints(
-      cape.map((p) => ({ x: p.x, y: p.y + 1 })),
+      [
+        { x: cx - 6, y: top + 17 },
+        { x: cx + 6, y: top + 17 },
+        { x: cx + 11, y: top + 31 },
+        { x: cx + 8, y: top + 36 },
+        { x: cx, y: top + 34.5 },
+        { x: cx - 8, y: top + 36 },
+        { x: cx - 11, y: top + 31 },
+      ],
       true,
     );
+    // Single highlight rim on the player-facing edge.
     g.fillStyle(CAPE_HI, 0.55);
-    g.fillEllipse(cx - 4, top + 22, 4, 12);
+    g.fillEllipse(cx - 5, top + 24, 3, 10);
 
-    // 2) HEM-STREAMERS — windblown short triangles past the cape hem,
-    //    callback to the Prismarch's tattered look. Three on each side at
-    //    asymmetric angles.
+    // 2) HEM-STREAMERS — windblown triangles past the cape hem.
     g.fillStyle(CAPE_OUT, 1);
     g.fillTriangle(cx - 13, top + 32, cx - 10, top + 38, cx - 14, top + 41);
     g.fillTriangle(cx + 13, top + 32, cx + 10, top + 38, cx + 12, top + 42);
-    g.fillTriangle(cx - 8, top + 36, cx - 6, top + 41, cx - 9, top + 43);
     g.fillTriangle(cx + 8, top + 36, cx + 6, top + 41, cx + 7, top + 43);
 
-    // 3) BODY — steel breastplate with pauldrons. Bell silhouette echoes
-    //    the wizard so the player reads as the same scale.
+    // 3) BODY — steel breastplate, outline + flat fill + center seam.
     const body: Array<{ x: number; y: number }> = [
-      { x: cx - 5, y: top + 18 },     // L pauldron top
-      { x: cx + 5, y: top + 18 },     // R pauldron top
-      { x: cx + 7, y: top + 22 },     // R pauldron edge
-      { x: cx + 6, y: top + 30 },     // R waist
-      { x: cx + 7, y: top + 36 },     // R hip flare
-      { x: cx, y: top + 38 },         // skirt center
-      { x: cx - 7, y: top + 36 },     // L hip flare
-      { x: cx - 6, y: top + 30 },     // L waist
-      { x: cx - 7, y: top + 22 },     // L pauldron edge
+      { x: cx - 6, y: top + 18 },
+      { x: cx + 6, y: top + 18 },
+      { x: cx + 7, y: top + 30 },
+      { x: cx + 7, y: top + 37 },
+      { x: cx, y: top + 38.5 },
+      { x: cx - 7, y: top + 37 },
+      { x: cx - 7, y: top + 30 },
     ];
     g.fillStyle(OUT, 1);
     g.fillPoints(body, true);
     g.fillStyle(BODY, 1);
     g.fillPoints(
-      body.map((p) => ({ x: p.x, y: p.y + 1 })),
+      [
+        { x: cx - 5, y: top + 19 },
+        { x: cx + 5, y: top + 19 },
+        { x: cx + 6, y: top + 36 },
+        { x: cx, y: top + 37 },
+        { x: cx - 6, y: top + 36 },
+      ],
       true,
     );
-    // Vertical seam down the centre — gives the breastplate a forge-line.
-    g.fillStyle(BODY_SHADOW, 0.7);
-    g.fillRect(cx, top + 20, 1, 14);
-    // Pauldron highlights — bright top arc on each shoulder cup.
-    g.fillStyle(BODY_HI, 1);
-    g.fillEllipse(cx - 5, top + 19, 4, 2);
-    g.fillEllipse(cx + 5, top + 19, 4, 2);
-    // Chest plate highlight — single bright slash on the left side.
-    g.fillStyle(BODY_HI, 0.65);
-    g.fillEllipse(cx - 2, top + 24, 2, 6);
-
-    // 4) BELT with tarnished gold buckle.
+    // Pauldron cups — two outlined flat discs at the shoulders.
     g.fillStyle(OUT, 1);
-    g.fillRect(cx - 7, top + 30, 14, 3);
-    g.fillStyle(BOOT, 1);
-    g.fillRect(cx - 6, top + 31, 12, 1);
-    g.fillStyle(POMMEL_DARK, 1);
-    g.fillRect(cx - 2, top + 31, 4, 2);
+    g.fillCircle(cx - 6, top + 20, 3);
+    g.fillCircle(cx + 6, top + 20, 3);
+    g.fillStyle(BODY, 1);
+    g.fillCircle(cx - 6, top + 20, 2);
+    g.fillCircle(cx + 6, top + 20, 2);
+    g.fillStyle(BODY_HI, 1);
+    g.fillRect(cx - 7, top + 19, 1, 1);
+    g.fillRect(cx + 5, top + 19, 1, 1);
+    // Center seam + single chest highlight.
+    g.fillStyle(BODY_SHADOW, 0.8);
+    g.fillRect(cx, top + 21, 1, 13);
+    g.fillStyle(BODY_HI, 0.6);
+    g.fillEllipse(cx - 2, top + 24, 2, 5);
+
+    // 4) BELT with gold buckle.
+    g.fillStyle(OUT, 1);
+    g.fillRoundedRect(cx - 7, top + 30, 14, 4, 1.5);
     g.fillStyle(POMMEL, 1);
-    g.fillRect(cx - 1, top + 31, 2, 1);
+    g.fillRect(cx - 2, top + 31, 4, 2);
 
     // 5) BOOTS / GREAVES.
     g.fillStyle(OUT, 1);
     g.fillEllipse(cx - 3, top + 42, 5, 3);
     g.fillEllipse(cx + 3, top + 42, 5, 3);
     g.fillStyle(BOOT, 1);
-    g.fillEllipse(cx - 3, top + 42, 3.5, 2);
-    g.fillEllipse(cx + 3, top + 42, 3.5, 2);
-    g.fillStyle(BOOT_HI, 1);
-    g.fillRect(cx - 4, top + 41, 1, 1);
-    g.fillRect(cx + 2, top + 41, 1, 1);
+    g.fillEllipse(cx - 3, top + 41.5, 3.5, 2);
+    g.fillEllipse(cx + 3, top + 41.5, 3.5, 2);
 
-    // 6) HELM — angular knight's helm. Flat top + straight sides + beveled
-    //    corners + slight chin taper. Reads boxier and more knightly than
-    //    the rounded dome the v1 sketch used (user-flagged "rund passt
-    //    nicht"). Three-tone shading + trim band + visor slit.
+    // 6) HELM — angular silver knight's helm, outline + flat fill.
     const helm: Array<{ x: number; y: number }> = [
-      { x: cx - 6, y: top + 0 },      // top-left corner (flat top)
-      { x: cx + 6, y: top + 0 },      // top-right corner
-      { x: cx + 7, y: top + 2 },      // bevel R
-      { x: cx + 7, y: top + 13 },     // straight side R
-      { x: cx + 5, y: top + 15 },     // chin taper R
-      { x: cx + 4, y: top + 17 },     // chin bottom R
-      { x: cx - 4, y: top + 17 },     // chin bottom L
-      { x: cx - 5, y: top + 15 },     // chin taper L
-      { x: cx - 7, y: top + 13 },     // straight side L
-      { x: cx - 7, y: top + 2 },      // bevel L
+      { x: cx - 6, y: top - 1 },
+      { x: cx + 6, y: top - 1 },
+      { x: cx + 7, y: top + 13 },
+      { x: cx + 4, y: top + 17 },
+      { x: cx - 4, y: top + 17 },
+      { x: cx - 7, y: top + 13 },
     ];
     g.fillStyle(OUT, 1);
     g.fillPoints(helm, true);
     g.fillStyle(HELM, 1);
     g.fillPoints(
-      helm.map((p) => ({ x: p.x, y: p.y + 1 })),
+      [
+        { x: cx - 5, y: top + 0 },
+        { x: cx + 5, y: top + 0 },
+        { x: cx + 6, y: top + 13 },
+        { x: cx + 3.5, y: top + 16 },
+        { x: cx - 3.5, y: top + 16 },
+        { x: cx - 6, y: top + 13 },
+      ],
       true,
     );
-    // Crown ridge — a thin raised line down the centre of the helm top,
-    // sells "this is a forged plate, not a smooth bowl". Two-tone for a
-    // bit of dimension.
-    g.fillStyle(HELM_SHADOW, 1);
-    g.fillRect(cx - 1, top + 0, 2, 4);
+    // Single polished highlight on the upper-left.
     g.fillStyle(HELM_HI, 1);
-    g.fillRect(cx, top + 1, 1, 3);
-    // Top-left highlight band — polished steel catches light here.
-    g.fillStyle(HELM_HI, 1);
-    g.fillRect(cx - 5, top + 1, 3, 1);
-    g.fillRect(cx - 6, top + 2, 1, 4);
-    g.fillStyle(HELM_HI, 0.55);
-    g.fillRect(cx - 6, top + 6, 1, 6);
-    // Right-side darker shading — depth on the shadowed cheek.
-    g.fillStyle(HELM_SHADOW, 0.7);
-    g.fillRect(cx + 5, top + 4, 2, 9);
+    g.fillEllipse(cx - 3, top + 3, 2, 4);
 
-    // Visor slit — horizontal dark band with subtle violet glow inside,
-    // echoing the Prismarch's amethyst eye-channel. Sits low on the face
-    // so the angular crown reads as the dominant feature.
+    // Visor slit — dark band with violet glow + two eye-glows.
     g.fillStyle(OUT, 1);
-    g.fillRect(cx - 5, top + 9, 10, 2);
+    g.fillRoundedRect(cx - 5, top + 9, 10, 2.5, 1);
     g.fillStyle(VISOR_GLOW, 0.7);
     g.fillRect(cx - 4, top + 10, 8, 1);
-    // Two pinpoint eye-glows inside the slit.
     g.fillStyle(VISOR_GLOW, 1);
     g.fillRect(cx - 3, top + 10, 1, 1);
     g.fillRect(cx + 2, top + 10, 1, 1);
 
-    // Helm trim band — tarnished gold strip at the chin / gorget seam.
-    g.fillStyle(HELM_TRIM, 1);
-    g.fillRect(cx - 6, top + 14, 13, 1);
-    g.fillStyle(HELM_TRIM_HI, 0.85);
-    g.fillRect(cx - 5, top + 14, 1, 1);
-    g.fillRect(cx + 4, top + 14, 1, 1);
-    // Cheek-rivet pixels for armor detail.
-    g.fillStyle(HELM_TRIM, 1);
-    g.fillRect(cx - 6, top + 6, 1, 1);
-    g.fillRect(cx + 5, top + 6, 1, 1);
-    g.fillRect(cx - 6, top + 12, 1, 1);
-    g.fillRect(cx + 5, top + 12, 1, 1);
+    // Helm trim band — gold strip at the chin seam.
+    g.fillStyle(HELM_TRIM_HI, 1);
+    g.fillRect(cx - 5, top + 14, 11, 1);
 
-    // 7) ANGLED ONYX LONGSWORD — held diagonally up-right at the same
-    //    tilt as the wizard's wand for visual rhyme between the two
-    //    playable characters. Pommel tucked near the right hip, blade
-    //    points up-right past the shoulder. Replaces the previous
-    //    vertical "knight at rest" silhouette per user feedback
-    //    (2026-05-09 — "können wir das schwert noch anwinkeln, so wie
-    //    beim zauberstab vom wizard?").
-    //
-    //    Sword axis matches the wand axis (cx+2,top+30 → cx+11,top+16),
-    //    extended to longsword length. Crossguard sits perpendicular to
-    //    that axis at the grip-blade junction; pommel + grip extend
-    //    down-left, blade extends up-right.
-
-    // Pommel — small dark disc with gold accent at the back end of the
-    // grip, tucked near the right hip.
+    // 7) ANGLED ONYX LONGSWORD — pommel + grip + gold crossguard + blade.
+    // Pommel.
     g.fillStyle(OUT, 1);
-    g.fillCircle(cx + 2, top + 30, 1.8);
+    g.fillCircle(cx + 2, top + 30, 2);
     g.fillStyle(POMMEL, 1);
     g.fillCircle(cx + 2, top + 30, 1.3);
-    g.fillStyle(POMMEL_HI, 1);
-    g.fillRect(cx + 1, top + 30, 1, 1);
 
-    // Grip (leather wrap) — angled quad from pommel up-right toward the
-    // crossguard. Built as two triangles since fillPoints would alpha-
-    // blend the seam.
+    // Grip.
     g.fillStyle(OUT, 1);
     g.fillTriangle(cx + 1, top + 29, cx + 3, top + 30, cx + 5, top + 25);
     g.fillTriangle(cx + 5, top + 25, cx + 3, top + 30, cx + 6, top + 26);
     g.fillStyle(BOOT, 1);
-    g.fillTriangle(cx + 1.6, top + 29.1, cx + 2.7, top + 29.7, cx + 4.8, top + 25.4);
-    g.fillTriangle(cx + 4.8, top + 25.4, cx + 2.7, top + 29.7, cx + 5.5, top + 26.1);
+    g.fillTriangle(cx + 1.7, top + 29.1, cx + 2.7, top + 29.7, cx + 4.9, top + 25.5);
+    g.fillTriangle(cx + 4.9, top + 25.5, cx + 2.7, top + 29.7, cx + 5.5, top + 26.2);
 
-    // Crossguard — perpendicular gold bar at the grip-blade junction,
-    // ~7 px diagonal length. Two-triangle quad with the same outline /
-    // mid / highlight stack as the original horizontal version.
+    // Crossguard — gold bar.
     g.fillStyle(OUT, 1);
     g.fillTriangle(cx + 2, top + 22, cx + 4, top + 21, cx + 8, top + 27);
     g.fillTriangle(cx + 2, top + 22, cx + 8, top + 27, cx + 6, top + 28);
-    g.fillStyle(POMMEL_DARK, 1);
-    g.fillTriangle(cx + 2.6, top + 22.4, cx + 3.6, top + 21.7, cx + 7.4, top + 26.7);
-    g.fillTriangle(cx + 2.6, top + 22.4, cx + 7.4, top + 26.7, cx + 6.1, top + 27.5);
     g.fillStyle(POMMEL, 1);
-    g.fillTriangle(cx + 3, top + 22.6, cx + 3.8, top + 22.1, cx + 7, top + 26.5);
+    g.fillTriangle(cx + 2.8, top + 22.2, cx + 3.8, top + 21.6, cx + 7.2, top + 26.8);
+    g.fillTriangle(cx + 2.8, top + 22.2, cx + 7.2, top + 26.8, cx + 6, top + 27.5);
 
-    // Blade — long tapered triangle from base to tip along the wand
-    // axis. Outline + onyx mid + bright forge edge + soft amethyst glow.
-    // Mirrors the wand's two-triangle outline+fill technique: inner
-    // vertices nudged ~0.5 px along the axis to leave a hairline outline
-    // rim on the lower-right edge.
+    // Blade — onyx triangle, outline + flat fill + single glow highlight.
     g.fillStyle(BLADE_OUT, 1);
     g.fillTriangle(cx + 4, top + 21, cx + 8, top + 26, cx + 19, top + 6);
     g.fillStyle(BLADE, 1);
-    g.fillTriangle(cx + 4.5, top + 21.5, cx + 7, top + 25.5, cx + 18, top + 7);
-    // Forge-edge highlight on the upper-left side of the blade — thin
-    // triangle running the full length of the upper edge.
+    g.fillTriangle(cx + 4.8, top + 21.6, cx + 7, top + 25.3, cx + 17.8, top + 7.2);
     g.fillStyle(BLADE_HI, 1);
-    g.fillTriangle(cx + 4, top + 20.5, cx + 5.3, top + 21.5, cx + 18, top + 6.5);
-    // Subtle amethyst shine on the upper third — onyx-magic shimmer
-    // near the tip without a wand-orb-style halo.
-    g.fillStyle(BLADE_GLOW, 0.32);
-    g.fillTriangle(cx + 11, top + 14, cx + 13, top + 17, cx + 18, top + 7);
+    g.fillTriangle(cx + 4.4, top + 20.8, cx + 5.6, top + 21.6, cx + 18, top + 6.6);
+    g.fillStyle(BLADE_GLOW, 0.35);
+    g.fillTriangle(cx + 12, top + 13, cx + 14, top + 16, cx + 18, top + 7);
 
-    // Hand (gauntlet) on the grip — drawn AFTER blade & crossguard so
-    // the armored hand sits on top of the grip-crossguard seam.
+    // Gauntlet hand on the grip.
     g.fillStyle(OUT, 1);
-    g.fillCircle(cx + 4, top + 27, 1.9);
+    g.fillCircle(cx + 4, top + 27, 2);
     g.fillStyle(BODY, 1);
-    g.fillCircle(cx + 4, top + 27, 1.4);
+    g.fillCircle(cx + 4, top + 27, 1.3);
 
-    // 8) Ground shadow under the boots.
+    // 8) Ground shadow.
     g.fillStyle(SHADOW, 0.45);
     g.fillEllipse(cx, figBot, 14, 2);
 
@@ -996,26 +923,21 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Outer trail-glow halos (two soft rings)
-    g.fillStyle(0xc084fc, 0.18);
+    // FLAT-VECTOR — soft halo, bold outline ring, flat violet body, one
+    // top-left highlight. Cleaner cartoon orb.
+    g.fillStyle(0xc084fc, 0.22);
     g.fillCircle(cx, cy, cx);
-    g.fillStyle(0xc084fc, 0.4);
-    g.fillCircle(cx, cy, cx - 2);
-    // Mid violet
-    g.fillStyle(0xa855f7, 0.85);
-    g.fillCircle(cx, cy, cx - 4);
-    // Bright lavender core
+    // Bold dark outline disc.
+    g.fillStyle(0x2a0c4a, 1);
+    g.fillCircle(cx, cy, cx - 3);
+    // Flat violet body.
+    g.fillStyle(0xa855f7, 1);
+    g.fillCircle(cx, cy, cx - 5);
+    // Single soft highlight (top-left).
     g.fillStyle(0xe9d5ff, 1);
-    g.fillCircle(cx, cy, cx - 6);
-    // White-hot center
-    g.fillStyle(0xffffff, 1);
-    g.fillCircle(cx, cy, 2);
-    // Outline
-    g.lineStyle(1, 0x2a0c4a, 1);
-    g.strokeCircle(cx, cy, cx - 3);
-    // Specular highlight (top-left)
+    g.fillCircle(cx - 1.5, cy - 1.5, 2.4);
     g.fillStyle(0xffffff, 0.95);
-    g.fillCircle(cx - 2, cy - 2, 1.5);
+    g.fillCircle(cx - 2.5, cy - 2.5, 1.2);
 
     g.generateTexture(TextureKeys.MagicMissile, size, size);
   }
@@ -1041,14 +963,12 @@ export class PreloadScene extends Phaser.Scene {
     const cy = size / 2;
     g.clear();
 
-    // 1) Faint outer halo — soft glow that reads as "magic" past the
-    //    blade silhouette.
+    // FLAT-VECTOR — faint halo, bold outline diamond, flat violet body, one
+    // leading-edge highlight, pommel orb. Clean directional spell-sword.
     g.fillStyle(0xffffff, 0.18);
     g.fillEllipse(cx, cy, size, size * 0.5);
 
-    // 2) Mid violet body — slightly squashed diamond so the trail reads
-    //    as "magic blade" rather than "thrown sword". Drawn as an
-    //    elongated diamond polygon along the +x axis.
+    // Outline (dark) — elongated diamond along +x.
     const blade: Array<{ x: number; y: number }> = [
       { x: cx + 11, y: cy },     // tip (right)
       { x: cx + 2, y: cy - 3 },  // upper shoulder
@@ -1057,54 +977,34 @@ export class PreloadScene extends Phaser.Scene {
       { x: cx - 6, y: cy + 1.5 },// lower hilt taper
       { x: cx + 2, y: cy + 3 },  // lower shoulder
     ];
-    // Outline (dark)
     g.fillStyle(0x2a0c4a, 1);
     g.fillPoints(blade, true);
-    // Mid violet body — slightly inset so the outline shows.
+
+    // Flat violet body — inset so the outline shows.
     g.fillStyle(0xa855f7, 1);
-    const bladeInset: Array<{ x: number; y: number }> = [
-      { x: cx + 10, y: cy },
-      { x: cx + 2, y: cy - 2.3 },
-      { x: cx - 5.3, y: cy - 1 },
-      { x: cx - 8, y: cy },
-      { x: cx - 5.3, y: cy + 1 },
-      { x: cx + 2, y: cy + 2.3 },
-    ];
-    g.fillPoints(bladeInset, true);
+    g.fillPoints(
+      [
+        { x: cx + 9.5, y: cy },
+        { x: cx + 2, y: cy - 2.2 },
+        { x: cx - 5.3, y: cy - 1 },
+        { x: cx - 7.8, y: cy },
+        { x: cx - 5.3, y: cy + 1 },
+        { x: cx + 2, y: cy + 2.2 },
+      ],
+      true,
+    );
 
-    // 3) Bright lavender inner body — narrower diamond, the "hot core" of
-    //    the blade.
+    // Single leading-edge highlight along the top edge to the tip.
     g.fillStyle(0xe9d5ff, 1);
-    const bladeCore: Array<{ x: number; y: number }> = [
-      { x: cx + 9, y: cy },
-      { x: cx + 1, y: cy - 1.4 },
-      { x: cx - 4, y: cy - 0.6 },
-      { x: cx - 7, y: cy },
-      { x: cx - 4, y: cy + 0.6 },
-      { x: cx + 1, y: cy + 1.4 },
-    ];
-    g.fillPoints(bladeCore, true);
-
-    // 4) White-hot leading-edge highlight — a thin top-edge sliver from
-    //    the upper shoulder to the tip. Sells "this side is the cutting
-    //    edge" and gives the sprite a clear directional read so the
-    //    rotation in fire() is legible.
+    g.fillTriangle(cx + 9, cy, cx + 1, cy - 1.6, cx + 1, cy - 0.4);
     g.fillStyle(0xffffff, 0.95);
-    g.fillTriangle(cx + 10, cy, cx + 1, cy - 1.6, cx + 1, cy - 0.6);
-    g.fillTriangle(cx + 10, cy, cx + 1, cy - 0.6, cx + 6, cy - 0.4);
+    g.fillTriangle(cx + 8, cy - 0.2, cx + 2, cy - 1.2, cx + 2, cy - 0.4);
 
-    // 5) Pommel orb — small bright circle at the trailing end so the
-    //    sprite reads as "spell sword" not "shard". Mirrors the wizard
-    //    missile's sparkle vocabulary.
+    // Pommel orb at the trailing end.
     g.fillStyle(0xfff8c0, 1);
     g.fillCircle(cx - 9, cy, 1.4);
     g.fillStyle(0xffffff, 0.9);
     g.fillCircle(cx - 9, cy - 0.4, 0.6);
-
-    // 6) Specular sparkle on the upper blade — same trick as the missile
-    //    texture (top-left highlight pixel) for a consistent "magic" feel.
-    g.fillStyle(0xffffff, 0.9);
-    g.fillCircle(cx + 4, cy - 1.2, 0.8);
 
     g.generateTexture(TextureKeys.SpellbladeBolt, size, size);
   }
@@ -1124,50 +1024,41 @@ export class PreloadScene extends Phaser.Scene {
       const rng = new RNG(`${theme.id}-floor-${variant}`);
       g.clear();
 
-      // Base
+      // FLAT-VECTOR — flat base tone + a few clean rounded grass tufts +
+      // soft accent blobs. No dithered speckle noise.
       g.fillStyle(floorBase, 1);
       g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-      // Accent speckles (mid tone)
-      const accentSpeckles = 14 + rng.intBetween(0, 8);
-      g.fillStyle(floorAccent, 1);
-      for (let i = 0; i < accentSpeckles; i++) {
-        const x = rng.intBetween(2, TILE_SIZE - 3);
-        const y = rng.intBetween(2, TILE_SIZE - 3);
-        const s = rng.intBetween(1, 2);
-        g.fillRect(x, y, s, s);
-      }
-
-      // Dark sprinkles (dirt clumps) — fall back on `ambient` so the colour
-      // stays palette-driven for future floors.
-      const darkSpeckles = 6 + rng.intBetween(0, 4);
-      g.fillStyle(ambient, 1);
-      for (let i = 0; i < darkSpeckles; i++) {
-        const x = rng.intBetween(2, TILE_SIZE - 3);
-        const y = rng.intBetween(2, TILE_SIZE - 3);
-        g.fillRect(x, y, 1, 1);
-      }
-
-      // Grass tufts: a small vertical mid-toned blade with a brighter cap.
-      const tufts = 2 + rng.intBetween(0, 2);
-      for (let i = 0; i < tufts; i++) {
+      // A couple of soft flat accent patches (single tone, rounded).
+      const patches = 2 + rng.intBetween(0, 1);
+      g.fillStyle(floorAccent, 0.55);
+      for (let i = 0; i < patches; i++) {
         const x = rng.intBetween(6, TILE_SIZE - 7);
         const y = rng.intBetween(6, TILE_SIZE - 7);
-        g.fillStyle(floorAccent, 1);
-        g.fillRect(x, y, 2, 3);
-        g.fillStyle(glow, 0.55);
-        g.fillRect(x, y, 2, 1);
+        g.fillCircle(x, y, rng.intBetween(2, 4));
       }
 
-      // Occasional glowing sparkle pixel.
-      if (rng.chance(0.5)) {
-        const dots = rng.intBetween(1, 2);
+      // Clean rounded grass tufts: a small blade with a bright cap.
+      const tufts = 1 + rng.intBetween(0, 2);
+      for (let i = 0; i < tufts; i++) {
+        const x = rng.intBetween(6, TILE_SIZE - 7);
+        const y = rng.intBetween(8, TILE_SIZE - 7);
+        g.fillStyle(ambient, 1);
+        g.fillRoundedRect(x - 1, y - 4, 4, 6, 1.5);
+        g.fillStyle(floorAccent, 1);
+        g.fillRoundedRect(x, y - 4, 2, 5, 1);
         g.fillStyle(glow, 0.7);
-        for (let i = 0; i < dots; i++) {
-          const x = rng.intBetween(6, TILE_SIZE - 7);
-          const y = rng.intBetween(6, TILE_SIZE - 7);
-          g.fillCircle(x, y, 1.4);
-        }
+        g.fillCircle(x + 1, y - 4, 1.2);
+      }
+
+      // Occasional glowing sparkle.
+      if (rng.chance(0.5)) {
+        g.fillStyle(glow, 0.7);
+        g.fillCircle(
+          rng.intBetween(6, TILE_SIZE - 7),
+          rng.intBetween(6, TILE_SIZE - 7),
+          1.4,
+        );
       }
 
       // Faint tile border so adjacent tiles read as a grid.
@@ -1208,80 +1099,54 @@ export class PreloadScene extends Phaser.Scene {
     const { wallBase, wallHighlight, ambient, glow } = theme.palette;
     const rng = new RNG(`${theme.id}-wall`);
 
-    // Background gap colour (between planks)
+    // FLAT-VECTOR — flat bark planks separated by dark gaps, a flat moss
+    // crown along the top, clean knots + a firefly. No groove noise.
     g.fillStyle(ambient, 1);
     g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-    // Four vertical bark planks, each 14 px wide with a 2 px dark gap.
-    const PLANK_W = 14;
-    const GAP = 2;
-    for (let i = 0; i < 4; i++) {
+    // Three flat bark planks with bold dark gaps + one left-edge highlight.
+    const PLANK_W = 18;
+    const GAP = 3;
+    for (let i = 0; i < 3; i++) {
       const px = i * (PLANK_W + GAP) + GAP;
-      // Dark side shadow on the right, key-light strip on the left.
       g.fillStyle(0x0a0604, 1);
-      g.fillRect(px, 0, PLANK_W, TILE_SIZE);
+      g.fillRect(px - 1, 0, PLANK_W + 2, TILE_SIZE);
       g.fillStyle(wallBase, 1);
-      g.fillRect(px + 1, 0, PLANK_W - 2, TILE_SIZE);
-      g.fillStyle(wallHighlight, 1);
-      g.fillRect(px + 1, 0, 2, TILE_SIZE); // left highlight strip
+      g.fillRect(px, 0, PLANK_W, TILE_SIZE);
+      // Single soft highlight strip on the left.
+      g.fillStyle(wallHighlight, 0.85);
+      g.fillRect(px + 1, 0, 2, TILE_SIZE);
+      // One bark knot per plank (flat outlined disc).
+      const ky = 18 + rng.intBetween(0, 26);
       g.fillStyle(0x0a0604, 1);
-      g.fillRect(px + PLANK_W - 2, 0, 1, TILE_SIZE); // right shadow strip
-      // Vertical bark grooves (3-4 thin dark lines per plank).
-      g.fillStyle(0x0a0604, 0.55);
-      const grooves = 3 + rng.intBetween(0, 1);
-      for (let gi = 0; gi < grooves; gi++) {
-        const gx = px + 3 + rng.intBetween(0, PLANK_W - 6);
-        const gy = rng.intBetween(2, 10);
-        const gh = TILE_SIZE - gy - rng.intBetween(2, 8);
-        g.fillRect(gx, gy, 1, gh);
-      }
-      // Bark knots — 0-2 small dark circles per plank.
-      const knots = rng.intBetween(0, 2);
-      for (let k = 0; k < knots; k++) {
-        const kx = px + 3 + rng.intBetween(0, PLANK_W - 6);
-        const ky = 8 + rng.intBetween(0, TILE_SIZE - 20);
-        g.fillStyle(0x0a0604, 1);
-        g.fillCircle(kx, ky, 2);
-        g.fillStyle(wallBase, 1);
-        g.fillCircle(kx, ky, 1);
-        g.fillStyle(0x0a0604, 1);
-        g.fillRect(kx, ky, 1, 1);
-      }
+      g.fillCircle(px + PLANK_W / 2, ky, 2.4);
+      g.fillStyle(wallBase, 1);
+      g.fillCircle(px + PLANK_W / 2, ky, 1.2);
     }
 
-    // Mossy crown along the top — a few overlapping dark-green domes.
+    // Flat moss crown along the top — overlapping flat domes + leaf points.
     g.fillStyle(0x081210, 1);
-    g.fillRect(0, 0, TILE_SIZE, 6);
+    g.fillRect(0, 0, TILE_SIZE, 7);
     g.fillStyle(0x14361a, 1);
-    g.fillEllipse(8, 4, 16, 8);
-    g.fillEllipse(24, 5, 18, 9);
-    g.fillEllipse(42, 4, 16, 8);
-    g.fillEllipse(58, 5, 14, 7);
+    g.fillEllipse(10, 4, 20, 9);
+    g.fillEllipse(32, 5, 22, 10);
+    g.fillEllipse(54, 4, 18, 9);
     g.fillStyle(0x2d6634, 1);
-    g.fillEllipse(8, 3, 12, 5);
-    g.fillEllipse(28, 3, 14, 5);
-    g.fillEllipse(50, 3, 12, 5);
-    g.fillStyle(0x4ea656, 0.9);
-    g.fillEllipse(10, 2, 6, 2);
-    g.fillEllipse(40, 2, 7, 2);
-    // Small leaf silhouettes peeking up
+    g.fillEllipse(14, 3, 12, 4);
+    g.fillEllipse(46, 3, 12, 4);
     g.fillStyle(0x14361a, 1);
-    g.fillTriangle(14, 0, 18, 3, 12, 3);
-    g.fillTriangle(36, 0, 40, 3, 33, 3);
-    g.fillTriangle(54, 0, 58, 3, 51, 3);
+    g.fillTriangle(20, 0, 24, 4, 16, 4);
+    g.fillTriangle(44, 0, 48, 4, 40, 4);
 
-    // Firefly glow accents in the bark (palette glow colour).
-    const fireflies = 1 + rng.intBetween(0, 2);
-    for (let f = 0; f < fireflies; f++) {
-      const fx = rng.intBetween(4, TILE_SIZE - 4);
-      const fy = rng.intBetween(12, TILE_SIZE - 6);
-      g.fillStyle(0x040a05, 1);
-      g.fillCircle(fx, fy, 2);
-      g.fillStyle(glow, 1);
-      g.fillCircle(fx, fy, 1.3);
-      g.fillStyle(0xffffff, 0.85);
-      g.fillRect(fx, fy - 1, 1, 1);
-    }
+    // One firefly glow accent.
+    const fx = rng.intBetween(8, TILE_SIZE - 8);
+    const fy = rng.intBetween(20, TILE_SIZE - 8);
+    g.fillStyle(0x040a05, 1);
+    g.fillCircle(fx, fy, 2.2);
+    g.fillStyle(glow, 1);
+    g.fillCircle(fx, fy, 1.3);
+    g.fillStyle(0xffffff, 0.85);
+    g.fillRect(fx, fy - 1, 1, 1);
 
     // Outer outline so wall tiles separate cleanly from the floor.
     g.lineStyle(2, 0x000000, 0.45);
@@ -1298,91 +1163,60 @@ export class PreloadScene extends Phaser.Scene {
     const { wallBase, wallHighlight, ambient, glow } = theme.palette;
     const rng = new RNG(`${theme.id}-wall`);
 
-    // Algae-slime base between roots.
-    g.fillStyle(0x081818, 1);
+    // FLAT-VECTOR — flat algae base, bold-outlined flat mangrove roots
+    // (one body tone + one left highlight strip), cyan glow nodes.
+    g.fillStyle(0x0c2420, 1);
     g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    g.fillStyle(0x123028, 1);
-    for (let i = 0; i < 12; i++) {
-      const sx = rng.intBetween(0, TILE_SIZE);
-      const sy = rng.intBetween(0, TILE_SIZE);
-      g.fillEllipse(sx, sy, 6 + rng.intBetween(0, 4), 4 + rng.intBetween(0, 3));
-    }
 
-    // 5-6 vertical roots of varying widths and slight curve via stacked
-    // segments. Each root is dark woody brown with a lighter highlight on
-    // its left side (key light from upper-left).
+    // 5-6 vertical roots, each a single outlined flat band.
     const rootCount = 5 + rng.intBetween(0, 1);
     const rootXs: number[] = [];
     for (let r = 0; r < rootCount; r++) {
       const baseX = Math.floor((TILE_SIZE / rootCount) * r) + rng.intBetween(0, 4);
       rootXs.push(baseX);
-      const width = 6 + rng.intBetween(0, 4);
-      // Build the root as a stack of 8 px segments, slightly drifting.
-      let x = baseX;
-      const segH = 8;
-      for (let y = 0; y < TILE_SIZE; y += segH) {
-        x += rng.intBetween(-1, 1);
-        // Outline
-        g.fillStyle(0x040408, 1);
-        g.fillRect(x - 1, y, width + 2, segH);
-        // Body — mid woody brown
-        g.fillStyle(0x2a1a0e, 1);
-        g.fillRect(x, y, width, segH);
-        // Inner darker tone (right side shadow)
-        g.fillStyle(0x180a04, 1);
-        g.fillRect(x + width - 2, y, 2, segH);
-        // Highlight strip (left side, key light)
-        g.fillStyle(wallBase, 1);
-        g.fillRect(x, y, 2, segH);
-        g.fillStyle(wallHighlight, 1);
-        g.fillRect(x + 1, y, 1, segH - 1);
-      }
+      const width = 7 + rng.intBetween(0, 3);
+      // Bold dark outline
+      g.fillStyle(0x040408, 1);
+      g.fillRect(baseX - 1, 0, width + 2, TILE_SIZE);
+      // Flat woody body
+      g.fillStyle(wallBase, 1);
+      g.fillRect(baseX, 0, width, TILE_SIZE);
+      // Single left highlight strip
+      g.fillStyle(wallHighlight, 1);
+      g.fillRect(baseX + 1, 0, 2, TILE_SIZE);
     }
 
-    // Algae draping across roots — a few thin teal threads.
-    g.lineStyle(1, 0x2c7060, 0.85);
-    for (let a = 0; a < 3; a++) {
-      const ay = 12 + rng.intBetween(0, TILE_SIZE - 24);
+    // A couple of thin teal algae threads draping across.
+    g.lineStyle(1, 0x2c7060, 0.8);
+    for (let a = 0; a < 2; a++) {
+      const ay = 16 + rng.intBetween(0, TILE_SIZE - 32);
       g.beginPath();
       g.moveTo(0, ay);
-      let cx = 0;
-      let cy = ay;
+      let lx = 0;
+      let ly = ay;
       for (let s = 0; s < 8; s++) {
-        cx += 8;
-        cy += rng.intBetween(-2, 2);
-        g.lineTo(cx, cy);
+        lx += 8;
+        ly += rng.intBetween(-2, 2);
+        g.lineTo(lx, ly);
       }
       g.strokePath();
     }
 
-    // Sapphire glow nodes at root joints (where the segment edges show).
+    // Cyan glow nodes at root joints.
     const nodes = 2 + rng.intBetween(0, 2);
     for (let n = 0; n < nodes; n++) {
       const rx = rootXs[rng.intBetween(0, rootXs.length - 1)] + 3;
       const ry = 8 + rng.intBetween(0, 5) * 8;
       g.fillStyle(0x040408, 1);
-      g.fillCircle(rx, ry, 2.2);
+      g.fillCircle(rx, ry, 2.4);
       g.fillStyle(glow, 1);
       g.fillCircle(rx, ry, 1.4);
-      g.fillStyle(0xffffff, 0.85);
-      g.fillRect(rx, ry - 1, 1, 1);
-    }
-
-    // Hanging algae strands at the top edge — short tendrils dripping down.
-    g.fillStyle(0x081818, 1);
-    g.fillRect(0, 0, TILE_SIZE, 4);
-    g.fillStyle(0x2c7060, 1);
-    for (let i = 0; i < 6; i++) {
-      const tx = i * 11 + rng.intBetween(0, 4);
-      const tlen = 4 + rng.intBetween(0, 5);
-      g.fillRect(tx, 0, 1, tlen);
-      g.fillStyle(0x4ea66a, 0.85);
-      g.fillRect(tx, 0, 1, Math.min(2, tlen));
-      g.fillStyle(0x2c7060, 1);
+      g.fillStyle(0xffffff, 0.9);
+      g.fillCircle(rx - 0.5, ry - 0.5, 0.6);
     }
 
     // Subtle ambient overlay so palette tints any flat areas.
-    g.fillStyle(ambient, 0.18);
+    g.fillStyle(ambient, 0.16);
     g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
     // Outer outline so wall tiles separate cleanly from the floor.
@@ -1406,7 +1240,8 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(ambient, 1);
     g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-    // 4 courses of bricks, each course offset horizontally so bonds break.
+    // FLAT-VECTOR — 4 courses of bricks, each a single flat body tone with
+    // one top highlight strip; bold dark mortar gaps, no dithering speckle.
     const courseH = 16;
     const brickW = 22;
     for (let row = 0; row < 4; row++) {
@@ -1414,23 +1249,15 @@ export class PreloadScene extends Phaser.Scene {
       const y = row * courseH;
       for (let bx = -brickW; bx < TILE_SIZE + brickW; bx += brickW) {
         const x = bx + offset;
-        // Mortar gap
+        // Bold dark mortar gap
         g.fillStyle(0x040208, 1);
         g.fillRect(x, y, brickW, courseH);
-        // Brick body
+        // Flat brick body
         g.fillStyle(wallBase, 1);
         g.fillRect(x + 1, y + 1, brickW - 2, courseH - 2);
-        // Top highlight strip
+        // Single top highlight strip
         g.fillStyle(wallHighlight, 1);
         g.fillRect(x + 1, y + 1, brickW - 2, 2);
-        // Bottom shadow strip
-        g.fillStyle(0x180828, 1);
-        g.fillRect(x + 1, y + courseH - 3, brickW - 2, 2);
-        // Random speckle on the brick for stone texture
-        if (rng.chance(0.7)) {
-          g.fillStyle(0x180828, 0.9);
-          g.fillRect(x + 4 + rng.intBetween(0, brickW - 8), y + 4 + rng.intBetween(0, courseH - 8), 1, 1);
-        }
       }
     }
 
@@ -1600,13 +1427,11 @@ export class PreloadScene extends Phaser.Scene {
     // Base ring
     g.fillRect(cx - 11, cy + 14, 22, 4);
 
-    // Body — purple ceramic
-    g.fillStyle(0x261438, 1);
+    // Body — flat purple ceramic + one soft top-left highlight
+    g.fillStyle(0x33184c, 1);
     g.fillEllipse(cx, cy, 18, 26);
-    g.fillStyle(0x402060, 1);
-    g.fillEllipse(cx - 4, cy - 4, 7, 14);
-    g.fillStyle(0x180828, 1);
-    g.fillEllipse(cx + 4, cy + 4, 7, 12);
+    g.fillStyle(0x4a2470, 1);
+    g.fillEllipse(cx - 4, cy - 6, 6, 12);
 
     // Rim
     g.fillStyle(0x261438, 1);
@@ -1662,61 +1487,51 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Dark base
+    // FLAT-VECTOR — flat stone frame with a bold inner outline, flat gold
+    // corner studs, magenta sigil glow + clean skull.
     g.fillStyle(0x1a0a14, 1);
     g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-
-    // Stone frame (palette-driven)
-    g.fillStyle(wallBase, 1);
+    g.fillStyle(0x000000, 1);
     g.fillRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    g.fillStyle(wallBase, 1);
+    g.fillRect(4, 4, TILE_SIZE - 8, TILE_SIZE - 8);
     g.fillStyle(ambient, 1);
-    g.fillRect(6, 6, TILE_SIZE - 12, TILE_SIZE - 12);
+    g.fillRect(7, 7, TILE_SIZE - 14, TILE_SIZE - 14);
 
-    // Frame highlight + shadow strips for chiseled feel
-    g.fillStyle(0x4a3a2a, 1);
-    g.fillRect(2, 2, TILE_SIZE - 4, 2); // top hi
-    g.fillRect(2, 2, 2, TILE_SIZE - 4); // left hi
-    g.fillStyle(0x080404, 1);
-    g.fillRect(2, TILE_SIZE - 4, TILE_SIZE - 4, 2); // bottom shadow
-    g.fillRect(TILE_SIZE - 4, 2, 2, TILE_SIZE - 4); // right shadow
-
-    // Gold corner studs
+    // Gold corner studs (flat disc + highlight).
     const stud = (sx: number, sy: number): void => {
-      g.fillStyle(0x7a5a1a, 1);
-      g.fillRect(sx, sy, 4, 4);
+      g.fillStyle(0x000000, 1);
+      g.fillCircle(sx, sy, 2.6);
       g.fillStyle(0xffd84a, 1);
-      g.fillRect(sx, sy, 3, 3);
+      g.fillCircle(sx, sy, 1.8);
       g.fillStyle(0xfff0a0, 1);
-      g.fillRect(sx, sy, 1, 1);
+      g.fillRect(sx - 1, sy - 1, 1, 1);
     };
-    stud(4, 4);
-    stud(TILE_SIZE - 8, 4);
-    stud(4, TILE_SIZE - 8);
-    stud(TILE_SIZE - 8, TILE_SIZE - 8);
+    stud(6, 6);
+    stud(TILE_SIZE - 6, 6);
+    stud(6, TILE_SIZE - 6);
+    stud(TILE_SIZE - 6, TILE_SIZE - 6);
 
-    // Skull / sigil center — magenta glow ring + dark socket + gold cross-eyes.
-    g.fillStyle(0xff44aa, 0.45);
+    // Magenta sigil glow + dark socket.
+    g.fillStyle(0xff44aa, 0.4);
     g.fillCircle(cx, cy, 16);
     g.fillStyle(0xff44aa, 0.8);
     g.fillCircle(cx, cy, 12);
     g.fillStyle(0x14040a, 1);
     g.fillCircle(cx, cy, 9);
 
-    // Skull silhouette (rounded top + jaw notch)
+    // Clean skull — rounded cranium + jaw, outlined eye sockets, glow pupils.
     g.fillStyle(0xe0d0d8, 1);
     g.fillCircle(cx, cy - 1, 6);
-    g.fillRect(cx - 4, cy + 2, 8, 4);
-    // Eye sockets
+    g.fillRoundedRect(cx - 4, cy + 2, 8, 4, 1.5);
     g.fillStyle(0x14040a, 1);
-    g.fillRect(cx - 4, cy - 2, 2, 3);
-    g.fillRect(cx + 2, cy - 2, 2, 3);
-    // Glowing pupils
+    g.fillCircle(cx - 3, cy - 1, 1.6);
+    g.fillCircle(cx + 3, cy - 1, 1.6);
     g.fillStyle(0xff44aa, 1);
     g.fillRect(cx - 3, cy - 1, 1, 1);
     g.fillRect(cx + 3, cy - 1, 1, 1);
-    // Tooth gap
     g.fillStyle(0x14040a, 1);
-    g.fillRect(cx - 1, cy + 3, 2, 2);
+    g.fillRect(cx - 0.5, cy + 3, 1.5, 2);
 
     // Outline
     g.lineStyle(2, 0x000000, 1);
@@ -1739,90 +1554,56 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Dark base
+    // FLAT-VECTOR — flat stone frame with a bold inner outline, flat wooden
+    // plank panel with clean seams + two iron straps + a handle ring.
     g.fillStyle(0x14080a, 1);
     g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-
-    // Stone frame matching the wall theme so the door reads as set into the wall
-    g.fillStyle(wallBase, 1);
+    g.fillStyle(0x000000, 1);
     g.fillRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    g.fillStyle(wallBase, 1);
+    g.fillRect(4, 4, TILE_SIZE - 8, TILE_SIZE - 8);
     g.fillStyle(ambient, 1);
     g.fillRect(6, 6, TILE_SIZE - 12, TILE_SIZE - 12);
 
-    // Frame highlight + shadow strips for chiseled feel
-    g.fillStyle(0x4a3a2a, 1);
-    g.fillRect(2, 2, TILE_SIZE - 4, 2);
-    g.fillRect(2, 2, 2, TILE_SIZE - 4);
-    g.fillStyle(0x080404, 1);
-    g.fillRect(2, TILE_SIZE - 4, TILE_SIZE - 4, 2);
-    g.fillRect(TILE_SIZE - 4, 2, 2, TILE_SIZE - 4);
-
-    // Wooden plank panel inside the frame
+    // Wooden plank panel — bold outline + flat wood fill.
     const woodLeft = 8;
     const woodTop = 8;
     const woodRight = TILE_SIZE - 8;
     const woodBottom = TILE_SIZE - 8;
-    const woodW = woodRight - woodLeft; // 48
-    const woodH = woodBottom - woodTop; // 48
-
-    g.fillStyle(0x4a2e16, 1);
+    const woodW = woodRight - woodLeft;
+    const woodH = woodBottom - woodTop;
+    g.fillStyle(0x1a0e06, 1);
+    g.fillRect(woodLeft - 1, woodTop - 1, woodW + 2, woodH + 2);
+    g.fillStyle(0x6a3e1e, 1);
     g.fillRect(woodLeft, woodTop, woodW, woodH);
-    // Wood-grain highlight rows
-    g.fillStyle(0x6a3e1e, 1);
-    g.fillRect(woodLeft + 1, woodTop + 1, woodW - 2, 1);
-    g.fillRect(woodLeft + 1, woodTop + woodH - 3, woodW - 2, 1);
-    // Wood-grain shadow row at the bottom
+
+    // Clean vertical plank seams.
     g.fillStyle(0x2e1a0a, 1);
-    g.fillRect(woodLeft + 1, woodTop + woodH - 2, woodW - 2, 1);
+    g.fillRect(woodLeft + Math.floor(woodW / 3), woodTop, 1.5, woodH);
+    g.fillRect(woodLeft + Math.floor((woodW * 2) / 3), woodTop, 1.5, woodH);
 
-    // Vertical plank seams (3 planks → 2 seams)
-    const seam1 = woodLeft + Math.floor(woodW / 3); // 24
-    const seam2 = woodLeft + Math.floor((woodW * 2) / 3); // 40
-    g.fillStyle(0x2e1a0a, 1);
-    g.fillRect(seam1, woodTop + 1, 1, woodH - 2);
-    g.fillRect(seam2, woodTop + 1, 1, woodH - 2);
-    g.fillStyle(0x6a3e1e, 1);
-    g.fillRect(seam1 + 1, woodTop + 1, 1, woodH - 2);
-    g.fillRect(seam2 + 1, woodTop + 1, 1, woodH - 2);
-
-    // Iron straps (top + bottom)
-    const strapH = 4;
-    const strapTopY = woodTop + 4;
-    const strapBotY = woodBottom - 4 - strapH;
-    g.fillStyle(0x1a1a22, 1);
-    g.fillRect(woodLeft, strapTopY, woodW, strapH);
-    g.fillRect(woodLeft, strapBotY, woodW, strapH);
-    g.fillStyle(0x3a3a44, 1);
-    g.fillRect(woodLeft, strapTopY, woodW, 1);
-    g.fillRect(woodLeft, strapBotY, woodW, 1);
-    g.fillStyle(0x080808, 1);
-    g.fillRect(woodLeft, strapTopY + strapH - 1, woodW, 1);
-    g.fillRect(woodLeft, strapBotY + strapH - 1, woodW, 1);
-
-    // Rivets on the straps
-    const rivet = (sx: number, sy: number): void => {
-      g.fillStyle(0x080808, 1);
-      g.fillRect(sx, sy, 2, 2);
+    // Two flat iron straps + a rivet at each end.
+    const strapH = 5;
+    const drawStrap = (sy: number): void => {
+      g.fillStyle(0x14141c, 1);
+      g.fillRect(woodLeft, sy, woodW, strapH);
+      g.fillStyle(0x3a3a44, 1);
+      g.fillRect(woodLeft, sy + 1, woodW, 1.5);
       g.fillStyle(0x7a7a84, 1);
-      g.fillRect(sx, sy, 1, 1);
+      g.fillCircle(woodLeft + 3, sy + strapH / 2, 1.2);
+      g.fillCircle(woodRight - 3, sy + strapH / 2, 1.2);
     };
-    rivet(woodLeft + 2, strapTopY + 1);
-    rivet(woodRight - 4, strapTopY + 1);
-    rivet(woodLeft + 2, strapBotY + 1);
-    rivet(woodRight - 4, strapBotY + 1);
+    drawStrap(woodTop + 5);
+    drawStrap(woodBottom - 5 - strapH);
 
-    // Iron handle ring on the right side, between the straps
+    // Iron handle ring on the right, between the straps.
     const handleX = cx + 10;
-    const handleY = cy;
     g.fillStyle(0x080808, 1);
-    g.fillCircle(handleX, handleY, 4);
+    g.fillCircle(handleX, cy, 4);
     g.fillStyle(0x3a3a44, 1);
-    g.fillCircle(handleX, handleY, 3);
-    g.fillStyle(0x7a7a84, 1);
-    g.fillRect(handleX - 1, handleY - 3, 1, 1);
-    // Hole through the ring (lets the wood show through)
-    g.fillStyle(0x4a2e16, 1);
-    g.fillCircle(handleX, handleY, 1);
+    g.fillCircle(handleX, cy, 3);
+    g.fillStyle(0x6a3e1e, 1);
+    g.fillCircle(handleX, cy, 1.3);
 
     // Outline
     g.lineStyle(2, 0x000000, 1);
@@ -1849,92 +1630,57 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
+    // FLAT-VECTOR — flat stone frame + bold inner outline, gold halo, a
+    // clean flat treasure chest with gold trim + clasp.
     g.fillStyle(0x140e08, 1);
     g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-
-    g.fillStyle(wallBase, 1);
+    g.fillStyle(0x000000, 1);
     g.fillRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    g.fillStyle(wallBase, 1);
+    g.fillRect(4, 4, TILE_SIZE - 8, TILE_SIZE - 8);
     g.fillStyle(ambient, 1);
-    g.fillRect(6, 6, TILE_SIZE - 12, TILE_SIZE - 12);
+    g.fillRect(7, 7, TILE_SIZE - 14, TILE_SIZE - 14);
 
-    // Frame highlight + shadow
-    g.fillStyle(0x4a3a2a, 1);
-    g.fillRect(2, 2, TILE_SIZE - 4, 2);
-    g.fillRect(2, 2, 2, TILE_SIZE - 4);
-    g.fillStyle(0x080404, 1);
-    g.fillRect(2, TILE_SIZE - 4, TILE_SIZE - 4, 2);
-    g.fillRect(TILE_SIZE - 4, 2, 2, TILE_SIZE - 4);
-
-    // Gold corner studs
+    // Gold corner studs.
     const stud = (sx: number, sy: number): void => {
-      g.fillStyle(0x7a5a1a, 1);
-      g.fillRect(sx, sy, 4, 4);
+      g.fillStyle(0x000000, 1);
+      g.fillCircle(sx, sy, 2.6);
       g.fillStyle(0xffd84a, 1);
-      g.fillRect(sx, sy, 3, 3);
+      g.fillCircle(sx, sy, 1.8);
       g.fillStyle(0xfff0a0, 1);
-      g.fillRect(sx, sy, 1, 1);
+      g.fillRect(sx - 1, sy - 1, 1, 1);
     };
-    stud(4, 4);
-    stud(TILE_SIZE - 8, 4);
-    stud(4, TILE_SIZE - 8);
-    stud(TILE_SIZE - 8, TILE_SIZE - 8);
+    stud(6, 6);
+    stud(TILE_SIZE - 6, 6);
+    stud(6, TILE_SIZE - 6);
+    stud(TILE_SIZE - 6, TILE_SIZE - 6);
 
-    // Gold halo behind the chest
-    g.fillStyle(0xffd84a, 0.18);
-    g.fillCircle(cx, cy, 16);
-    g.fillStyle(0xffd84a, 0.28);
-    g.fillCircle(cx, cy, 11);
+    // Gold halo behind the chest.
+    g.fillStyle(0xffd84a, 0.22);
+    g.fillCircle(cx, cy, 15);
 
-    // Treasure chest body — wooden box with gold trim and a clasp.
-    const chestLeft = cx - 11;
-    const chestRight = cx + 11;
-    const chestTop = cy - 8;
-    const chestBottom = cy + 9;
-    const chestW = chestRight - chestLeft; // 22
-    const chestH = chestBottom - chestTop; // 17
-    const lidH = 6;
-
-    // Outline / shadow behind the chest
+    // Treasure chest — bold outline + flat wood body + flat lid + gold trim.
+    const chestLeft = cx - 12;
+    const chestTop = cy - 9;
+    const chestW = 24;
+    const chestH = 19;
+    const lidH = 7;
     g.fillStyle(0x080404, 1);
-    g.fillRect(chestLeft - 1, chestTop - 1, chestW + 2, chestH + 2);
-    // Body wood (lower half)
-    g.fillStyle(0x4a2e16, 1);
-    g.fillRect(chestLeft, chestTop, chestW, chestH);
-    // Lid wood (slightly lighter)
+    g.fillRoundedRect(chestLeft - 1, chestTop - 1, chestW + 2, chestH + 2, 2);
     g.fillStyle(0x6a3e1e, 1);
-    g.fillRect(chestLeft, chestTop, chestW, lidH);
-    // Top highlight on the lid
+    g.fillRect(chestLeft, chestTop + lidH, chestW, chestH - lidH);
     g.fillStyle(0x8a5a2e, 1);
-    g.fillRect(chestLeft + 1, chestTop, chestW - 2, 1);
-    // Lid seam shadow
-    g.fillStyle(0x1a0a04, 1);
-    g.fillRect(chestLeft, chestTop + lidH, chestW, 1);
-    // Vertical plank seams on the body
-    g.fillStyle(0x2e1a0a, 1);
-    g.fillRect(cx - 5, chestTop + lidH + 2, 1, chestH - lidH - 4);
-    g.fillRect(cx + 4, chestTop + lidH + 2, 1, chestH - lidH - 4);
-
-    // Gold corner brackets (top + bottom of the chest)
-    const bracket = (sx: number, sy: number): void => {
-      g.fillStyle(0x7a5a1a, 1);
-      g.fillRect(sx, sy, 3, 3);
-      g.fillStyle(0xffd84a, 1);
-      g.fillRect(sx, sy, 2, 2);
-      g.fillStyle(0xfff0a0, 1);
-      g.fillRect(sx, sy, 1, 1);
-    };
-    bracket(chestLeft, chestTop);
-    bracket(chestRight - 3, chestTop);
-    bracket(chestLeft, chestBottom - 3);
-    bracket(chestRight - 3, chestBottom - 3);
-
-    // Front clasp — small gold plate straddling the lid seam
-    g.fillStyle(0x080404, 1);
-    g.fillRect(cx - 3, chestTop + lidH - 1, 6, 5);
-    g.fillStyle(0x7a5a1a, 1);
-    g.fillRect(cx - 2, chestTop + lidH - 1, 4, 4);
+    g.fillRoundedRect(chestLeft, chestTop, chestW, lidH + 1, 2);
+    // Lid seam + gold trim bands.
     g.fillStyle(0xffd84a, 1);
-    g.fillRect(cx - 2, chestTop + lidH - 1, 3, 3);
+    g.fillRect(chestLeft, chestTop + lidH, chestW, 1.5);
+    g.fillRect(chestLeft, chestTop, 2, chestH);
+    g.fillRect(chestLeft + chestW - 2, chestTop, 2, chestH);
+    // Front clasp.
+    g.fillStyle(0x080404, 1);
+    g.fillRect(cx - 3, chestTop + lidH - 2, 6, 6);
+    g.fillStyle(0xffd84a, 1);
+    g.fillRect(cx - 2, chestTop + lidH - 1, 4, 4);
     g.fillStyle(0xfff0a0, 1);
     g.fillRect(cx - 2, chestTop + lidH - 1, 1, 1);
 
@@ -1966,29 +1712,23 @@ export class PreloadScene extends Phaser.Scene {
     const plateLeft = cx - plateW / 2; // 24
     const plateTop = TILE_SIZE - 18; // 46
 
-    // Plate shadow / dark border
+    // FLAT-VECTOR — bold outline plate + flat iron face + one highlight +
+    // rivets + bold keyhole.
     g.fillStyle(0x080404, 1);
-    g.fillRect(plateLeft, plateTop, plateW, plateH);
-    // Iron face
+    g.fillRoundedRect(plateLeft, plateTop, plateW, plateH, 2);
     g.fillStyle(0x363842, 1);
-    g.fillRect(plateLeft + 1, plateTop + 1, plateW - 2, plateH - 2);
-    // Top highlight
+    g.fillRoundedRect(plateLeft + 1.5, plateTop + 1.5, plateW - 3, plateH - 3, 1.5);
     g.fillStyle(0x5a5a64, 1);
-    g.fillRect(plateLeft + 1, plateTop + 1, plateW - 2, 1);
-    g.fillRect(plateLeft + 1, plateTop + 1, 1, plateH - 2);
-    // Bottom shadow
-    g.fillStyle(0x14141c, 1);
-    g.fillRect(plateLeft + 1, plateTop + plateH - 2, plateW - 2, 1);
-    // Rivets (top corners of plate)
+    g.fillRect(plateLeft + 2, plateTop + 2, plateW - 4, 1.5);
     g.fillStyle(0x7a7a84, 1);
-    g.fillRect(plateLeft + 2, plateTop + 2, 1, 1);
-    g.fillRect(plateLeft + plateW - 3, plateTop + 2, 1, 1);
+    g.fillCircle(plateLeft + 3, plateTop + 3, 0.9);
+    g.fillCircle(plateLeft + plateW - 3, plateTop + 3, 0.9);
 
-    // Keyhole — bold black circle + tail, centered on the plate
+    // Keyhole — bold black circle + tail, centered on the plate.
     const khCx = cx;
     const khCy = plateTop + 5;
     g.fillStyle(0x000000, 1);
-    g.fillCircle(khCx, khCy, 2);
+    g.fillCircle(khCx, khCy, 2.2);
     g.fillRect(khCx - 1, khCy + 1, 2, 5);
   }
 
@@ -2010,76 +1750,49 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Dark base — wooden brown rather than the boss door's purple-black, so
-    // the door reads warm.
+    // FLAT-VECTOR — flat warm wooden inset in a stone frame + bold inner
+    // outline, gold studs, a clean flat gold coin with tally marks.
     g.fillStyle(0x1a0e06, 1);
     g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-
-    // Stone frame (palette-driven) with a wooden inset
-    g.fillStyle(wallBase, 1);
+    g.fillStyle(0x000000, 1);
     g.fillRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
-    g.fillStyle(0x4a2e1a, 1); // wooden inset
-    g.fillRect(6, 6, TILE_SIZE - 12, TILE_SIZE - 12);
-    g.fillStyle(ambient, 0.6);
-    g.fillRect(8, 8, TILE_SIZE - 16, TILE_SIZE - 16);
+    g.fillStyle(wallBase, 1);
+    g.fillRect(4, 4, TILE_SIZE - 8, TILE_SIZE - 8);
+    g.fillStyle(0x4a2e1a, 1);
+    g.fillRect(7, 7, TILE_SIZE - 14, TILE_SIZE - 14);
+    g.fillStyle(ambient, 0.5);
+    g.fillRect(9, 9, TILE_SIZE - 18, TILE_SIZE - 18);
 
-    // Wooden plank lines
-    g.fillStyle(0x2e1c0c, 1);
-    g.fillRect(8, 22, TILE_SIZE - 16, 1);
-    g.fillRect(8, 40, TILE_SIZE - 16, 1);
-
-    // Frame highlight + shadow
-    g.fillStyle(0x5a3a2a, 1);
-    g.fillRect(2, 2, TILE_SIZE - 4, 2);
-    g.fillRect(2, 2, 2, TILE_SIZE - 4);
-    g.fillStyle(0x080404, 1);
-    g.fillRect(2, TILE_SIZE - 4, TILE_SIZE - 4, 2);
-    g.fillRect(TILE_SIZE - 4, 2, 2, TILE_SIZE - 4);
-
-    // Gold corner studs
+    // Gold corner studs.
     const stud = (sx: number, sy: number): void => {
-      g.fillStyle(0x7a5a1a, 1);
-      g.fillRect(sx, sy, 4, 4);
+      g.fillStyle(0x000000, 1);
+      g.fillCircle(sx, sy, 2.6);
       g.fillStyle(0xffd84a, 1);
-      g.fillRect(sx, sy, 3, 3);
+      g.fillCircle(sx, sy, 1.8);
       g.fillStyle(0xfff0a0, 1);
-      g.fillRect(sx, sy, 1, 1);
+      g.fillRect(sx - 1, sy - 1, 1, 1);
     };
-    stud(4, 4);
-    stud(TILE_SIZE - 8, 4);
-    stud(4, TILE_SIZE - 8);
-    stud(TILE_SIZE - 8, TILE_SIZE - 8);
+    stud(6, 6);
+    stud(TILE_SIZE - 6, 6);
+    stud(6, TILE_SIZE - 6);
+    stud(TILE_SIZE - 6, TILE_SIZE - 6);
 
-    // Gold coin halo
+    // Gold coin halo.
     g.fillStyle(0xffd84a, 0.22);
     g.fillCircle(cx, cy, 14);
 
-    // Coin disc — outer gold rim, inner pale yellow face
+    // Coin disc — bold outline + flat gold + one highlight + tally marks.
     g.fillStyle(0x080404, 1);
     g.fillCircle(cx, cy, 11);
-    g.fillStyle(0x7a5a1a, 1);
-    g.fillCircle(cx, cy, 10);
     g.fillStyle(0xffd84a, 1);
-    g.fillCircle(cx, cy, 8);
-    g.fillStyle(0xfff0a0, 1);
-    g.fillCircle(cx, cy, 7);
-    g.fillStyle(0xffd84a, 1);
-    g.fillCircle(cx, cy, 6);
-    // Top-left highlight on the coin
+    g.fillCircle(cx, cy, 9);
     g.fillStyle(0xfff0a0, 0.8);
-    g.fillCircle(cx - 2, cy - 2, 2);
-    // Sparkle accent at the top-right edge of the coin
-    g.fillStyle(0xfff0a0, 1);
-    g.fillRect(cx + 3, cy - 3, 1, 1);
-    g.fillRect(cx + 4, cy - 2, 1, 1);
-    // Tiny tally marks on the coin face — three short horizontal dashes.
-    // (Replaces the old "$" glyph which, at this pixel scale, read as a
-    // keyhole silhouette: thick middle block + thin top/bottom tails.)
+    g.fillCircle(cx - 3, cy - 3, 2.5);
     const dark = 0x14080a;
     g.fillStyle(dark, 1);
-    g.fillRect(cx - 3, cy - 1, 6, 1);
-    g.fillRect(cx - 3, cy + 1, 6, 1);
-    g.fillRect(cx - 3, cy + 3, 4, 1);
+    g.fillRect(cx - 3, cy - 1, 6, 1.2);
+    g.fillRect(cx - 3, cy + 1.5, 6, 1.2);
+    g.fillRect(cx - 3, cy + 4, 4, 1.2);
 
     if (locked) {
       this.drawLockBadge(g);
@@ -2115,40 +1828,29 @@ export class PreloadScene extends Phaser.Scene {
     // Ground shadow
     this.groundShadow(g, cx, h - 3, 4, 1, 0.5);
 
-    // Glow halo under the cap
-    g.fillStyle(glow, 0.22);
-    g.fillCircle(cx, 11, 9);
-    g.fillStyle(glow, 0.4);
-    g.fillCircle(cx, 11, 6);
+    // FLAT-VECTOR — soft glow halo, outlined flat stem, outlined flat
+    // domed cap with one highlight + white spots.
+    g.fillStyle(glow, 0.3);
+    g.fillCircle(cx, 11, 8);
 
-    // Stem outline + fill + highlight
+    // Stem — outlined flat capsule.
     g.fillStyle(ambient, 1);
-    g.fillRect(cx - 2, 11, 4, 6); // outline-ish
-    g.fillStyle(0xd6d0c2, 1);
-    g.fillRect(cx - 1, 11, 2, 6);
-    g.fillStyle(0xf2ecdc, 1);
-    g.fillRect(cx - 1, 11, 1, 6);
+    g.fillRoundedRect(cx - 2, 10, 4, 7, 1.5);
+    g.fillStyle(0xe8e2d2, 1);
+    g.fillRoundedRect(cx - 1, 10, 2, 6, 1);
 
-    // Cap silhouette (dark outline)
+    // Cap — bold outline dome + flat glow fill.
     g.fillStyle(ambient, 1);
-    g.fillRect(cx - 4, 6, 8, 1);
-    g.fillRect(cx - 5, 7, 10, 1);
-    g.fillRect(cx - 5, 8, 10, 1);
-    g.fillRect(cx - 4, 9, 8, 1);
-    // Cap fill — bright glow tone
+    g.fillEllipse(cx, 8, 12, 7);
     g.fillStyle(glow, 1);
-    g.fillRect(cx - 4, 7, 8, 1);
-    g.fillRect(cx - 4, 8, 8, 1);
-    // Cap shadow band along bottom
-    g.fillStyle(0x3aa86a, 1);
-    g.fillRect(cx - 4, 9, 8, 1);
-    // Highlight pixels on the cap
+    g.fillEllipse(cx, 8, 10, 5.5);
+    // Single highlight (top-left).
     g.fillStyle(0xa0ffc0, 1);
-    g.fillRect(cx - 2, 7, 1, 1);
-    // White spots
+    g.fillEllipse(cx - 2, 6.5, 3, 1.6);
+    // White spots.
     g.fillStyle(0xffffff, 1);
-    g.fillRect(cx - 1, 8, 1, 1);
-    g.fillRect(cx + 2, 8, 1, 1);
+    g.fillCircle(cx - 1, 8, 1);
+    g.fillCircle(cx + 2.5, 8.5, 0.9);
 
     g.generateTexture(mushroomDecoKey(theme.id), w, h);
   }
@@ -2174,51 +1876,33 @@ export class PreloadScene extends Phaser.Scene {
     // Drop shadow underneath
     this.groundShadow(g, cx, cy + 7, w / 2 - 2, 3, 0.5);
 
-    // Asymmetric mossy boulder: an offset main body + a smaller side lump,
-    // four tonal bands, then a moss cap that drapes down one flank, then an
-    // emerald-glow crystal cluster sprouting from the crown to mirror the
-    // mangrove's glow-node detail. Outlines are layered so the silhouette
-    // reads cleanly against any floor variant.
+    // FLAT-VECTOR — asymmetric boulder (main body + side lump) as a bold
+    // outline + single flat stone tone + one top-left highlight, a flat
+    // moss cap, and the signature emerald crystal cluster on the crown.
     g.fillStyle(0x06070a, 1);
     g.fillEllipse(cx - 1, cy + 1, 30, 18);
     g.fillEllipse(cx + 9, cy + 3, 14, 10);
-
-    g.fillStyle(0x1f1c18, 1);
-    g.fillEllipse(cx - 1, cy + 1, 28, 16);
-    g.fillEllipse(cx + 9, cy + 3, 12, 8);
-
-    g.fillStyle(0x3a3631, 1);
-    g.fillEllipse(cx - 2, cy, 26, 14);
-    g.fillEllipse(cx + 9, cy + 2, 10, 6);
-
-    g.fillStyle(0x5a554c, 1);
-    g.fillEllipse(cx - 3, cy - 2, 20, 9);
-    g.fillEllipse(cx + 8, cy + 1, 7, 4);
-
-    // Top-left highlight band (key light)
+    g.fillStyle(0x4a463e, 1);
+    g.fillEllipse(cx - 1, cy + 1, 27, 15);
+    g.fillEllipse(cx + 9, cy + 3, 11, 7);
+    // Single top-left highlight.
     g.fillStyle(0x827a6a, 1);
-    g.fillEllipse(cx - 5, cy - 4, 11, 4);
-    g.fillStyle(0xa39a86, 1);
-    g.fillRect(cx - 7, cy - 5, 2, 1);
-    g.fillRect(cx - 3, cy - 6, 1, 1);
+    g.fillEllipse(cx - 5, cy - 3, 11, 4);
 
-    // Moss cap — draped over the crown, dripping down the front-right.
+    // Moss cap — flat outline + single green fill draped over the crown.
     g.fillStyle(0x12281a, 1);
-    g.fillEllipse(cx - 2, cy - 3, 22, 6);
-    g.fillStyle(0x1f4a26, 1);
-    g.fillEllipse(cx - 2, cy - 4, 18, 5);
+    g.fillEllipse(cx - 2, cy - 3, 22, 7);
     g.fillStyle(0x2d6634, 1);
-    g.fillEllipse(cx - 4, cy - 5, 10, 3);
-    // Drip tendrils
+    g.fillEllipse(cx - 2, cy - 4, 18, 5);
+    // Drip tendrils.
     g.fillStyle(0x1f4a26, 1);
-    g.fillRect(cx - 8, cy - 2, 1, 3);
-    g.fillRect(cx + 4, cy - 1, 1, 4);
-    g.fillRect(cx + 11, cy, 1, 3);
+    g.fillRect(cx - 8, cy - 2, 1.5, 3);
+    g.fillRect(cx + 5, cy - 1, 1.5, 4);
 
-    // Emerald crystal cluster on the crown — glow-coloured shards.
+    // Emerald crystal cluster on the crown — flat glow shards.
     const crystal = (sx: number, sy: number, hy: number): void => {
       g.fillStyle(0x040c08, 1);
-      g.fillTriangle(sx - 1.5, sy + hy, sx + 1.5, sy + hy, sx, sy - hy);
+      g.fillTriangle(sx - 1.8, sy + hy, sx + 1.8, sy + hy, sx, sy - hy);
       g.fillStyle(glow, 1);
       g.fillTriangle(sx - 1, sy + hy - 1, sx + 1, sy + hy - 1, sx, sy - hy + 1);
       g.fillStyle(0xffffff, 0.85);
@@ -2228,7 +1912,7 @@ export class PreloadScene extends Phaser.Scene {
     crystal(cx + 1, cy - 5, 3);
     crystal(cx - 5, cy - 5, 2);
 
-    // Glow node accent on the side lump
+    // Glow node accent on the side lump.
     g.fillStyle(0x040c08, 1);
     g.fillCircle(cx + 11, cy + 1, 1.8);
     g.fillStyle(glow, 1);
@@ -2256,95 +1940,58 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Ground shadow + roots first so the trunk overlaps them.
+    // FLAT-VECTOR — outlined tapered trunk + a flat rounded foliage crown
+    // with one soft highlight + leaf points + glow berries.
     this.groundShadow(g, cx, h - 2, 10, 3, 0.5);
 
-    // Root flares — three small triangular toes spreading from the trunk
-    // base. Mirrors how the mangrove fans out from a central knot.
+    // Trunk — outlined tapered rectangle, flat fill.
     g.fillStyle(0x100a06, 1);
-    g.fillTriangle(cx - 6, 42, cx - 2, 38, cx - 2, 42);
-    g.fillTriangle(cx + 6, 42, cx + 2, 38, cx + 2, 42);
-    g.fillTriangle(cx - 2, 43, cx + 2, 43, cx, 39);
+    g.fillTriangle(cx - 5, 43, cx + 5, 43, cx + 4, 24);
+    g.fillTriangle(cx - 5, 43, cx - 4, 24, cx + 4, 24);
     g.fillStyle(0x3a2818, 1);
-    g.fillTriangle(cx - 5, 41, cx - 2, 39, cx - 2, 41);
-    g.fillTriangle(cx + 5, 41, cx + 2, 39, cx + 2, 41);
-
-    // Trunk — tapered: wider at the base (8 px) narrowing to 6 px at the top.
-    g.fillStyle(0x100a06, 1);
-    g.fillTriangle(cx - 4, 42, cx + 4, 42, cx + 3, 24);
-    g.fillTriangle(cx - 4, 42, cx - 3, 24, cx + 3, 24);
-    g.fillStyle(0x3a2818, 1);
-    g.fillTriangle(cx - 3, 41, cx + 3, 41, cx + 2, 25);
-    g.fillTriangle(cx - 3, 41, cx - 2, 25, cx + 2, 25);
-    // Bark highlight strip (key light from the upper-left)
+    g.fillTriangle(cx - 3.5, 42, cx + 3.5, 42, cx + 2.5, 25);
+    g.fillTriangle(cx - 3.5, 42, cx - 2.5, 25, cx + 2.5, 25);
+    // Single bark highlight strip on the left.
     g.fillStyle(0x5a3e22, 1);
-    g.fillRect(cx - 3, 26, 1, 15);
-    g.fillStyle(0x7a5430, 1);
-    g.fillRect(cx - 3, 28, 1, 4);
-    // Bark shadow strip on the right
-    g.fillStyle(0x1f1208, 1);
-    g.fillRect(cx + 2, 26, 1, 15);
-    // Bark notches
-    g.fillStyle(0x1f1208, 1);
-    g.fillRect(cx - 1, 29, 2, 1);
-    g.fillRect(cx, 34, 2, 1);
-    g.fillRect(cx - 2, 38, 2, 1);
+    g.fillRect(cx - 3, 27, 1.5, 13);
 
-    // Foliage crown — four overlapping clumps, four tonal bands. Outline
-    // is drawn first as a slightly oversized silhouette so the highlights
-    // read cleanly without anti-aliasing artifacts.
+    // Foliage crown — bold outline silhouette, then a single flat green fill.
     g.fillStyle(0x040a05, 1);
-    g.fillEllipse(cx, 18, 28, 24);
-    g.fillEllipse(cx - 9, 13, 16, 16);
-    g.fillEllipse(cx + 9, 13, 16, 16);
-    g.fillEllipse(cx, 7, 14, 12);
+    g.fillEllipse(cx, 17, 30, 26);
+    g.fillEllipse(cx - 9, 12, 17, 17);
+    g.fillEllipse(cx + 9, 12, 17, 17);
+    g.fillEllipse(cx, 6, 15, 13);
+    g.fillStyle(0x2d6634, 1);
+    g.fillEllipse(cx, 17, 27, 23);
+    g.fillEllipse(cx - 8, 12, 14, 14);
+    g.fillEllipse(cx + 8, 12, 14, 14);
+    g.fillEllipse(cx, 6, 12, 11);
 
-    g.fillStyle(0x102015, 1); // deep shadow
-    g.fillEllipse(cx, 18, 26, 22);
-    g.fillEllipse(cx - 8, 13, 14, 14);
-    g.fillEllipse(cx + 8, 13, 14, 14);
-    g.fillEllipse(cx, 7, 12, 10);
+    // Single soft highlight (top-left).
+    g.fillStyle(0x4ea656, 1);
+    g.fillEllipse(cx - 5, 9, 8, 5);
 
-    g.fillStyle(0x1f3a24, 1); // mid green
-    g.fillEllipse(cx, 17, 22, 18);
-    g.fillEllipse(cx - 7, 12, 12, 12);
-    g.fillEllipse(cx + 7, 12, 12, 12);
+    // Leaf points poking out so it reads as foliage, not a blob.
+    g.fillStyle(0x2d6634, 1);
+    g.fillTriangle(cx + 12, 14, cx + 16, 12, cx + 14, 17);
+    g.fillTriangle(cx - 13, 16, cx - 16, 14, cx - 14, 19);
+    g.fillTriangle(cx + 2, 1, cx + 5, 5, cx, 5);
 
-    g.fillStyle(0x2d6634, 1); // upper highlight
-    g.fillEllipse(cx - 4, 11, 12, 9);
-    g.fillEllipse(cx + 5, 10, 9, 7);
-
-    g.fillStyle(0x4ea656, 1); // brightest highlight
-    g.fillEllipse(cx - 5, 9, 7, 4);
-
-    // Sparkle highlight pixels (mirrors the lily pad's pad-edge sparkle)
-    g.fillStyle(0xb0e890, 1);
-    g.fillRect(cx - 7, 8, 2, 1);
-    g.fillRect(cx - 3, 7, 1, 1);
-
-    // Visible leaf silhouettes on the crown edge — small triangular points
-    // poking out so it reads as foliage, not a blob.
-    g.fillStyle(0x1f3a24, 1);
-    g.fillTriangle(cx + 11, 14, cx + 14, 12, cx + 13, 16);
-    g.fillTriangle(cx - 12, 16, cx - 15, 14, cx - 13, 18);
-    g.fillTriangle(cx + 2, 3, cx + 5, 6, cx, 6);
-
-    // Glow accents — fireflies / glow-berries in the floor's palette.
+    // Glow berries in the floor palette.
     const glowAccent = (sx: number, sy: number, r: number): void => {
       g.fillStyle(0x040a05, 1);
-      g.fillCircle(sx, sy, r + 0.8);
+      g.fillCircle(sx, sy, r + 0.9);
       g.fillStyle(glow, 1);
       g.fillCircle(sx, sy, r);
       g.fillStyle(0xffffff, 0.9);
       g.fillRect(sx, sy - 1, 1, 1);
     };
-    glowAccent(cx + 6, 10, 1.4);
-    glowAccent(cx - 8, 17, 1.2);
-    glowAccent(cx + 3, 21, 1.0);
+    glowAccent(cx + 6, 10, 1.5);
+    glowAccent(cx - 8, 17, 1.3);
 
-    // Inner shadow at bottom of foliage so trunk reads as separate
-    g.fillStyle(ambient, 0.55);
-    g.fillEllipse(cx, 24, 22, 6);
+    // Inner shadow at bottom of foliage so trunk reads as separate.
+    g.fillStyle(ambient, 0.5);
+    g.fillEllipse(cx, 23, 20, 5);
 
     g.generateTexture(treeDecoKey(theme.id), w, h);
   }
@@ -2371,15 +2018,13 @@ export class PreloadScene extends Phaser.Scene {
     // Soft shadow underneath the pad
     this.groundShadow(g, cx, cy + 5, 14, 3, 0.4);
 
-    // Pad body — outlined ellipse with three tone bands
+    // FLAT-VECTOR — bold dark outline ellipse, one flat teal body tone,
+    // one soft top-left highlight.
     g.fillStyle(0x040c10, 1);
     g.fillEllipse(cx, cy, 30, 16);
-    g.fillStyle(0x1f4a4a, 1); // dark teal pad
-    g.fillEllipse(cx, cy, 28, 14);
-    g.fillStyle(0x2c7060, 1); // mid teal
-    g.fillEllipse(cx, cy - 1, 24, 11);
-    // Top-left highlight band
-    g.fillStyle(0x4ea66a, 1);
+    g.fillStyle(0x2c8068, 1);
+    g.fillEllipse(cx, cy, 27, 13);
+    g.fillStyle(0x58b87a, 1);
     g.fillEllipse(cx - 5, cy - 3, 12, 4);
 
     // Radial dark veins from the center (fanning outward).
@@ -2489,13 +2134,13 @@ export class PreloadScene extends Phaser.Scene {
     drawRoot(cx, cy, cx - 6, cy - 8, 5);  // upper-left curling
     drawRoot(cx, cy, cx + 7, cy - 7, 5);  // upper-right curling
 
-    // Central knot — a darker chunky disc that ties the roots together.
+    // Central knot — bold outline disc, flat body, single highlight.
     g.fillStyle(0x080404, 1);
     g.fillCircle(cx, cy, 5);
-    g.fillStyle(0x2a1a0e, 1);
+    g.fillStyle(0x3a240f, 1);
     g.fillCircle(cx, cy, 4);
-    g.fillStyle(0x4a2e16, 1);
-    g.fillCircle(cx - 1, cy - 1, 2);
+    g.fillStyle(0x5a3a1e, 1);
+    g.fillCircle(cx - 1.2, cy - 1.2, 1.6);
 
     // Sapphire glow nodes — at the joints where roots branch.
     const glowNode = (sx: number, sy: number): void => {
@@ -2542,16 +2187,10 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Outer + inner halo
-    g.fillStyle(0x6effa0, 0.18);
-    g.fillCircle(cx, cy, cx);
-    g.fillStyle(0x6effa0, 0.32);
-    g.fillCircle(cx, cy, cx - 4);
-
-    // Mockup grid is 16×16 anchored around (10,10). PX=2 → 32×32, fits nicely.
-    const PX = 2;
-    const offX = 0;
-    const offY = 0;
+    // FLAT-VECTOR — soft glow halo, two flat wings, one round flat body with
+    // a bold outline + single highlight + cute eyes + mouth.
+    g.fillStyle(0x6effa0, 0.22);
+    g.fillCircle(cx, cy, cx - 1);
 
     const OUT = 0x1e4022;
     const BODY = 0x7ad068;
@@ -2559,50 +2198,32 @@ export class PreloadScene extends Phaser.Scene {
     const WING = 0xc0e0a0;
     const EYE = 0x0a0a0a;
 
-    const block = (x: number, y: number, w: number, h: number, color: number): void =>
-      this.pxBlock(g, x, y, w, h, color, PX, offX, offY);
-    const dot = (x: number, y: number, color: number): void =>
-      this.px(g, x, y, color, PX, offX, offY);
+    // Wings — flat outlined leaves either side.
+    for (const m of [-1, 1] as const) {
+      g.fillStyle(OUT, 1);
+      g.fillEllipse(cx + m * 9, cy - 1, 7, 5);
+      g.fillStyle(WING, 0.9);
+      g.fillEllipse(cx + m * 9, cy - 1, 5, 3.5);
+    }
 
-    // Wings
-    block(5, 8, 2, 1, WING);
-    dot(4, 8, OUT);
-    dot(5, 9, OUT);
-    block(13, 8, 2, 1, WING);
-    dot(15, 8, OUT);
-    dot(14, 9, OUT);
+    // Body — bold outline circle + flat fill.
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx, cy, 6);
+    g.fillStyle(BODY, 1);
+    g.fillCircle(cx, cy, 4.6);
+    // Single highlight (top-left).
+    g.fillStyle(HI, 1);
+    g.fillCircle(cx - 1.5, cy - 1.8, 1.6);
 
-    // Body silhouette (outline ring)
-    block(8, 6, 4, 1, OUT);
-    dot(7, 7, OUT);
-    dot(12, 7, OUT);
-    dot(7, 8, OUT);
-    dot(12, 8, OUT);
-    dot(7, 9, OUT);
-    dot(12, 9, OUT);
-    dot(7, 10, OUT);
-    dot(12, 10, OUT);
-    dot(7, 11, OUT);
-    dot(12, 11, OUT);
-    block(8, 12, 4, 1, OUT);
-
-    // Body fill
-    block(8, 7, 4, 5, BODY);
-    block(9, 6, 2, 1, BODY);
-    block(9, 12, 2, 1, BODY);
-
-    // Highlight (top-left)
-    dot(8, 7, HI);
-    dot(9, 7, HI);
-    dot(8, 8, HI);
-
-    // Eyes
-    dot(9, 9, EYE);
-    dot(11, 9, EYE);
-    // Mouth
-    dot(9, 10, EYE);
-    dot(10, 10, EYE);
-    dot(11, 10, EYE);
+    // Cute eyes (dark dot + catch-light) + smile.
+    g.fillStyle(EYE, 1);
+    g.fillCircle(cx - 1.6, cy - 0.4, 1);
+    g.fillCircle(cx + 1.6, cy - 0.4, 1);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillRect(cx - 2, cy - 1, 1, 1);
+    g.fillRect(cx + 1, cy - 1, 1, 1);
+    g.fillStyle(EYE, 1);
+    g.fillRect(cx - 2, cy + 2, 4, 1);
 
     g.generateTexture(TextureKeys.ForestSprite, size, size);
   }
@@ -2621,91 +2242,60 @@ export class PreloadScene extends Phaser.Scene {
     const h = 48;
     g.clear();
 
-    // Mockup grid is 28 × 20. PX = 2 → 56 × 40, centered in 64 × 48 frame so
-    // the slime renders at the same pixel density as the Wizard.
-    const PX = 2;
-    const offX = 4;
-    const offY = 4;
+    const cx = w / 2;
+    const baseY = 34;
 
     const OUT = 0x0e2a14;
     const BODY = 0x3a7a3a;
-    const HI = 0x6cc06c;
-    const HI_BRIGHT = 0xa0e0a0;
-    const SHADOW = 0x244a26;
+    const HI = 0x9ce09c;
     const MOSS = 0x2a5e2a;
     const MOSS_HI = 0x56a04e;
     const EYE = 0x1a1a1a;
 
-    const block = (x: number, y: number, w: number, h: number, color: number): void =>
-      this.pxBlock(g, x, y, w, h, color, PX, offX, offY);
-    const dot = (x: number, y: number, color: number): void =>
-      this.px(g, x, y, color, PX, offX, offY);
+    // FLAT-VECTOR — rounded slime dome, bold outline + single flat tone +
+    // one top sheen + flat moss patches + cute eyes + mouth + drip.
+    // Sized to sit just above its 14px hitbox radius (user: "slimes zu groß").
+    this.groundShadow(g, cx, baseY + 2, 13, 3, 0.45);
 
-    // Ground shadow
-    this.groundShadow(g, offX + 14 * PX, offY + 16.5 * PX, 7 * PX, 1.3 * PX, 0.45);
+    // Dome — outline then flat fill. Built as an ellipse top + flat base.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx, 23, 30, 24);
+    g.fillRect(cx - 15, 23, 30, baseY - 23);
+    g.fillStyle(BODY, 1);
+    g.fillEllipse(cx, 23, 26, 20);
+    g.fillRect(cx - 13, 23, 26, baseY - 24);
+    // Re-cap the bottom edge with the outline so it reads as a clean base.
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 13, baseY - 1, 26, 2);
 
-    // Dome silhouette (outline ring)
-    block(11, 6, 6, 1, OUT);
-    block(9, 7, 10, 1, OUT);
-    block(8, 8, 12, 1, OUT);
-    block(7, 9, 14, 1, OUT);
-    block(6, 15, 16, 1, OUT);
-    dot(7, 10, OUT);
-    dot(20, 10, OUT);
-    dot(7, 11, OUT);
-    dot(20, 11, OUT);
-    dot(7, 12, OUT);
-    dot(20, 12, OUT);
-    dot(7, 13, OUT);
-    dot(20, 13, OUT);
-    dot(7, 14, OUT);
-    dot(20, 14, OUT);
+    // Single top sheen highlight.
+    g.fillStyle(HI, 1);
+    g.fillEllipse(cx - 5, 15, 7, 3);
 
-    // Body fill
-    block(11, 6, 6, 1, BODY);
-    block(10, 7, 8, 1, BODY);
-    block(9, 8, 10, 1, BODY);
-    block(8, 9, 12, 1, BODY);
-    block(8, 10, 12, 1, BODY);
-    block(8, 11, 12, 1, BODY);
-    block(8, 12, 12, 1, BODY);
-    block(8, 13, 12, 1, BODY);
-    block(8, 14, 12, 1, SHADOW);
-    block(7, 15, 14, 1, SHADOW);
+    // Flat moss patches.
+    g.fillStyle(MOSS, 1);
+    g.fillEllipse(cx + 7, 14, 5, 3);
+    g.fillEllipse(cx - 8, 26, 4, 2.5);
+    g.fillStyle(MOSS_HI, 1);
+    g.fillCircle(cx + 8, 13, 1);
+    g.fillCircle(cx - 7, 25, 0.9);
 
-    // Top highlight curve
-    block(12, 7, 3, 1, HI);
-    block(11, 8, 4, 1, HI);
-    block(10, 9, 3, 1, HI);
-    block(9, 10, 2, 1, HI);
-    dot(12, 7, HI_BRIGHT);
-    dot(11, 8, HI_BRIGHT);
+    // Cute eyes (dark + catch-light) + mouth.
+    g.fillStyle(EYE, 1);
+    g.fillCircle(cx - 4, 22, 2);
+    g.fillCircle(cx + 4, 22, 2);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(cx - 5, 21, 0.8);
+    g.fillCircle(cx + 3, 21, 0.8);
+    g.fillStyle(EYE, 1);
+    g.fillRect(cx - 3, 27, 6, 1.3);
+    g.fillRect(cx - 1.5, 28.3, 3, 1.3);
 
-    // Moss patches
-    dot(14, 9, MOSS);
-    block(15, 9, 2, 1, MOSS);
-    dot(15, 8, MOSS);
-    dot(16, 9, MOSS_HI);
-    block(17, 11, 2, 1, MOSS);
-    dot(18, 11, MOSS_HI);
-    block(8, 13, 2, 1, MOSS);
-    dot(9, 13, MOSS_HI);
-
-    // Eyes with sparkle
-    block(11, 11, 2, 2, EYE);
-    block(15, 11, 2, 2, EYE);
-    dot(11, 11, 0xffffff);
-    dot(15, 11, 0xffffff);
-
-    // Mouth
-    block(12, 13, 4, 1, EYE);
-    dot(13, 14, EYE);
-    dot(14, 14, EYE);
-
-    // Drip droplet
-    dot(17, 16, BODY);
-    dot(17, 17, BODY);
-    dot(17, 18, OUT);
+    // Drip droplet.
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx + 10, baseY + 2, 1.8);
+    g.fillStyle(BODY, 1);
+    g.fillCircle(cx + 10, baseY + 1, 1);
 
     g.generateTexture(TextureKeys.MossySlime, w, h);
   }
@@ -2727,22 +2317,20 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Ground shadow at base
+    // FLAT-VECTOR — outlined flat root mound, flat tapered vine, leafy bud
+    // with a cute eye, flat side leaves, thorn tip.
     this.groundShadow(g, cx, h - 3, 9, 2.5, 0.5);
 
-    // Base / root mound — outline + fill + highlight
+    // Root mound — outline + single flat fill.
     g.fillStyle(0x040a05, 1);
     g.fillEllipse(cx, h - 5, 20, 10);
-    g.fillStyle(0x1a2818, 1);
-    g.fillEllipse(cx, h - 5, 18, 8);
     g.fillStyle(0x2d4220, 1);
-    g.fillEllipse(cx - 1, h - 6, 14, 5);
-    // Two visible roots at the base
+    g.fillEllipse(cx, h - 6, 16, 7);
     g.fillStyle(0x040a05, 1);
     g.fillRect(cx - 8, h - 4, 3, 2);
     g.fillRect(cx + 5, h - 4, 3, 2);
 
-    // Twisting vine — three tapered triangle segments with shading.
+    // Twisting vine — flat tapered segments, outline + single fill.
     const vineSeg = (
       tipX: number,
       tipY: number,
@@ -2750,53 +2338,42 @@ export class PreloadScene extends Phaser.Scene {
       baseRX: number,
       baseY: number,
     ): void => {
-      // Outline
       g.fillStyle(0x040a05, 1);
       g.fillTriangle(baseLX - 1, baseY, baseRX + 1, baseY, tipX, tipY - 1);
-      // Mid green
       g.fillStyle(0x2a5a32, 1);
       g.fillTriangle(baseLX, baseY, baseRX, baseY, tipX, tipY);
-      // Highlight
-      g.fillStyle(0x4f8a44, 1);
-      g.fillTriangle(baseLX, baseY, baseLX + 2, baseY - 1, tipX - 1, tipY + 1);
     };
     vineSeg(cx + 2, h - 16, cx - 2, cx + 4, h - 8);
     vineSeg(cx, h - 24, cx - 4, cx + 2, h - 16);
     vineSeg(cx + 1, h - 30, cx - 2, cx + 4, h - 24);
 
-    // Bud (leafy head) — outline ring, dark green body, mid green inner
+    // Bud — bold outline + flat fill + single highlight.
     g.fillStyle(0x040a05, 1);
     g.fillCircle(cx, h - 32, 10);
-    g.fillStyle(0x1f4a26, 1);
-    g.fillCircle(cx, h - 32, 9);
     g.fillStyle(0x2d6634, 1);
-    g.fillCircle(cx, h - 32, 7);
+    g.fillCircle(cx, h - 32, 8.5);
     g.fillStyle(0x4f8a44, 1);
-    g.fillCircle(cx - 2, h - 34, 4);
+    g.fillCircle(cx - 2.5, h - 34, 3);
 
-    // Eye in the bud (sclera + iris + pupil + sparkle)
+    // Cute eye in the bud.
     g.fillStyle(0xfff2c4, 1);
     g.fillCircle(cx, h - 32, 4);
-    g.fillStyle(0xa64a1a, 1);
-    g.fillCircle(cx, h - 32, 2.5);
     g.fillStyle(0x111111, 1);
-    g.fillCircle(cx, h - 32, 1.2);
+    g.fillCircle(cx, h - 32, 1.8);
     g.fillStyle(0xffffff, 1);
     g.fillRect(cx - 1, h - 33, 1, 1);
 
-    // Side leaves — dark outline + mid green + highlight
+    // Side leaves — flat outlined triangles.
     const leaf = (mirror: 1 | -1): void => {
       g.fillStyle(0x040a05, 1);
       g.fillTriangle(cx + mirror * 8, h - 30, cx + mirror * 15, h - 28, cx + mirror * 9, h - 25);
       g.fillStyle(0x2d6634, 1);
-      g.fillTriangle(cx + mirror * 8, h - 30, cx + mirror * 13, h - 28, cx + mirror * 9, h - 26);
-      g.fillStyle(0x6effa0, 0.85);
-      g.fillTriangle(cx + mirror * 9, h - 29, cx + mirror * 12, h - 28, cx + mirror * 10, h - 26);
+      g.fillTriangle(cx + mirror * 8.5, h - 29.5, cx + mirror * 13, h - 28, cx + mirror * 9.5, h - 26);
     };
     leaf(-1);
     leaf(1);
 
-    // Thorn tip on top — outline + body + bright highlight
+    // Thorn tip on top.
     g.fillStyle(0x040a05, 1);
     g.fillTriangle(cx - 3, h - 38, cx + 3, h - 38, cx, h - 44);
     g.fillStyle(0x6effa0, 1);
@@ -2824,66 +2401,59 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Halo (magenta-pink glow, two layers)
-    g.fillStyle(0xff7ac0, 0.18);
-    g.fillCircle(cx, cy, cx);
-    g.fillStyle(0xff7ac0, 0.32);
-    g.fillCircle(cx, cy, cx - 3);
+    // FLAT-VECTOR — soft pink halo, flat outlined wings, flat pink torso +
+    // round head with hair tuft, cute eyes + smile, a few sparkles.
+    g.fillStyle(0xff7ac0, 0.28);
+    g.fillCircle(cx, cy, cx - 1);
 
-    // Wings — translucent leaves with subtle outline
-    const wing = (sx: number, sy: number, mirror: 1 | -1): void => {
-      g.fillStyle(0xffd0e8, 0.55);
+    // Wings — flat translucent leaves with a thin outline.
+    const wing = (sx: number, sy: number): void => {
+      g.lineStyle(1, 0xa84080, 0.7);
+      g.fillStyle(0xffd0e8, 0.6);
       g.fillEllipse(sx, sy, 10, 8);
-      g.fillStyle(0xffffff, 0.4);
-      g.fillEllipse(sx + mirror * 1, sy - 1, 6, 5);
-      g.lineStyle(1, 0xa84080, 0.6);
       g.strokeEllipse(sx, sy, 10, 8);
     };
-    wing(cx - 8, cy - 2, -1);
-    wing(cx + 8, cy - 2, 1);
-    g.fillStyle(0xfff8a0, 0.45);
-    g.fillEllipse(cx - 8, cy + 4, 8, 6);
-    g.fillEllipse(cx + 8, cy + 4, 8, 6);
+    wing(cx - 8, cy - 2);
+    wing(cx + 8, cy - 2);
+    g.lineStyle(0, 0, 0);
 
-    // Body (pink torso with outline + highlight)
+    // Torso — bold outline + flat pink fill + one highlight.
     g.fillStyle(0x4d0d22, 1);
-    g.fillEllipse(cx, cy + 1, 9, 12);
+    g.fillEllipse(cx, cy + 1, 10, 13);
     g.fillStyle(0xff5577, 1);
-    g.fillEllipse(cx, cy + 1, 7, 10);
+    g.fillEllipse(cx, cy + 1, 8, 11);
     g.fillStyle(0xff90a8, 1);
-    g.fillEllipse(cx - 1, cy - 1, 3, 5);
+    g.fillEllipse(cx - 1.5, cy - 1, 2.5, 4);
 
-    // Head (skin, with outline + chin shadow)
+    // Head — outline + flat skin.
     g.fillStyle(0x4d0d22, 1);
     g.fillCircle(cx, cy - 6, 4.5);
     g.fillStyle(0xfde68a, 1);
     g.fillCircle(cx, cy - 6, 3.5);
-    g.fillStyle(0xc89a6c, 1);
-    g.fillRect(cx - 2, cy - 4, 4, 1);
 
-    // Hair tuft (auburn)
+    // Hair tuft (auburn, flat).
     g.fillStyle(0x4a1a08, 1);
-    g.fillEllipse(cx, cy - 9, 8, 3);
+    g.fillEllipse(cx, cy - 9, 8, 3.5);
     g.fillStyle(0xa64a1a, 1);
-    g.fillEllipse(cx, cy - 9, 6, 2);
+    g.fillEllipse(cx, cy - 9.5, 5, 1.8);
 
-    // Eyes
+    // Cute eyes (dot + catch-light) + smile.
     g.fillStyle(0x111111, 1);
-    g.fillRect(cx - 2, cy - 6, 1, 1);
-    g.fillRect(cx + 1, cy - 6, 1, 1);
-    // Tiny smile
+    g.fillCircle(cx - 1.4, cy - 6, 0.9);
+    g.fillCircle(cx + 1.4, cy - 6, 0.9);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillRect(cx - 2, cy - 6.5, 1, 1);
+    g.fillRect(cx + 1, cy - 6.5, 1, 1);
     g.fillStyle(0xa83048, 1);
     g.fillRect(cx - 1, cy - 4, 2, 1);
 
-    // Sparkle pixels around the figure
+    // Sparkles around the figure.
     g.fillStyle(0xffffff, 0.95);
     g.fillRect(cx - 12, cy - 5, 1, 1);
     g.fillRect(cx + 11, cy + 3, 1, 1);
+    g.fillStyle(0xfff8a0, 0.8);
     g.fillRect(cx + 10, cy - 8, 1, 1);
     g.fillRect(cx - 10, cy + 7, 1, 1);
-    g.fillStyle(0xfff8a0, 0.8);
-    g.fillRect(cx + 12, cy - 2, 1, 1);
-    g.fillRect(cx - 11, cy - 9, 1, 1);
 
     g.generateTexture(TextureKeys.PixieDancer, size, size);
   }
@@ -2912,24 +2482,27 @@ export class PreloadScene extends Phaser.Scene {
     // Ground shadow
     this.groundShadow(g, cx, h - 4, 11, 2.5, 0.5);
 
-    // Body — outline + fill + highlight
-    g.fillStyle(0x0e2a18, 1);
-    g.fillEllipse(cx, cy + 3, 24, 18);
-    g.fillStyle(0x2c6e44, 1);
+    // Body — bold outline + flat fill + one highlight (bolder pass)
+    g.fillStyle(0x05180e, 1);
+    g.fillEllipse(cx, cy + 3, 26, 20);
+    g.fillStyle(0x368a52, 1);
     g.fillEllipse(cx, cy + 3, 22, 16);
-    g.fillStyle(0x4ea66a, 1);
+    g.fillStyle(0x52b870, 1);
     g.fillEllipse(cx - 4, cy, 10, 6);
 
     // Belly (lighter underside)
-    g.fillStyle(0x7eccaa, 0.7);
+    g.fillStyle(0x9ee0c0, 0.7);
     g.fillEllipse(cx, cy + 7, 16, 6);
 
     // Spots (darker green-blue speckle)
-    g.fillStyle(0x183c28, 1);
+    g.fillStyle(0x16331f, 1);
     g.fillCircle(cx + 5, cy - 1, 1.5);
     g.fillCircle(cx - 6, cy + 4, 1.5);
     g.fillCircle(cx + 7, cy + 4, 1.2);
     g.fillCircle(cx - 2, cy + 1, 1.2);
+    // Bold body outline.
+    g.lineStyle(2, 0x05180e, 1);
+    g.strokeEllipse(cx, cy + 3, 24, 18);
 
     // Eye sockets (raised bumps on the head)
     g.fillStyle(0x0e2a18, 1);
@@ -2976,23 +2549,21 @@ export class PreloadScene extends Phaser.Scene {
     // Ground shadow at the base
     this.groundShadow(g, cx, h - 3, 9, 2.5, 0.5);
 
-    // Root mound
+    // FLAT-VECTOR — root mound: bold outline + one flat tone.
     g.fillStyle(0x040810, 1);
     g.fillEllipse(cx, h - 5, 20, 10);
-    g.fillStyle(0x1a2230, 1);
+    g.fillStyle(0x243248, 1);
     g.fillEllipse(cx, h - 5, 18, 8);
-    g.fillStyle(0x2c3e58, 1);
-    g.fillEllipse(cx - 3, h - 6, 6, 2);
 
-    // Stem — three shaded tones
+    // Stem — bold outline + flat body + one left highlight.
     g.fillStyle(0x040810, 1);
     g.fillRect(cx - 3, h - 22, 6, 18);
-    g.fillStyle(0x1f3848, 1);
+    g.fillStyle(0x274a5e, 1);
     g.fillRect(cx - 2, h - 22, 4, 18);
     g.fillStyle(0x3a607a, 1);
     g.fillRect(cx - 2, h - 22, 1, 18);
 
-    // Side leaves (small fronds)
+    // Side leaves (small fronds) — outline + flat fill.
     g.fillStyle(0x040810, 1);
     g.fillEllipse(cx - 8, h - 16, 8, 4);
     g.fillEllipse(cx + 8, h - 18, 8, 4);
@@ -3000,15 +2571,14 @@ export class PreloadScene extends Phaser.Scene {
     g.fillEllipse(cx - 8, h - 16, 7, 3);
     g.fillEllipse(cx + 8, h - 18, 7, 3);
 
-    // Bulb / head — outlined
+    // Bulb / head — bold outline, flat violet body, one highlight.
     const headY = h - 28;
     g.fillStyle(0x0a0410, 1);
     g.fillEllipse(cx, headY, 22, 18);
-    // Outer petals (violet)
-    g.fillStyle(0x5a1f7a, 1);
+    g.fillStyle(0x6a2a92, 1);
     g.fillEllipse(cx, headY, 20, 16);
-    g.fillStyle(0x7a3fbe, 1);
-    g.fillEllipse(cx - 3, headY - 2, 8, 5);
+    g.fillStyle(0x9a5ad8, 1);
+    g.fillEllipse(cx - 4, headY - 4, 7, 4);
 
     // Mouth opening — dark cleft + white tooth pixels
     g.fillStyle(0x14040a, 1);
@@ -3069,12 +2639,14 @@ export class PreloadScene extends Phaser.Scene {
     wing(cx + 8, cy + 5, 7, 3);
 
     // Body — long horizontal capsule, warm orange highlight
-    g.fillStyle(0x140820, 1);
-    g.fillEllipse(cx, cy, 30, 7);
-    g.fillStyle(0x4a1a4a, 1);
+    g.fillStyle(0x0a0414, 1);
+    g.fillEllipse(cx, cy, 31, 8);
+    g.fillStyle(0x5e2a66, 1);
     g.fillEllipse(cx, cy, 28, 5);
     g.fillStyle(0xff7aa0, 1);
     g.fillEllipse(cx, cy - 1, 22, 2);
+    g.lineStyle(1.5, 0x0a0414, 1);
+    g.strokeEllipse(cx, cy, 28, 5);
     // Bright segment dots
     g.fillStyle(0xffd84a, 1);
     g.fillRect(cx - 8, cy - 1, 2, 1);
@@ -3144,14 +2716,16 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0xffffff, 1);
     g.fillRect(cx - 16, cy - 2, 1, 1);
 
-    // Shell — dark purple dome with outline
-    g.fillStyle(0x0a0410, 1);
-    g.fillEllipse(cx, cy - 2, 26, 18);
-    g.fillStyle(0x3a1a5a, 1);
+    // Shell — dark purple dome with a bold outline (bolder pass)
+    g.fillStyle(0x06030c, 1);
+    g.fillEllipse(cx, cy - 2, 28, 20);
+    g.fillStyle(0x4a2470, 1);
     g.fillEllipse(cx, cy - 2, 24, 16);
     // Shell highlight strip
-    g.fillStyle(0x6a3aa0, 1);
+    g.fillStyle(0x7a4ab8, 1);
     g.fillEllipse(cx - 4, cy - 6, 10, 4);
+    g.lineStyle(2, 0x06030c, 1);
+    g.strokeEllipse(cx, cy - 2, 26, 18);
 
     // Sapphire shell plates — six glowing spots
     const plate = (sx: number, sy: number): void => {
@@ -3193,15 +2767,16 @@ export class PreloadScene extends Phaser.Scene {
 
     this.groundShadow(g, cx, h - 4, 16, 3, 0.55);
 
-    // Body
+    // FLAT-VECTOR — bold outline, flat teal body, one top-left highlight,
+    // lighter belly region.
     g.fillStyle(0x06160e, 1);
     g.fillEllipse(cx, cy + 5, 36, 26);
-    g.fillStyle(0x1f5a36, 1);
+    g.fillStyle(0x227d44, 1);
     g.fillEllipse(cx, cy + 5, 34, 24);
-    g.fillStyle(0x4ea66a, 1);
-    g.fillEllipse(cx - 6, cy + 1, 14, 8);
-    g.fillStyle(0x7eccaa, 0.7);
-    g.fillEllipse(cx, cy + 10, 24, 8);
+    g.fillStyle(0x5cc080, 1);
+    g.fillEllipse(cx - 6, cy + 1, 13, 7);
+    g.fillStyle(0x8fd8b0, 1);
+    g.fillEllipse(cx, cy + 11, 22, 6);
 
     // Spots
     g.fillStyle(0x103022, 1);
@@ -3279,18 +2854,18 @@ export class PreloadScene extends Phaser.Scene {
 
     this.groundShadow(g, cx, h - 4, 14, 3, 0.55);
 
-    // Root mound
+    // FLAT-VECTOR — root mound: bold outline + one flat tone + small sheen.
     g.fillStyle(0x040810, 1);
     g.fillEllipse(cx, h - 6, 32, 14);
-    g.fillStyle(0x1a2230, 1);
+    g.fillStyle(0x243248, 1);
     g.fillEllipse(cx, h - 6, 30, 12);
-    g.fillStyle(0x2c3e58, 1);
-    g.fillEllipse(cx - 5, h - 8, 10, 3);
+    g.fillStyle(0x3a607a, 1);
+    g.fillEllipse(cx - 5, h - 8, 9, 2.5);
 
-    // Stem (thicker than the mob)
+    // Stem — bold outline + flat body + one left highlight.
     g.fillStyle(0x040810, 1);
     g.fillRect(cx - 5, h - 30, 10, 24);
-    g.fillStyle(0x1f3848, 1);
+    g.fillStyle(0x274a5e, 1);
     g.fillRect(cx - 4, h - 30, 8, 24);
     g.fillStyle(0x3a607a, 1);
     g.fillRect(cx - 4, h - 30, 2, 24);
@@ -3313,10 +2888,10 @@ export class PreloadScene extends Phaser.Scene {
     const headY = h - 38;
     g.fillStyle(0x0a0410, 1);
     g.fillEllipse(cx, headY, 36, 30);
-    g.fillStyle(0x5a1f7a, 1);
+    g.fillStyle(0x6a2a92, 1);
     g.fillEllipse(cx, headY, 33, 27);
-    g.fillStyle(0x7a3fbe, 1);
-    g.fillEllipse(cx - 5, headY - 4, 14, 8);
+    g.fillStyle(0x9a5ad8, 1);
+    g.fillEllipse(cx - 5, headY - 4, 13, 7);
 
     // Mouth — wide with teeth
     g.fillStyle(0x14040a, 1);
@@ -3515,88 +3090,64 @@ export class PreloadScene extends Phaser.Scene {
     const h = 72;
     g.clear();
 
-    const PX = 3;
-    // Grid is 28 × 20 (same as the slime). PX = 3 → 84 × 60. Centered in
-    // 96 × 72 with offsets so the dome reads as a beefier sibling.
-    const offX = Math.floor((w - 28 * PX) / 2);
-    const offY = Math.floor((h - 20 * PX) / 2);
+    const cx = w / 2;
+    const baseY = 54;
 
     const OUT = 0x041a08;
     const BODY = 0x2f6b30;
-    const HI = 0x6cc06c;
-    const HI_BRIGHT = 0xa0e0a0;
-    const SHADOW = 0x1d3e1f;
+    const HI = 0x9ce09c;
     const MOSS = 0x244f24;
     const MOSS_HI = 0x56a04e;
     const EYE = 0x1a1a1a;
 
-    const block = (x: number, y: number, gw: number, gh: number, color: number): void =>
-      this.pxBlock(g, x, y, gw, gh, color, PX, offX, offY);
-    const dot = (x: number, y: number, color: number): void =>
-      this.px(g, x, y, color, PX, offX, offY);
+    // FLAT-VECTOR — beefy slime dome, bold outline + single flat tone + one
+    // top sheen + flat moss patches + THREE alien eyes + angry mouth + drip.
+    // Dome trimmed to ~original footprint (user: "slimes zu groß") — still
+    // comfortably larger than the 30px hitbox radius.
+    this.groundShadow(g, cx, baseY + 4, 24, 5, 0.55);
 
-    // Heavy ground shadow
-    this.groundShadow(g, offX + 14 * PX, offY + 16.5 * PX, 11 * PX, 2 * PX, 0.55);
+    // Dome — outline ellipse + flat base, then flat fill.
+    g.fillStyle(OUT, 1);
+    g.fillEllipse(cx, 32, 48, 40);
+    g.fillRect(cx - 24, 32, 48, baseY - 32);
+    g.fillStyle(BODY, 1);
+    g.fillEllipse(cx, 32, 42, 34);
+    g.fillRect(cx - 21, 32, 42, baseY - 34);
+    g.fillStyle(OUT, 1);
+    g.fillRect(cx - 21, baseY - 2, 42, 3);
 
-    // Outline ring (dome silhouette)
-    block(11, 5, 6, 1, OUT);
-    block(9, 6, 10, 1, OUT);
-    block(8, 7, 12, 1, OUT);
-    block(7, 8, 14, 1, OUT);
-    block(6, 16, 16, 1, OUT);
-    for (let y = 9; y <= 15; y++) {
-      dot(6, y, OUT);
-      dot(21, y, OUT);
+    // Single top sheen.
+    g.fillStyle(HI, 1);
+    g.fillEllipse(cx - 9, 18, 12, 5);
+
+    // Flat moss patches.
+    g.fillStyle(MOSS, 1);
+    g.fillEllipse(cx - 13, 18, 8, 5);
+    g.fillEllipse(cx + 13, 15, 7, 4);
+    g.fillEllipse(cx + 14, 36, 6, 4);
+    g.fillStyle(MOSS_HI, 1);
+    g.fillCircle(cx - 11, 17, 1.3);
+    g.fillCircle(cx + 15, 14, 1.3);
+
+    // THREE alien eyes (dark + catch-light).
+    for (const dx of [-10, 0, 10]) {
+      g.fillStyle(EYE, 1);
+      g.fillCircle(cx + dx, 30, 2.8);
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(cx + dx - 1, 29, 1);
     }
 
-    // Body fill — bigger than the slime's 6→14 dome
-    block(11, 5, 6, 1, BODY);
-    block(10, 6, 8, 1, BODY);
-    block(9, 7, 10, 1, BODY);
-    block(8, 8, 12, 1, BODY);
-    for (let y = 9; y <= 14; y++) block(7, y, 14, 1, BODY);
-    block(7, 15, 14, 1, SHADOW);
-    block(6, 16, 16, 1, SHADOW);
+    // Wide angry mouth.
+    g.fillStyle(EYE, 1);
+    g.fillRect(cx - 8, 38, 16, 2.2);
+    g.fillTriangle(cx - 8, 38, cx - 5, 42, cx - 2, 38);
+    g.fillTriangle(cx + 2, 38, cx + 5, 42, cx + 8, 38);
 
-    // Top highlight curve
-    block(12, 6, 4, 1, HI);
-    block(11, 7, 6, 1, HI);
-    block(10, 8, 4, 1, HI);
-    block(9, 9, 3, 1, HI);
-    dot(12, 6, HI_BRIGHT);
-    dot(13, 6, HI_BRIGHT);
-    dot(11, 7, HI_BRIGHT);
-
-    // Heavy moss patches across the dome
-    block(8, 9, 3, 1, MOSS);
-    block(8, 10, 2, 1, MOSS);
-    dot(8, 11, MOSS);
-    dot(10, 9, MOSS_HI);
-    block(15, 8, 3, 1, MOSS);
-    dot(16, 7, MOSS);
-    dot(17, 8, MOSS_HI);
-    block(17, 12, 3, 1, MOSS);
-    dot(18, 13, MOSS_HI);
-    block(11, 13, 4, 1, MOSS);
-    dot(12, 13, MOSS_HI);
-
-    // THREE eyes (alien). Center eye sits between the side ones.
-    block(9, 11, 2, 2, EYE);
-    block(13, 11, 2, 2, EYE);
-    block(17, 11, 2, 2, EYE);
-    dot(9, 11, 0xffffff);
-    dot(13, 11, 0xffffff);
-    dot(17, 11, 0xffffff);
-
-    // Wide angry mouth
-    block(11, 14, 6, 1, EYE);
-    dot(12, 15, EYE);
-    dot(15, 15, EYE);
-
-    // Big drip on the right shoulder
-    dot(20, 17, BODY);
-    dot(20, 18, BODY);
-    dot(20, 19, OUT);
+    // Big drip on the right shoulder.
+    g.fillStyle(OUT, 1);
+    g.fillCircle(cx + 19, baseY + 4, 2.6);
+    g.fillStyle(BODY, 1);
+    g.fillCircle(cx + 19, baseY + 3, 1.6);
 
     g.generateTexture(TextureKeys.BossMossyBehemoth, w, h);
   }
@@ -3616,60 +3167,47 @@ export class PreloadScene extends Phaser.Scene {
     const cy = size / 2;
     g.clear();
 
-    // Halo — three concentric layers, larger and more saturated than the
-    // regular Pixie Dancer's.
-    g.fillStyle(0xff7ac0, 0.14);
+    // FLAT-VECTOR — soft pink halo, flat outlined wing pairs, flat dress +
+    // round head with hair, three-spike gold crown, cute face, star sparkles.
+    g.fillStyle(0xff7ac0, 0.2);
     g.fillCircle(cx, cy, cx);
-    g.fillStyle(0xff7ac0, 0.22);
-    g.fillCircle(cx, cy, cx - 5);
-    g.fillStyle(0xffaad8, 0.32);
-    g.fillCircle(cx, cy, cx - 12);
+    g.fillStyle(0xffaad8, 0.3);
+    g.fillCircle(cx, cy, cx - 10);
 
-    // Wings — two pairs (upper + lower), translucent leaves with outline.
-    const wing = (sx: number, sy: number, mirror: 1 | -1, scale: number): void => {
-      const wW = 16 * scale;
-      const wH = 12 * scale;
-      g.fillStyle(0xffd0e8, 0.55);
-      g.fillEllipse(sx, sy, wW, wH);
-      g.fillStyle(0xffffff, 0.4);
-      g.fillEllipse(sx + mirror * 1, sy - 1, wW * 0.6, wH * 0.6);
+    // Wings — flat translucent leaves with thin outline.
+    const wing = (sx: number, sy: number, wW: number, wH: number, fill: number): void => {
       g.lineStyle(1, 0xa84080, 0.7);
+      g.fillStyle(fill, 0.55);
+      g.fillEllipse(sx, sy, wW, wH);
       g.strokeEllipse(sx, sy, wW, wH);
     };
-    // Upper wings (smaller, behind shoulders)
-    wing(cx - 12, cy - 6, -1, 0.95);
-    wing(cx + 12, cy - 6, 1, 0.95);
-    // Lower wings (larger, behind hips) — yellow translucent leaves
-    g.fillStyle(0xfff8a0, 0.5);
-    g.fillEllipse(cx - 14, cy + 6, 14, 10);
-    g.fillEllipse(cx + 14, cy + 6, 14, 10);
-    g.lineStyle(1, 0xa84080, 0.55);
-    g.strokeEllipse(cx - 14, cy + 6, 14, 10);
-    g.strokeEllipse(cx + 14, cy + 6, 14, 10);
+    wing(cx - 12, cy - 6, 15, 11, 0xffd0e8);
+    wing(cx + 12, cy - 6, 15, 11, 0xffd0e8);
+    wing(cx - 14, cy + 6, 14, 10, 0xfff8a0);
+    wing(cx + 14, cy + 6, 14, 10, 0xfff8a0);
+    g.lineStyle(0, 0, 0);
 
-    // Dress — two-tone (deeper magenta lower, lighter pink upper)
+    // Dress — bold outline + flat fill + one highlight.
     g.fillStyle(0x4d0d22, 1);
     g.fillEllipse(cx, cy + 4, 18, 22);
     g.fillStyle(0xb02468, 1);
-    g.fillEllipse(cx, cy + 6, 15, 18);
+    g.fillEllipse(cx, cy + 5, 15, 18);
     g.fillStyle(0xff5b86, 1);
-    g.fillEllipse(cx, cy + 1, 13, 14);
+    g.fillEllipse(cx, cy + 1, 12, 13);
     g.fillStyle(0xff90a8, 1);
-    g.fillEllipse(cx - 2, cy - 1, 4, 6);
+    g.fillEllipse(cx - 2.5, cy - 1, 3.5, 5);
 
-    // Head (skin + outline + chin shadow)
+    // Head — outline + flat skin.
     g.fillStyle(0x4d0d22, 1);
     g.fillCircle(cx, cy - 10, 7);
     g.fillStyle(0xfde68a, 1);
     g.fillCircle(cx, cy - 10, 5.5);
-    g.fillStyle(0xc89a6c, 1);
-    g.fillRect(cx - 3, cy - 7, 6, 1);
 
-    // Hair tuft (auburn, longer than the Dancer)
+    // Hair tuft (auburn, flat).
     g.fillStyle(0x4a1a08, 1);
     g.fillEllipse(cx, cy - 14, 13, 5);
     g.fillStyle(0xa64a1a, 1);
-    g.fillEllipse(cx, cy - 14, 10, 3);
+    g.fillEllipse(cx, cy - 14.5, 8, 2.4);
 
     // Crown (gold, three-spike)
     const crownY = cy - 18;
@@ -3692,11 +3230,13 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0xffffff, 1);
     g.fillRect(cx, crownY - 4, 1, 1);
 
-    // Eyes
+    // Cute eyes (dot + catch-light) + smile.
     g.fillStyle(0x111111, 1);
-    g.fillRect(cx - 3, cy - 10, 1, 2);
-    g.fillRect(cx + 2, cy - 10, 1, 2);
-    // Smile
+    g.fillCircle(cx - 2.4, cy - 10, 1.2);
+    g.fillCircle(cx + 2.4, cy - 10, 1.2);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillRect(cx - 3, cy - 11, 1, 1);
+    g.fillRect(cx + 2, cy - 11, 1, 1);
     g.fillStyle(0xa83048, 1);
     g.fillRect(cx - 2, cy - 7, 4, 1);
 
@@ -3773,37 +3313,31 @@ export class PreloadScene extends Phaser.Scene {
     leafTip(cx - 19, cy - 8);
     leafTip(cx + 19, cy - 8);
 
-    // Outer dark ring (outline of the disk)
+    // FLAT-VECTOR — bold outline disk + single flat green fill + two clean
+    // wood-grain rings + bright glow core + one highlight + eye pits.
     g.fillStyle(0x041a08, 1);
     g.fillCircle(cx, cy, 22);
-
-    // Dark wood-ring tone
-    g.fillStyle(0x1f4a26, 1);
-    g.fillCircle(cx, cy, 20);
-
-    // Mid green
     g.fillStyle(0x2d6634, 1);
-    g.fillCircle(cx, cy, 17);
-
-    // Concentric ring (slightly lighter) — gives the wood-grain feel
-    g.lineStyle(1, 0x4f8a44, 0.85);
+    g.fillCircle(cx, cy, 19.5);
+    // Two clean concentric rings for the wood-grain read.
+    g.lineStyle(1.5, 0x1f4a26, 1);
     g.strokeCircle(cx, cy, 14);
-    g.strokeCircle(cx, cy, 10);
-    g.strokeCircle(cx, cy, 6);
+    g.strokeCircle(cx, cy, 9);
+    g.lineStyle(0, 0, 0);
 
-    // Bright glow core (uses the standard emerald glow color)
-    g.fillStyle(0x6effa0, 0.85);
-    g.fillCircle(cx, cy, 7);
+    // Single top-left highlight crescent.
+    g.fillStyle(0x4ea656, 0.7);
+    g.fillEllipse(cx - 6, cy - 11, 12, 5);
+
+    // Bright glow core.
+    g.fillStyle(0x6effa0, 0.9);
+    g.fillCircle(cx, cy, 6.5);
     g.fillStyle(0xa8ffd0, 1);
-    g.fillCircle(cx, cy, 4);
+    g.fillCircle(cx, cy, 3.5);
     g.fillStyle(0xffffff, 1);
-    g.fillCircle(cx - 1, cy - 1, 1.6);
+    g.fillCircle(cx - 1, cy - 1, 1.4);
 
-    // Top highlight crescent on the disk
-    g.fillStyle(0x6effa0, 0.45);
-    g.fillEllipse(cx - 6, cy - 12, 14, 6);
-
-    // Two small "eye" pits to read as a face/heart on the trunk
+    // Two eye pits to read as a face on the trunk.
     g.fillStyle(0x041a08, 1);
     g.fillCircle(cx - 8, cy - 4, 1.6);
     g.fillCircle(cx + 8, cy - 4, 1.6);
@@ -3829,38 +3363,28 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Outer glow halo (two layers)
-    g.fillStyle(0x6effa0, 0.2);
-    g.fillEllipse(w / 2, cy, w - 4, h - 4);
-    g.fillStyle(0x6effa0, 0.4);
-    g.fillEllipse(w / 2, cy, w - 12, h - 12);
+    // FLAT-VECTOR — soft halo, bold outline triangle, flat green body, one
+    // ridge highlight, tip glint.
+    g.fillStyle(0x6effa0, 0.22);
+    g.fillEllipse(w / 2, cy, w - 6, h - 6);
 
-    // Outline triangle
+    // Bold outline triangle.
     g.fillStyle(0x041a08, 1);
     g.fillTriangle(baseX - 1, cy - 7, tipX + 1, cy, baseX - 1, cy + 7);
 
-    // Dark base body
-    g.fillStyle(0x0e2a14, 1);
-    g.fillTriangle(baseX, cy - 6, tipX, cy, baseX, cy + 6);
-
-    // Mid-green body
+    // Flat green body.
     g.fillStyle(0x2d6634, 1);
     g.fillTriangle(baseX + 1, cy - 5, tipX - 1, cy, baseX + 1, cy + 5);
 
-    // Bright top ridge highlight
+    // Single bright ridge highlight along the top edge.
     g.fillStyle(0x88ffaa, 1);
-    g.fillTriangle(baseX + 3, cy - 3, tipX - 3, cy - 0.5, tipX - 3, cy + 0.5);
+    g.fillTriangle(baseX + 3, cy - 3, tipX - 4, cy - 0.5, baseX + 4, cy - 0.5);
 
-    // Tip glint (white-hot pixel)
+    // Tip glint.
     g.fillStyle(0xfaffe0, 1);
     g.fillCircle(tipX - 1, cy, 1.6);
     g.fillStyle(0xffffff, 1);
     g.fillRect(tipX - 1, cy - 1, 1, 1);
-
-    // Two small base notches so it reads as a thorn / barb
-    g.fillStyle(0x041a08, 1);
-    g.fillRect(baseX + 4, cy - 5, 1, 1);
-    g.fillRect(baseX + 4, cy + 5, 1, 1);
 
     g.generateTexture(TextureKeys.Thorn, w, h);
   }
@@ -3881,38 +3405,26 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Outer glow halo (two layers, sapphire-cyan)
-    g.fillStyle(0x4ad8ff, 0.2);
-    g.fillEllipse(w / 2, cy, w - 4, h - 4);
-    g.fillStyle(0x4ad8ff, 0.4);
-    g.fillEllipse(w / 2, cy, w - 12, h - 12);
+    // FLAT-VECTOR — soft cyan halo, bold dark outline triangle, single
+    // flat sapphire body, one top-edge highlight + tip glint.
+    g.fillStyle(0x4ad8ff, 0.3);
+    g.fillEllipse(w / 2, cy, w - 8, h - 8);
 
-    // Outline triangle (deep sapphire)
+    // Bold dark outline triangle
     g.fillStyle(0x041a30, 1);
     g.fillTriangle(baseX - 1, cy - 7, tipX + 1, cy, baseX - 1, cy + 7);
 
-    // Dark base body (deep blue)
-    g.fillStyle(0x0e2a5a, 1);
-    g.fillTriangle(baseX, cy - 6, tipX, cy, baseX, cy + 6);
+    // Flat sapphire body
+    g.fillStyle(0x2d6ad0, 1);
+    g.fillTriangle(baseX + 1, cy - 5, tipX - 2, cy, baseX + 1, cy + 5);
 
-    // Mid-blue body
-    g.fillStyle(0x2d5a99, 1);
-    g.fillTriangle(baseX + 1, cy - 5, tipX - 1, cy, baseX + 1, cy + 5);
+    // Single top-edge highlight ridge
+    g.fillStyle(0x9ce4ff, 1);
+    g.fillTriangle(baseX + 3, cy - 3, tipX - 4, cy - 0.5, tipX - 4, cy + 0.5);
 
-    // Bright top ridge highlight (cyan)
-    g.fillStyle(0x88dcff, 1);
-    g.fillTriangle(baseX + 3, cy - 3, tipX - 3, cy - 0.5, tipX - 3, cy + 0.5);
-
-    // Tip glint (white-hot pixel)
-    g.fillStyle(0xe0f4ff, 1);
-    g.fillCircle(tipX - 1, cy, 1.6);
+    // Tip glint
     g.fillStyle(0xffffff, 1);
-    g.fillRect(tipX - 1, cy - 1, 1, 1);
-
-    // Two small base notches (deep sapphire)
-    g.fillStyle(0x041a30, 1);
-    g.fillRect(baseX + 4, cy - 5, 1, 1);
-    g.fillRect(baseX + 4, cy + 5, 1, 1);
+    g.fillCircle(tipX - 1, cy, 1.4);
 
     g.generateTexture(TextureKeys.SapphireThorn, w, h);
   }
@@ -3932,79 +3444,41 @@ export class PreloadScene extends Phaser.Scene {
     const size = 18;
     const HEART_RED = 0xd83a3a;
     const HEART_RED_HI = 0xff8888;
-    const HEART_RED_SHADOW = 0x8a1a1a;
     const HEART_EMPTY = 0x3a2a2a;
     const OUTLINE = 0x180404;
+    const cx = size / 2;
 
-    // 11×10 pixel-art heart on an 18×18 canvas (PX=1, centered).
-    // Mask layout (1 = filled, 0 = empty):
-    //   row 0:   .##...##.   (lobes top)
-    //   row 1:   #####.#####  → uses 11 wide
-    // We design on an 11×10 grid centered at offX=4, offY=3.
-    const PX = 1;
-    const offX = 4;
-    const offY = 3;
-    // Mask split into left half (cols 0-4) and right half (cols 6-10), col 5
-    // is always part of both halves to avoid a center seam.
-    // We'll iterate over each pixel and decide its color based on the mask
-    // and which side it is on.
-    const mask: number[][] = [
-      [0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0],
-      [1, 2, 2, 1, 0, 1, 0, 1, 2, 2, 1],
-      [1, 2, 2, 2, 1, 1, 1, 2, 2, 2, 1],
-      [1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1],
-      [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
-      [0, 1, 2, 2, 2, 2, 2, 2, 2, 1, 0],
-      [0, 0, 1, 2, 2, 2, 2, 2, 1, 0, 0],
-      [0, 0, 0, 1, 2, 2, 2, 1, 0, 0, 0],
-      [0, 0, 0, 0, 1, 2, 1, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-    ];
-    // Highlight pixels (top-left lobe) — overlaid on top of the fill.
-    const highlight: ReadonlyArray<readonly [number, number]> = [
-      [2, 1],
-      [1, 2],
-    ];
-    // Subtle shadow pixels (bottom-right) — overlaid likewise.
-    const shadow: ReadonlyArray<readonly [number, number]> = [
-      [8, 4],
-      [7, 6],
-      [6, 7],
-    ];
+    // FLAT-VECTOR heart — bold outline + flat fill per half + one highlight.
+    // Built from two top lobes (circles) + a bottom triangle so each half can
+    // be filled independently (full / half / empty hearts).
+    const paintHalf = (side: -1 | 1, fill: number): void => {
+      // Lobe (top) — circle on this side.
+      g.fillStyle(fill, 1);
+      g.fillCircle(cx + side * 2.6, 6, 3.6);
+      // Body — a half-rectangle + tapering triangle to the bottom point.
+      if (side === -1) {
+        g.fillRect(cx - 6, 6, 6, 3);
+        g.fillTriangle(cx - 6, 8.5, cx, 8.5, cx, 14.5);
+      } else {
+        g.fillRect(cx, 6, 6, 3);
+        g.fillTriangle(cx + 6, 8.5, cx, 8.5, cx, 14.5);
+      }
+    };
 
     const draw = (leftFill: number, rightFill: number, addHighlight: boolean): void => {
-      for (let y = 0; y < mask.length; y++) {
-        const row = mask[y];
-        for (let x = 0; x < row.length; x++) {
-          const cell = row[x];
-          if (cell === 0) continue;
-          const isLeft = x < 5 || (x === 5 && cell === 1);
-          let color = OUTLINE;
-          if (cell === 2) {
-            color = isLeft ? leftFill : rightFill;
-            // Center column 5 is the divider — fill matches whichever side is
-            // "more lit" so half-hearts stay clean. We treat col 5 as left.
-            if (x === 5) color = leftFill;
-          }
-          this.px(g, x, y, color, PX, offX, offY);
-        }
-      }
+      // Bold outline silhouette behind both halves.
+      g.fillStyle(OUTLINE, 1);
+      g.fillCircle(cx - 2.6, 6, 4.6);
+      g.fillCircle(cx + 2.6, 6, 4.6);
+      g.fillRect(cx - 7, 6, 14, 3);
+      g.fillTriangle(cx - 7, 8, cx + 7, 8, cx, 16);
+      // Flat fill per half.
+      paintHalf(-1, leftFill);
+      paintHalf(1, rightFill);
       if (addHighlight) {
-        for (const [hx, hy] of highlight) {
-          this.px(g, hx, hy, HEART_RED_HI, PX, offX, offY);
-        }
-        for (const [sx, sy] of shadow) {
-          // Only paint shadow if the pixel under it is filled (non-empty fill).
-          const row = mask[sy];
-          const cell = row?.[sx];
-          if (cell === 2) {
-            const isLeft = sx < 5;
-            const fill = isLeft ? leftFill : rightFill;
-            if (fill !== HEART_EMPTY) {
-              this.px(g, sx, sy, HEART_RED_SHADOW, PX, offX, offY);
-            }
-          }
-        }
+        // Single highlight on the upper-left lobe.
+        g.fillStyle(HEART_RED_HI, 1);
+        g.fillCircle(cx - 3, 5, 1.4);
       }
     };
 
@@ -4037,36 +3511,23 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Drop shadow
+    // FLAT-VECTOR — drop shadow, bold outline ring, flat gold body, one
+    // highlight + a tiny star + sparkle.
     this.groundShadow(g, cx, h - 2, 4, 1.2, 0.45);
-
-    // Outline ring
     g.fillStyle(0x4a3008, 1);
     g.fillCircle(cx, cy - 1, 6);
-
-    // Main gold body
-    g.fillStyle(0xc89a1a, 1);
-    g.fillCircle(cx, cy - 1, 5);
-
-    // Brighter gold top half (light from top)
     g.fillStyle(0xffd84a, 1);
-    g.fillCircle(cx - 0.5, cy - 1.5, 4);
-
-    // Inner star pixel — small bright cross + center
+    g.fillCircle(cx, cy - 1, 4.8);
+    // Single highlight (top-left).
     g.fillStyle(0xfff8c0, 1);
-    g.fillRect(cx - 1, cy - 1, 1, 1);
-    g.fillRect(cx, cy - 1, 1, 1);
-    g.fillRect(cx - 1, cy - 2, 1, 1);
-    g.fillRect(cx, cy, 1, 1);
-
-    // Specular sparkle (top-left)
+    g.fillCircle(cx - 1.5, cy - 2.5, 1.6);
+    // Tiny center star.
+    g.fillStyle(0xc89a1a, 1);
+    g.fillRect(cx - 1.5, cy - 1, 3, 1);
+    g.fillRect(cx - 0.5, cy - 2.5, 1, 4);
+    // Specular sparkle.
     g.fillStyle(0xffffff, 1);
     g.fillRect(cx - 2, cy - 4, 1, 1);
-    g.fillRect(cx - 3, cy - 3, 1, 1);
-
-    // Outline rim accent (darker bottom)
-    g.fillStyle(0x6a4012, 1);
-    g.fillRect(cx - 1, cy + 3, 3, 1);
 
     g.generateTexture(TextureKeys.Coin, w, h);
   }
@@ -4086,50 +3547,40 @@ export class PreloadScene extends Phaser.Scene {
 
     g.clear();
 
-    // Drop shadow
+    // FLAT-VECTOR — bold outline + flat gold body. Round bow + shaft + teeth.
     this.groundShadow(g, w / 2, h - 2, 5, 1, 0.4);
 
     const OUT = 0x4a3008;
     const GOLD = 0xffd84a;
     const GOLD_HI = 0xfff0a0;
-    const GOLD_SHADOW = 0xc89a1a;
 
-    // Bow outline (head circle)
+    // Bow (head ring) — outline + gold + dark hole.
     const bowCx = 4;
     const bowCy = 6;
     g.fillStyle(OUT, 1);
     g.fillCircle(bowCx, bowCy, 4);
-    // Bow body (gold ring around dark center)
     g.fillStyle(GOLD, 1);
     g.fillCircle(bowCx, bowCy, 3);
     g.fillStyle(0x2a1a04, 1);
-    g.fillCircle(bowCx, bowCy, 1.5);
-    // Bow highlight
+    g.fillCircle(bowCx, bowCy, 1.4);
     g.fillStyle(GOLD_HI, 1);
     g.fillRect(bowCx - 2, bowCy - 2, 1, 1);
 
-    // Shaft (horizontal bar from bow to right edge)
+    // Shaft — outline + flat gold + highlight stripe.
     g.fillStyle(OUT, 1);
-    g.fillRect(7, 5, 9, 3);
+    g.fillRect(7, 5, 9, 4);
     g.fillStyle(GOLD, 1);
-    g.fillRect(7, 6, 9, 1);
-    g.fillStyle(GOLD_SHADOW, 1);
-    g.fillRect(7, 7, 9, 1);
-    // Shaft highlight stripe
+    g.fillRect(7, 6, 9, 2);
     g.fillStyle(GOLD_HI, 1);
     g.fillRect(8, 6, 6, 1);
 
-    // Teeth — two rectangular notches hanging off the bottom of the shaft
+    // Teeth.
     g.fillStyle(OUT, 1);
     g.fillRect(12, 8, 2, 3);
     g.fillRect(15, 8, 2, 3);
     g.fillStyle(GOLD, 1);
     g.fillRect(12, 8, 1, 2);
     g.fillRect(15, 8, 1, 2);
-
-    // Tip cap on the far right
-    g.fillStyle(GOLD_HI, 1);
-    g.fillRect(15, 5, 1, 1);
 
     g.generateTexture(TextureKeys.Key, w, h);
   }
@@ -4158,47 +3609,31 @@ export class PreloadScene extends Phaser.Scene {
     const WOOD_HI = 0xb27038;
     const IRON = 0x1a1208;
 
-    const bx = 2; // body left
-    const by = 4; // body top
-    const bw = w - 4; // body width
-    const bh = h - 6; // body height
+    const bx = 2;
+    const by = 4;
+    const bw = w - 4;
+    const bh = h - 6;
 
-    // Outline rectangle
+    // FLAT-VECTOR — bold outline box + flat wood fill + one top highlight +
+    // clean plank seams + iron corner fittings.
     g.fillStyle(OUT, 1);
-    g.fillRect(bx, by, bw, bh);
-
-    // Inner body (mid wood tone)
+    g.fillRoundedRect(bx, by, bw, bh, 2);
     g.fillStyle(WOOD, 1);
-    g.fillRect(bx + 1, by + 1, bw - 2, bh - 2);
-
-    // Top highlight band — light coming from the top
+    g.fillRoundedRect(bx + 1.5, by + 1.5, bw - 3, bh - 3, 1.5);
     g.fillStyle(WOOD_HI, 1);
-    g.fillRect(bx + 1, by + 1, bw - 2, 2);
+    g.fillRect(bx + 2, by + 2, bw - 4, 2);
 
-    // Bottom shadow band
+    // Clean plank seams.
     g.fillStyle(WOOD_DARK, 1);
-    g.fillRect(bx + 1, by + bh - 3, bw - 2, 2);
+    g.fillRect(bx + 7, by + 2, 1.5, bh - 4);
+    g.fillRect(bx + 13, by + 2, 1.5, bh - 4);
 
-    // Vertical plank seams (dark thin lines so it reads as boards)
-    g.fillStyle(WOOD_DARK, 1);
-    g.fillRect(bx + 5, by + 1, 1, bh - 2);
-    g.fillRect(bx + 10, by + 1, 1, bh - 2);
-    g.fillRect(bx + 14, by + 1, 1, bh - 2);
-
-    // Iron corner fittings — small dark squares
+    // Iron corner fittings.
     g.fillStyle(IRON, 1);
-    // Top-left
-    g.fillRect(bx + 1, by + 1, 2, 2);
-    // Top-right
-    g.fillRect(bx + bw - 3, by + 1, 2, 2);
-    // Bottom-left
-    g.fillRect(bx + 1, by + bh - 3, 2, 2);
-    // Bottom-right
-    g.fillRect(bx + bw - 3, by + bh - 3, 2, 2);
-
-    // Center seam pin (small dark dot in the middle for visual interest)
-    g.fillStyle(IRON, 1);
-    g.fillRect(bx + Math.floor(bw / 2) - 1, by + Math.floor(bh / 2) - 1, 2, 2);
+    g.fillRect(bx + 1.5, by + 1.5, 2.5, 2.5);
+    g.fillRect(bx + bw - 4, by + 1.5, 2.5, 2.5);
+    g.fillRect(bx + 1.5, by + bh - 4, 2.5, 2.5);
+    g.fillRect(bx + bw - 4, by + bh - 4, 2.5, 2.5);
 
     g.generateTexture(TextureKeys.BrownCrate, w, h);
   }
@@ -4223,7 +3658,6 @@ export class PreloadScene extends Phaser.Scene {
     this.groundShadow(g, w / 2, h - 2, 9, 1.5, 0.4);
 
     const OUT = 0x3a2810;
-    const GOLD_DARK = 0xc89a1a;
     const GOLD = 0xffd84a;
     const GOLD_HI = 0xfff0a0;
     const FITTING = 0x6a4a14;
@@ -4234,41 +3668,28 @@ export class PreloadScene extends Phaser.Scene {
     const bw = w - 4;
     const bh = h - 6;
 
-    // Outline
+    // FLAT-VECTOR — bold outline box + flat gold fill + one top highlight +
+    // ornament corner fittings + keyhole.
     g.fillStyle(OUT, 1);
-    g.fillRect(bx, by, bw, bh);
-
-    // Body (mid gold)
+    g.fillRoundedRect(bx, by, bw, bh, 2);
     g.fillStyle(GOLD, 1);
-    g.fillRect(bx + 1, by + 1, bw - 2, bh - 2);
-
-    // Top highlight band
+    g.fillRoundedRect(bx + 1.5, by + 1.5, bw - 3, bh - 3, 1.5);
     g.fillStyle(GOLD_HI, 1);
-    g.fillRect(bx + 1, by + 1, bw - 2, 2);
+    g.fillRect(bx + 2, by + 2, bw - 4, 2);
 
-    // Bottom shadow band
-    g.fillStyle(GOLD_DARK, 1);
-    g.fillRect(bx + 1, by + bh - 3, bw - 2, 2);
-
-    // Iron-style corner fittings, tinted dark gold so they read as ornament
-    // instead of black blots on a gold body.
+    // Corner fittings.
     g.fillStyle(FITTING, 1);
-    g.fillRect(bx + 1, by + 1, 2, 2);
-    g.fillRect(bx + bw - 3, by + 1, 2, 2);
-    g.fillRect(bx + 1, by + bh - 3, 2, 2);
-    g.fillRect(bx + bw - 3, by + bh - 3, 2, 2);
+    g.fillRect(bx + 1.5, by + 1.5, 2.5, 2.5);
+    g.fillRect(bx + bw - 4, by + 1.5, 2.5, 2.5);
+    g.fillRect(bx + 1.5, by + bh - 4, 2.5, 2.5);
+    g.fillRect(bx + bw - 4, by + bh - 4, 2.5, 2.5);
 
-    // Keyhole — small dark oval in the middle. Drawn as one wider block + a
-    // narrow tail under it to suggest a teardrop key shape.
+    // Keyhole — circle + tail.
     const kx = bx + Math.floor(bw / 2);
     const ky = by + Math.floor(bh / 2);
     g.fillStyle(KEYHOLE, 1);
-    g.fillRect(kx - 1, ky - 2, 3, 3);
-    g.fillRect(kx, ky + 1, 1, 2);
-
-    // Subtle highlight pixel on the top-left of the body for that polished feel.
-    g.fillStyle(GOLD_HI, 1);
-    g.fillRect(bx + 2, by + 2, 1, 1);
+    g.fillCircle(kx, ky - 1, 1.6);
+    g.fillRect(kx - 0.5, ky, 1.5, 3);
 
     g.generateTexture(TextureKeys.GoldCrate, w, h);
   }
@@ -4382,37 +3803,22 @@ export class PreloadScene extends Phaser.Scene {
     this.groundShadow(g, cx, h - 2, 11, 2, 0.5);
 
     const OUT = 0x141416;
-    const STONE_SHADOW = 0x2c2e34;
     const STONE = 0x4a4d56;
-    const STONE_HI = 0x707380;
     const TOP_HI = 0x9aa0b0;
 
-    // Base block (wider trapezoid feel)
+    // FLAT-VECTOR — bold outline + flat stone fill + one highlight strip.
     g.fillStyle(OUT, 1);
-    g.fillRect(2, 7, w - 4, 8);
-    g.fillStyle(STONE_SHADOW, 1);
-    g.fillRect(3, 8, w - 6, 6);
+    g.fillRoundedRect(2, 7, w - 4, 8, 1.5);
     g.fillStyle(STONE, 1);
-    g.fillRect(3, 8, w - 6, 4);
-    // Side highlights
-    g.fillStyle(STONE_HI, 1);
-    g.fillRect(3, 8, 1, 5);
-    g.fillStyle(OUT, 1);
-    g.fillRect(w - 4, 8, 1, 6);
+    g.fillRect(3.5, 8, w - 7, 5.5);
 
-    // Upper platform (slightly narrower, lighter — the altar top)
+    // Upper platform (altar top).
     g.fillStyle(OUT, 1);
-    g.fillRect(5, 3, w - 10, 5);
+    g.fillRoundedRect(5, 3, w - 10, 5, 1.5);
     g.fillStyle(STONE, 1);
     g.fillRect(6, 4, w - 12, 3);
-    g.fillStyle(STONE_HI, 1);
-    g.fillRect(6, 4, w - 12, 1);
     g.fillStyle(TOP_HI, 1);
     g.fillRect(7, 4, w - 14, 1);
-
-    // Front lip line
-    g.fillStyle(OUT, 1);
-    g.fillRect(5, 7, w - 10, 1);
 
     g.generateTexture(TextureKeys.ItemPedestal, w, h);
   }
@@ -4761,34 +4167,24 @@ export class PreloadScene extends Phaser.Scene {
     const HEART = 0xe0274a;
     const HEART_HI = 0xff7a90;
     const GLOW = 0xffd84a;
+    const cx = 7;
 
-    // Soft halo
-    g.fillStyle(GLOW, 0.18);
+    // FLAT-VECTOR — soft gold halo, bold outline heart + single flat ruby
+    // fill + one highlight.
+    g.fillStyle(GLOW, 0.2);
     g.fillCircle(7, 7, 6);
-
-    // Heart body — two top lobes + tapered bottom
     g.fillStyle(OUT, 1);
-    g.fillRect(3, 3, 4, 1);
-    g.fillRect(7, 3, 4, 1);
-    g.fillRect(2, 4, 10, 1);
-    g.fillRect(2, 5, 10, 3);
-    g.fillRect(3, 8, 8, 1);
-    g.fillRect(4, 9, 6, 1);
-    g.fillRect(5, 10, 4, 1);
-    g.fillRect(6, 11, 2, 1);
-
+    g.fillCircle(cx - 2.6, 5, 3.6);
+    g.fillCircle(cx + 2.6, 5, 3.6);
+    g.fillRect(cx - 5.5, 5, 11, 2.5);
+    g.fillTriangle(cx - 5.5, 6.5, cx + 5.5, 6.5, cx, 13);
     g.fillStyle(HEART, 1);
-    g.fillRect(3, 4, 3, 1);
-    g.fillRect(8, 4, 3, 1);
-    g.fillRect(3, 5, 8, 3);
-    g.fillRect(4, 8, 6, 1);
-    g.fillRect(5, 9, 4, 1);
-    g.fillRect(6, 10, 2, 1);
-
-    // Highlight specular
+    g.fillCircle(cx - 2.4, 5, 2.6);
+    g.fillCircle(cx + 2.4, 5, 2.6);
+    g.fillRect(cx - 4.4, 5, 9, 2);
+    g.fillTriangle(cx - 4.4, 6.5, cx + 4.4, 6.5, cx, 11.5);
     g.fillStyle(HEART_HI, 1);
-    g.fillRect(4, 5, 2, 1);
-    g.fillRect(8, 5, 1, 1);
+    g.fillCircle(cx - 3, 4, 1.2);
 
     g.generateTexture(TextureKeys.ItemHeartContainer, w, h);
   }
@@ -4849,35 +4245,28 @@ export class PreloadScene extends Phaser.Scene {
     const SHELL_HI = 0xa07840;
     const CORE = 0xff7a48;
     const CORE_HI = 0xfff8c0;
+    const cx = 7;
 
-    // Heart body (same shape as Heart Container, different palette)
+    // FLAT-VECTOR — bold outline heart + single flat shell fill + one
+    // highlight + a glowing core.
     g.fillStyle(OUT, 1);
-    g.fillRect(3, 3, 4, 1);
-    g.fillRect(7, 3, 4, 1);
-    g.fillRect(2, 4, 10, 1);
-    g.fillRect(2, 5, 10, 3);
-    g.fillRect(3, 8, 8, 1);
-    g.fillRect(4, 9, 6, 1);
-    g.fillRect(5, 10, 4, 1);
-    g.fillRect(6, 11, 2, 1);
-
+    g.fillCircle(cx - 2.4, 5, 3.4);
+    g.fillCircle(cx + 2.4, 5, 3.4);
+    g.fillRect(cx - 5, 5, 10, 2.5);
+    g.fillTriangle(cx - 5, 6.5, cx + 5, 6.5, cx, 12.5);
     g.fillStyle(SHELL, 1);
-    g.fillRect(3, 4, 3, 1);
-    g.fillRect(8, 4, 3, 1);
-    g.fillRect(3, 5, 8, 3);
-    g.fillRect(4, 8, 6, 1);
-    g.fillRect(5, 9, 4, 1);
-    g.fillRect(6, 10, 2, 1);
-
+    g.fillCircle(cx - 2.2, 5, 2.4);
+    g.fillCircle(cx + 2.2, 5, 2.4);
+    g.fillRect(cx - 4, 5, 8, 2);
+    g.fillTriangle(cx - 4, 6.5, cx + 4, 6.5, cx, 11);
     g.fillStyle(SHELL_HI, 1);
-    g.fillRect(3, 5, 1, 2);
-    g.fillRect(9, 5, 1, 2);
+    g.fillCircle(cx - 3, 4, 1);
 
-    // Glowing core in the middle
+    // Glowing core.
     g.fillStyle(CORE, 1);
-    g.fillRect(6, 6, 2, 2);
+    g.fillCircle(cx, 6, 1.6);
     g.fillStyle(CORE_HI, 1);
-    g.fillRect(6, 6, 1, 1);
+    g.fillRect(cx - 1, 5.5, 1, 1);
 
     g.generateTexture(TextureKeys.ItemAncientHeart, w, h);
   }
@@ -5255,43 +4644,36 @@ export class PreloadScene extends Phaser.Scene {
     const SPARK = 0xd0a8ff;
     const VEIN = 0xffb060;
 
-    // Heart silhouette outline (two upper lobes + V-bottom)
+    // FLAT-VECTOR — bold heart outline, single flat stone fill, one top-left
+    // highlight facet, gold vein, sparkle.
     g.fillStyle(OUT, 1);
     g.fillCircle(cx - 2, 5, 3);
     g.fillCircle(cx + 2, 5, 3);
     g.fillRect(cx - 4, 5, 8, 4);
     g.fillTriangle(cx - 4, 7, cx + 4, 7, cx, 12);
 
-    // Mid stone fill (slightly inset)
-    g.fillStyle(STONE_DARK, 1);
+    // Single flat stone body (inset).
+    g.fillStyle(STONE, 1);
     g.fillCircle(cx - 2, 5, 2.4);
     g.fillCircle(cx + 2, 5, 2.4);
     g.fillRect(cx - 3, 5, 6, 3);
     g.fillTriangle(cx - 3, 7, cx + 3, 7, cx, 11);
 
-    g.fillStyle(STONE, 1);
-    g.fillCircle(cx - 2, 5, 1.8);
-    g.fillCircle(cx + 2, 5, 1.8);
-    g.fillRect(cx - 2, 5, 4, 2);
-    g.fillTriangle(cx - 2, 7, cx + 2, 7, cx, 10);
-
-    // Faceted highlight (left lobe brighter than right — directional light)
-    g.fillStyle(STONE_MID, 1);
-    g.fillRect(cx - 3, 4, 2, 2);
-    g.fillRect(cx - 1, 7, 2, 2);
+    // Single top-left highlight facet.
     g.fillStyle(STONE_HI, 1);
-    g.fillRect(cx - 3, 4, 1, 1);
-    g.fillRect(cx - 1, 7, 1, 1);
+    g.fillCircle(cx - 2, 4, 1.4);
 
-    // Gold vein crack (single thin diagonal — keeps the "obsidian with gold
-    // inlay" gothic vibe without overpowering the silhouette)
+    void STONE_DARK;
+    void STONE_MID;
+
+    // Gold vein crack (single thin diagonal — gothic "obsidian + gold inlay").
     g.fillStyle(VEIN, 1);
     g.fillRect(cx + 1, 6, 1, 1);
     g.fillRect(cx + 2, 7, 1, 1);
 
-    // Sparkle pixel
+    // Sparkle pixel.
     g.fillStyle(SPARK, 1);
-    g.fillRect(cx - 2, 4, 1, 1);
+    g.fillRect(cx - 3, 4, 1, 1);
 
     g.generateTexture(TextureKeys.ItemObsidianHeart, w, h);
   }
@@ -5307,35 +4689,24 @@ export class PreloadScene extends Phaser.Scene {
     const cx = w / 2;
     g.clear();
     const OUT = 0x102838;
-    const SHARD_DARK = 0x4a8aa8;
     const SHARD = 0x80c8e0;
     const SHARD_HI = 0xc8f0ff;
     const SPARK = 0xffffff;
 
-    // Outline (vertical shard, slightly tilted right at the tip)
+    // FLAT-VECTOR — bold outline shard + single flat fill + one edge
+    // highlight + sparkle.
     g.fillStyle(OUT, 1);
     g.fillTriangle(cx, 1, cx - 3, 9, cx + 3, 9);
     g.fillTriangle(cx - 3, 9, cx + 3, 9, cx + 1, 13);
-
-    // Mid fill
-    g.fillStyle(SHARD_DARK, 1);
-    g.fillTriangle(cx, 2, cx - 2, 9, cx + 2, 9);
-    g.fillTriangle(cx - 2, 9, cx + 2, 9, cx + 1, 12);
-
-    // Front facet
     g.fillStyle(SHARD, 1);
-    g.fillTriangle(cx, 3, cx - 1, 8, cx + 2, 8);
-    g.fillTriangle(cx - 1, 8, cx + 2, 8, cx + 1, 11);
-
-    // Bright highlight strip (left edge of the front facet)
+    g.fillTriangle(cx, 3, cx - 2, 8.5, cx + 2, 8.5);
+    g.fillTriangle(cx - 2, 8.5, cx + 2, 8.5, cx + 1, 11.5);
+    // Single left-edge highlight.
     g.fillStyle(SHARD_HI, 1);
-    g.fillRect(cx - 1, 4, 1, 4);
-    g.fillRect(cx, 8, 1, 2);
-
-    // Sparkle pixels
+    g.fillRect(cx - 1, 4, 1, 5);
+    // Sparkle.
     g.fillStyle(SPARK, 1);
     g.fillRect(cx + 1, 5, 1, 1);
-    g.fillRect(cx - 2, 11, 1, 1);
 
     g.generateTexture(TextureKeys.ItemMagicShard, w, h);
   }
@@ -5406,38 +4777,33 @@ export class PreloadScene extends Phaser.Scene {
     const cx = w / 2;
     g.clear();
     const OUT = 0x300800;
-    const EMBER_DARK = 0xa02810;
     const EMBER = 0xff5020;
     const FLAME = 0xff8030;
     const FLAME_HI = 0xfff060;
     const CORE = 0xffffd0;
 
-    // Orb body — solid sphere centered at (cx, 9)
+    // FLAT-VECTOR — soft glow, bold outline orb + single flat ember fill +
+    // one core highlight + three flat flame tongues.
+    g.fillStyle(EMBER, 0.22);
+    g.fillCircle(cx, 9, 6);
     g.fillStyle(OUT, 1);
     g.fillCircle(cx, 9, 4);
-    g.fillStyle(EMBER_DARK, 1);
-    g.fillCircle(cx, 9, 3.2);
     g.fillStyle(EMBER, 1);
-    g.fillCircle(cx, 9, 2.4);
-    g.fillStyle(FLAME, 1);
-    g.fillCircle(cx - 1, 8, 1.4);
+    g.fillCircle(cx, 9, 3);
     g.fillStyle(CORE, 1);
-    g.fillRect(cx - 1, 8, 1, 1);
+    g.fillCircle(cx - 1, 8, 1.1);
 
-    // Three flame tongues licking upward (tall central + short left/right)
+    // Three flat flame tongues (outline + fill).
     g.fillStyle(OUT, 1);
-    g.fillTriangle(cx - 1, 5, cx + 1, 5, cx, 1);
-    g.fillTriangle(cx - 3, 6, cx - 1, 6, cx - 2, 3);
-    g.fillTriangle(cx + 1, 6, cx + 3, 6, cx + 2, 3);
-
+    g.fillTriangle(cx - 1.5, 5, cx + 1.5, 5, cx, 0.5);
+    g.fillTriangle(cx - 3.5, 6, cx - 1, 6, cx - 2.2, 2.5);
+    g.fillTriangle(cx + 1, 6, cx + 3.5, 6, cx + 2.2, 2.5);
     g.fillStyle(FLAME, 1);
     g.fillTriangle(cx - 1, 5, cx + 1, 5, cx, 2);
+    g.fillTriangle(cx - 3, 6, cx - 1.2, 6, cx - 2.1, 3.4);
+    g.fillTriangle(cx + 1.2, 6, cx + 3, 6, cx + 2.1, 3.4);
     g.fillStyle(FLAME_HI, 1);
-    g.fillRect(cx, 3, 1, 2);
-
-    g.fillStyle(EMBER, 1);
-    g.fillTriangle(cx - 3, 6, cx - 1, 6, cx - 2, 4);
-    g.fillTriangle(cx + 1, 6, cx + 3, 6, cx + 2, 4);
+    g.fillRect(cx - 0.5, 3, 1, 2);
 
     g.generateTexture(TextureKeys.ItemFireOrb, w, h);
   }
@@ -5667,36 +5033,27 @@ export class PreloadScene extends Phaser.Scene {
     g.clear();
 
     const OUT = 0x1a1028;
-    const STONE_DARK = 0x504468;
     const STONE = 0x8878a8;
     const STONE_HI = 0xc0b0e0;
-    const GOLD_DARK = 0xb08818;
     const GOLD = 0xffd84a;
     const SPARKLE = 0xffffff;
 
-    // Soft gold halo — sells "arcane conversion engine"
-    g.fillStyle(GOLD, 0.1);
+    // FLAT-VECTOR — soft gold halo, bold outline + single flat stone fill +
+    // one top-left highlight + molten gold core + sparkle.
+    g.fillStyle(GOLD, 0.12);
     g.fillCircle(7, 7, 6.5);
-
-    // Stone body, 4-tone
     g.fillStyle(OUT, 1);
     g.fillCircle(7, 7, 5.5);
-    g.fillStyle(STONE_DARK, 1);
-    g.fillCircle(7, 7, 4.6);
     g.fillStyle(STONE, 1);
-    g.fillCircle(6.5, 6.5, 3.5);
-    // Facet highlight, top-left
+    g.fillCircle(7, 7, 4.3);
     g.fillStyle(STONE_HI, 1);
-    g.fillRect(5, 4, 2, 1);
-    g.fillRect(4, 5, 1, 2);
+    g.fillCircle(5.2, 5.2, 1.4);
 
-    // Molten gold core
-    g.fillStyle(GOLD_DARK, 1);
-    g.fillCircle(7, 7, 1.9);
+    // Molten gold core.
     g.fillStyle(GOLD, 1);
-    g.fillCircle(7, 7, 1.2);
+    g.fillCircle(7, 7, 1.6);
 
-    // Sparkle pixel off the rim
+    // Sparkle.
     g.fillStyle(SPARKLE, 1);
     g.fillRect(10, 3, 1, 1);
 
@@ -5810,32 +5167,22 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(4, 15, 1, 1);
     g.fillRect(13, 15, 1, 1);
     g.fillRect(5, 16, 8, 1);
-    // Body fill (mid)
+    // FLAT-VECTOR — single flat body fill + two clean step-facet lines + one
+    // top-left highlight facet + sparkle. Reads as an emerald-cut stone.
     g.fillStyle(mid, 1);
     g.fillRect(5, 3, 8, 13);
     g.fillRect(4, 4, 1, 11);
     g.fillRect(13, 4, 1, 11);
-    // Step facets — horizontal lines splitting the body into rows
+    // Two clean step-facet lines.
     g.fillStyle(dark, 1);
     g.fillRect(4, 6, 10, 1);
     g.fillRect(4, 12, 10, 1);
-    // Right-side darker facet (key light from top-left)
-    g.fillStyle(dark, 1);
-    g.fillRect(11, 4, 2, 11);
-    g.fillRect(13, 5, 1, 9);
-    // Top-left highlight facet
+    // Single top-left highlight facet.
     g.fillStyle(hi, 1);
-    g.fillRect(5, 4, 5, 1);
-    g.fillRect(5, 5, 1, 1);
-    g.fillRect(4, 5, 1, 1);
-    // Inner table highlight band
-    g.fillStyle(hi, 1);
-    g.fillRect(6, 8, 4, 1);
-    g.fillRect(6, 11, 3, 1);
-    // Sparkle pixel
+    g.fillRect(5, 4, 4, 2);
+    // Sparkle pixel.
     g.fillStyle(0xffffff, 1);
     g.fillRect(6, 4, 1, 1);
-    g.fillRect(7, 7, 1, 1);
   }
 
   /**
@@ -5867,7 +5214,8 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(6, 14, 1, 1);
     g.fillRect(11, 14, 1, 1);
     g.fillRect(7, 15, 4, 1);
-    // Body fill (mid)
+    // FLAT-VECTOR — single flat body fill + a clean table-octagon facet line
+    // + one top-left highlight facet + sparkle. Reads as a round-brilliant.
     g.fillStyle(mid, 1);
     g.fillRect(6, 2, 6, 1);
     g.fillRect(4, 3, 10, 1);
@@ -5876,36 +5224,16 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(5, 10, 8, 2);
     g.fillRect(6, 12, 6, 2);
     g.fillRect(7, 14, 4, 1);
-    // Crown facets (radial dark lines from center to edges)
+    // Clean facet table ring (dark girdle line + lower facet line).
     g.fillStyle(dark, 1);
-    // Star facets (4 spokes)
-    g.fillRect(8, 5, 2, 5); // vertical (subtle)
-    // Diagonals
-    g.fillRect(5, 5, 1, 1);
-    g.fillRect(6, 6, 1, 1);
-    g.fillRect(7, 7, 1, 1);
-    g.fillRect(12, 5, 1, 1);
-    g.fillRect(11, 6, 1, 1);
-    g.fillRect(10, 7, 1, 1);
-    g.fillRect(5, 12, 1, 1);
-    g.fillRect(6, 11, 1, 1);
-    g.fillRect(7, 10, 1, 1);
-    g.fillRect(12, 12, 1, 1);
-    g.fillRect(11, 11, 1, 1);
-    g.fillRect(10, 10, 1, 1);
-    // Right-side darker shadow
-    g.fillRect(12, 6, 2, 4);
-    g.fillRect(11, 9, 1, 1);
-    // Highlight crown facets (top-left)
+    g.fillRect(5, 8, 8, 1);
+    g.fillRect(6, 11, 6, 1);
+    // Single top-left highlight facet.
     g.fillStyle(hi, 1);
-    g.fillRect(5, 3, 4, 1);
-    g.fillRect(4, 4, 3, 1);
-    g.fillRect(4, 5, 1, 1);
-    g.fillRect(8, 8, 2, 1);
-    // Sparkle pixels
+    g.fillRect(5, 4, 4, 2);
+    // Sparkle pixel.
     g.fillStyle(0xffffff, 1);
-    g.fillRect(5, 4, 1, 1);
-    g.fillRect(8, 8, 1, 1);
+    g.fillRect(6, 5, 1, 1);
   }
 
   /**
@@ -5944,7 +5272,8 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(7, 15, 1, 1);
     g.fillRect(10, 15, 1, 1);
     g.fillRect(8, 16, 2, 1);
-    // Body fill (mid)
+    // FLAT-VECTOR — single flat body fill + one central facet spine + two
+    // clean side-facet lines + one top highlight + sparkle. Marquise read.
     g.fillStyle(mid, 1);
     g.fillRect(8, 2, 2, 1);
     g.fillRect(7, 3, 4, 1);
@@ -5955,31 +5284,16 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(6, 12, 6, 2);
     g.fillRect(7, 14, 4, 1);
     g.fillRect(8, 15, 2, 1);
-    // Central facet spine — vertical highlight
+    // Two clean side-facet lines (dark) framing the spine.
+    g.fillStyle(dark, 1);
+    g.fillRect(5, 8, 8, 1);
+    g.fillRect(6, 11, 6, 1);
+    // Central facet spine — vertical highlight.
     g.fillStyle(hi, 1);
     g.fillRect(8, 3, 1, 12);
-    g.fillRect(9, 7, 1, 4);
-    // Side facets — diagonal lines from spine to edge
-    g.fillStyle(dark, 1);
-    g.fillRect(9, 3, 2, 1);
-    g.fillRect(10, 4, 2, 1);
-    g.fillRect(11, 5, 1, 1);
-    g.fillRect(12, 6, 1, 1);
-    g.fillRect(13, 7, 1, 1);
-    g.fillRect(13, 8, 1, 2);
-    g.fillRect(12, 10, 1, 1);
-    g.fillRect(11, 11, 1, 1);
-    g.fillRect(10, 12, 1, 1);
-    g.fillRect(9, 13, 1, 1);
-    g.fillRect(9, 14, 1, 1);
-    // Bright table — small bright section at center
-    g.fillStyle(hi, 1);
-    g.fillRect(8, 8, 1, 1);
-    g.fillRect(7, 9, 1, 1);
-    // Sparkle pixels
+    // Sparkle pixel.
     g.fillStyle(0xffffff, 1);
-    g.fillRect(8, 4, 1, 1);
-    g.fillRect(8, 8, 1, 1);
+    g.fillRect(8, 5, 1, 1);
   }
 
   /**
@@ -6014,31 +5328,36 @@ export class PreloadScene extends Phaser.Scene {
 
     this.groundShadow(g, cx, cy + 18, 14, 5, 0.4);
 
-    // Tattered robe — wispy bottom, broader middle
-    g.fillStyle(0x180a28, 1);
-    g.fillTriangle(cx - 14, cy + 14, cx + 14, cy + 14, cx, cy - 14);
-    g.fillStyle(0x261438, 1);
-    g.fillTriangle(cx - 16, cy + 16, cx - 4, cy + 4, cx - 10, cy);
-    g.fillTriangle(cx + 16, cy + 16, cx + 4, cy + 4, cx + 10, cy);
-    // Tattered fringe pixels along the bottom hem
-    g.fillStyle(0x180a28, 1);
+    // FLAT-VECTOR — ghostly hooded robe: bold dark outline, one flat body
+    // tone, single top highlight, tattered hem, glowing eyes + catch-light.
+    // Outline silhouette (robe triangle + hood as one form).
+    g.fillStyle(0x0a0418, 1);
+    g.fillTriangle(cx - 15, cy + 15, cx + 15, cy + 15, cx, cy - 16);
+    g.fillEllipse(cx, cy - 10, 24, 22);
+    // Flat body fill.
+    g.fillStyle(0x3a1f58, 1);
+    g.fillTriangle(cx - 12, cy + 13, cx + 12, cy + 13, cx, cy - 13);
+    g.fillEllipse(cx, cy - 10, 20, 18);
+    // Single soft highlight on the hood (top-left).
+    g.fillStyle(0x5a3a82, 1);
+    g.fillEllipse(cx - 5, cy - 14, 5, 6);
+    // Tattered fringe pixels along the bottom hem.
+    g.fillStyle(0x0a0418, 1);
     for (let i = -12; i <= 12; i += 4) {
-      g.fillRect(cx + i, cy + 14, 2, 4);
+      g.fillRect(cx + i, cy + 12, 2, 4);
     }
 
-    // Hood — outline + interior shadow
-    g.fillStyle(0x0a0418, 1);
-    g.fillEllipse(cx, cy - 10, 22, 20);
-    g.fillStyle(0x180a28, 1);
-    g.fillEllipse(cx, cy - 10, 18, 16);
+    // Hood interior shadow (face void).
+    g.fillStyle(0x05020c, 1);
+    g.fillEllipse(cx, cy - 9, 13, 13);
 
-    // Glowing red eyes
+    // Glowing red eyes + catch-light.
     g.fillStyle(0xff5577, 1);
-    g.fillRect(cx - 4, cy - 11, 2, 2);
-    g.fillRect(cx + 2, cy - 11, 2, 2);
+    g.fillCircle(cx - 3.5, cy - 10, 1.6);
+    g.fillCircle(cx + 3.5, cy - 10, 1.6);
     g.fillStyle(0xffaad8, 1);
     g.fillRect(cx - 4, cy - 11, 1, 1);
-    g.fillRect(cx + 2, cy - 11, 1, 1);
+    g.fillRect(cx + 3, cy - 11, 1, 1);
 
     g.generateTexture(TextureKeys.Wraith, size, size);
   }
@@ -6066,59 +5385,55 @@ export class PreloadScene extends Phaser.Scene {
 
     this.groundShadow(g, cx, cy + 24, 20, 6, 0.45);
 
-    const CLOAK_DARK = 0x14361c;
-    const CLOAK = 0x215a2c;
-    const CLOAK_HI = 0x3c8a44;
-    const SKIN = 0x6a4a2c;
-    const SKIN_HI = 0x8a6438;
-    const ANTLER = 0xcfe8c0;
+    const OUT = 0x061a0c; // bold near-black moss outline
+    const CLOAK = 0x2a7236; // brighter flat moss (popped vs old 0x215a2c)
+    const CLOAK_HI = 0x58b85a;
+    const SKIN = 0x7a5430;
+    const SKIN_HI = 0xa87a3e;
+    const ANTLER = 0xd8f0c8;
     const GLOW = 0x9effb0;
 
-    // Layered moss cloak — broad bell hem narrowing to the shoulders.
-    g.fillStyle(CLOAK_DARK, 1);
-    g.fillPoints(
-      [
-        { x: cx - 16, y: cy + 22 },
-        { x: cx - 11, y: cy + 2 },
-        { x: cx - 7, y: cy - 12 },
-        { x: cx + 7, y: cy - 12 },
-        { x: cx + 11, y: cy + 2 },
-        { x: cx + 16, y: cy + 22 },
-      ],
-      true,
-    );
+    // FLAT-VECTOR (bolder pass) — moss cloak as a flat fill with an explicit
+    // thick stroked outline, flat hem fringe + seam, bark face with one
+    // highlight + big cute glowing eyes, bold antler crown + glow scepter.
+    const cloak = [
+      { x: cx - 15, y: cy + 22 },
+      { x: cx - 10, y: cy + 2 },
+      { x: cx - 6, y: cy - 11 },
+      { x: cx + 6, y: cy - 11 },
+      { x: cx + 10, y: cy + 2 },
+      { x: cx + 15, y: cy + 22 },
+    ];
     g.fillStyle(CLOAK, 1);
-    g.fillPoints(
-      [
-        { x: cx - 12, y: cy + 20 },
-        { x: cx - 8, y: cy + 1 },
-        { x: cx - 5, y: cy - 10 },
-        { x: cx + 5, y: cy - 10 },
-        { x: cx + 8, y: cy + 1 },
-        { x: cx + 12, y: cy + 20 },
-      ],
-      true,
-    );
-    // Ragged moss fringe along the hem.
+    g.fillPoints(cloak, true);
+    g.lineStyle(2.5, OUT, 1);
+    g.strokePoints(cloak, true);
+    // Flat ragged moss fringe along the hem.
     g.fillStyle(CLOAK_HI, 1);
     for (let i = -2; i <= 2; i++) {
-      g.fillTriangle(cx + i * 6, cy + 20, cx + i * 6 - 3, cy + 14, cx + i * 6 + 3, cy + 14);
+      g.fillTriangle(cx + i * 6, cy + 21, cx + i * 6 - 3, cy + 15, cx + i * 6 + 3, cy + 15);
     }
-    // Centre seam highlight.
-    g.fillStyle(CLOAK_HI, 0.7);
+    // Single centre seam highlight.
+    g.fillStyle(CLOAK_HI, 0.6);
     g.fillRect(cx - 1, cy - 8, 2, 26);
 
-    // Bark-skinned face hollow under the antlers.
+    // Bark-skinned face hollow — flat skin + thick outline + one highlight.
     g.fillStyle(SKIN, 1);
-    g.fillEllipse(cx, cy - 15, 11, 13);
+    g.fillEllipse(cx, cy - 15, 12, 14);
+    g.lineStyle(2.2, OUT, 1);
+    g.strokeEllipse(cx, cy - 15, 12, 14);
     g.fillStyle(SKIN_HI, 1);
-    g.fillEllipse(cx - 3, cy - 17, 4, 6);
+    g.fillEllipse(cx - 3, cy - 18, 3, 4);
+    // Big cute glowing eyes (dot + bright catch-light).
     g.fillStyle(GLOW, 1);
-    g.fillRect(cx - 4, cy - 15, 2, 2);
-    g.fillRect(cx + 2, cy - 15, 2, 2);
+    g.fillCircle(cx - 3.5, cy - 15, 2.2);
+    g.fillCircle(cx + 3.5, cy - 15, 2.2);
+    g.fillStyle(0xffffff, 0.95);
+    g.fillCircle(cx - 4.2, cy - 15.8, 0.9);
+    g.fillCircle(cx + 2.8, cy - 15.8, 0.9);
 
-    // Wide antler crown — two branching racks.
-    g.lineStyle(2, ANTLER, 1);
+    // Wide antler crown — two branching racks (bolder strokes).
+    g.lineStyle(3, ANTLER, 1);
     for (const dir of [-1, 1]) {
       g.beginPath();
       g.moveTo(cx + dir * 3, cy - 22);
@@ -6131,13 +5446,13 @@ export class PreloadScene extends Phaser.Scene {
       g.strokePath();
     }
     g.fillStyle(GLOW, 0.9);
-    g.fillCircle(cx - 16, cy - 26, 1.5);
-    g.fillCircle(cx + 16, cy - 26, 1.5);
-    g.fillCircle(cx - 12, cy - 32, 1.5);
-    g.fillCircle(cx + 12, cy - 32, 1.5);
+    g.fillCircle(cx - 16, cy - 26, 1.6);
+    g.fillCircle(cx + 16, cy - 26, 1.6);
+    g.fillCircle(cx - 12, cy - 32, 1.6);
+    g.fillCircle(cx + 12, cy - 32, 1.6);
 
-    // Forest scepter with a glow tip.
-    g.lineStyle(2, SKIN, 1);
+    // Forest scepter with a glow tip (bolder shaft).
+    g.lineStyle(3, SKIN, 1);
     g.beginPath();
     g.moveTo(cx + 13, cy - 6);
     g.lineTo(cx + 16, cy + 18);
@@ -6145,7 +5460,7 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(GLOW, 0.35);
     g.fillCircle(cx + 13, cy - 8, 6);
     g.fillStyle(GLOW, 1);
-    g.fillCircle(cx + 13, cy - 8, 3);
+    g.fillCircle(cx + 13, cy - 8, 3.2);
 
     g.generateTexture(TextureKeys.MinibossThornwoodShambler, size, size);
   }
@@ -6166,71 +5481,66 @@ export class PreloadScene extends Phaser.Scene {
 
     this.groundShadow(g, cx, cy + 22, 20, 6, 0.45);
 
-    const ROBE_DARK = 0x0d2438;
-    const ROBE = 0x1c4a66;
-    const ROBE_HI = 0x2d6a88;
-    const SKIN = 0x6a8a78;
+    const OUT = 0x06141f; // bold near-black sapphire outline
+    const ROBE = 0x265d80; // brighter flat robe (popped vs old 0x1c4a66)
+    const ROBE_HI = 0x3f86a8;
+    const SKIN = 0x7a9c86;
     const GLOW = 0x8ef0ff;
     const STAFF = 0x2a1d14;
 
-    // Hunched robe — bent-over bell weighted to one side.
-    g.fillStyle(ROBE_DARK, 1);
-    g.fillPoints(
-      [
-        { x: cx - 14, y: cy + 22 },
-        { x: cx - 13, y: cy + 2 },
-        { x: cx - 9, y: cy - 14 },
-        { x: cx + 3, y: cy - 18 },
-        { x: cx + 10, y: cy - 8 },
-        { x: cx + 13, y: cy + 6 },
-        { x: cx + 12, y: cy + 22 },
-      ],
-      true,
-    );
+    // FLAT-VECTOR (bolder pass) — hunched robe as a flat fill with an explicit
+    // thick stroked outline; hood with a big cute glinting eye; bolder staff +
+    // brighter will-o-wisp lantern.
+    const robe = [
+      { x: cx - 14, y: cy + 22 },
+      { x: cx - 13, y: cy + 2 },
+      { x: cx - 9, y: cy - 14 },
+      { x: cx + 3, y: cy - 18 },
+      { x: cx + 10, y: cy - 8 },
+      { x: cx + 13, y: cy + 6 },
+      { x: cx + 12, y: cy + 22 },
+    ];
     g.fillStyle(ROBE, 1);
-    g.fillPoints(
-      [
-        { x: cx - 10, y: cy + 20 },
-        { x: cx - 9, y: cy + 1 },
-        { x: cx - 5, y: cy - 12 },
-        { x: cx + 2, y: cy - 15 },
-        { x: cx + 7, y: cy - 7 },
-        { x: cx + 9, y: cy + 5 },
-        { x: cx + 8, y: cy + 20 },
-      ],
-      true,
-    );
-    g.fillStyle(ROBE_HI, 0.7);
+    g.fillPoints(robe, true);
+    g.lineStyle(2.5, OUT, 1);
+    g.strokePoints(robe, true);
+    g.fillStyle(ROBE_HI, 0.75);
     g.fillEllipse(cx - 4, cy + 4, 5, 16);
 
-    // Hood + shadowed face with a single glinting eye.
-    g.fillStyle(ROBE_DARK, 1);
-    g.fillEllipse(cx - 2, cy - 16, 13, 12);
+    // Hood + shadowed face with a single big glinting eye.
+    g.fillStyle(0x123246, 1);
+    g.fillEllipse(cx - 2, cy - 16, 14, 13);
+    g.lineStyle(2.2, OUT, 1);
+    g.strokeEllipse(cx - 2, cy - 16, 14, 13);
     g.fillStyle(0x05121c, 1);
     g.fillEllipse(cx - 2, cy - 15, 8, 8);
     g.fillStyle(GLOW, 1);
-    g.fillRect(cx - 5, cy - 16, 2, 2);
+    g.fillCircle(cx - 4, cy - 15, 2);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillCircle(cx - 4.6, cy - 15.7, 0.8);
     // Crooked bony nose poking out.
     g.fillStyle(SKIN, 1);
     g.fillTriangle(cx + 3, cy - 16, cx + 9, cy - 13, cx + 3, cy - 11);
 
-    // Crooked staff + raised will-o-wisp lantern.
-    g.lineStyle(2, STAFF, 1);
+    // Crooked staff + raised will-o-wisp lantern (bolder shaft).
+    g.lineStyle(3, STAFF, 1);
     g.beginPath();
     g.moveTo(cx + 15, cy - 18);
     g.lineTo(cx + 13, cy - 2);
     g.lineTo(cx + 15, cy + 18);
     g.strokePath();
     g.fillStyle(GLOW, 0.32);
-    g.fillCircle(cx + 15, cy - 21, 7);
+    g.fillCircle(cx + 15, cy - 21, 8);
     g.fillStyle(GLOW, 1);
-    g.fillCircle(cx + 15, cy - 21, 3.5);
-    g.fillStyle(0xffffff, 0.9);
-    g.fillCircle(cx + 14, cy - 22, 1);
+    g.fillCircle(cx + 15, cy - 21, 4);
+    g.fillStyle(0xffffff, 0.95);
+    g.fillCircle(cx + 14, cy - 22, 1.2);
 
     // Bony reaching hand at the hem.
     g.fillStyle(SKIN, 1);
-    g.fillCircle(cx - 13, cy + 2, 2.5);
+    g.fillCircle(cx - 13, cy + 2, 2.6);
+    g.lineStyle(1.5, OUT, 1);
+    g.strokeCircle(cx - 13, cy + 2, 2.6);
 
     g.generateTexture(TextureKeys.MinibossMireLurker, size, size);
   }
@@ -6247,11 +5557,13 @@ export class PreloadScene extends Phaser.Scene {
 
     this.groundShadow(g, cx, cy + 18, 18, 6, 0.45);
 
-    // Skull base — small, staring upward
-    g.fillStyle(0x261438, 1);
-    g.fillEllipse(cx, cy + 14, 18, 10);
-    g.fillStyle(0xe0d0c0, 1);
+    // Skull base — small, staring upward (bolder outline)
+    g.fillStyle(0x1a0e24, 1);
+    g.fillEllipse(cx, cy + 14, 19, 11);
+    g.fillStyle(0xe8d8c8, 1);
     g.fillEllipse(cx, cy + 12, 14, 10);
+    g.lineStyle(2, 0x1a0e24, 1);
+    g.strokeEllipse(cx, cy + 12, 14, 10);
     g.fillStyle(0x040208, 1);
     g.fillRect(cx - 4, cy + 10, 2, 2);
     g.fillRect(cx + 2, cy + 10, 2, 2);
@@ -6318,13 +5630,15 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0x8a5a18, 1);
     g.fillRect(cx - 8, cy + 14, 16, 1);
 
-    // Frame — gilt oval
-    g.fillStyle(0x402030, 1);
-    g.fillEllipse(cx, cy - 4, 26, 32);
+    // Frame — gilt oval with a bold dark outer rim (bolder pass)
+    g.fillStyle(0x120a1e, 1);
+    g.fillEllipse(cx, cy - 4, 28, 34);
     g.fillStyle(0x8a5a18, 1);
     g.fillEllipse(cx, cy - 4, 23, 29);
+    g.lineStyle(2, 0x120a1e, 1);
+    g.strokeEllipse(cx, cy - 4, 25, 31);
     g.lineStyle(1, 0xffd84a, 1);
-    g.strokeEllipse(cx, cy - 4, 23, 29);
+    g.strokeEllipse(cx, cy - 4, 22, 28);
 
     // Mirror surface — dark with amethyst sheen
     g.fillStyle(0x0a0410, 1);
@@ -6357,20 +5671,18 @@ export class PreloadScene extends Phaser.Scene {
     g.clear();
     const c = size / 2;
 
-    // Outer halo
+    // FLAT-VECTOR — soft halo, bold dark outline ring, flat body, one
+    // top-left highlight + catch-light.
     g.fillStyle(0xc864ff, 0.32);
     g.fillCircle(c, c, 7);
-    // Mid glow
-    g.fillStyle(0xc864ff, 0.85);
-    g.fillCircle(c, c, 4.5);
-    // Bright core
-    g.fillStyle(0xff64ff, 1);
-    g.fillCircle(c, c, 3);
-    // Highlight + sparkle
-    g.fillStyle(0xffaaff, 1);
-    g.fillRect(c - 2, c - 2, 2, 1);
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(c - 1, c - 1, 1, 1);
+    g.fillStyle(0x2a0840, 1);
+    g.fillCircle(c, c, 5);
+    g.fillStyle(0xc864ff, 1);
+    g.fillCircle(c, c, 3.6);
+    g.fillStyle(0xff9aff, 1);
+    g.fillCircle(c - 1, c - 1, 1.4);
+    g.fillStyle(0xffffff, 0.95);
+    g.fillCircle(c - 1.6, c - 1.6, 0.8);
 
     g.generateTexture(TextureKeys.MansionMissile, size, size);
   }
@@ -6390,15 +5702,18 @@ export class PreloadScene extends Phaser.Scene {
     const size = 16;
     g.clear();
     const c = size / 2;
+    // FLAT-VECTOR — soft halo, bold dark outline ring, flat body, one
+    // top-left highlight.
     g.fillStyle(halo, 0.32);
     g.fillCircle(c, c, 7);
-    g.fillStyle(mid, 0.85);
-    g.fillCircle(c, c, 4.5);
+    g.fillStyle(this.shadeColor(mid, -0.55), 1);
+    g.fillCircle(c, c, 5);
+    g.fillStyle(mid, 1);
+    g.fillCircle(c, c, 3.6);
     g.fillStyle(core, 1);
-    g.fillCircle(c, c, 3);
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(c - 2, c - 2, 2, 1);
-    g.fillRect(c - 1, c - 1, 1, 1);
+    g.fillCircle(c - 0.6, c - 0.6, 2);
+    g.fillStyle(0xffffff, 0.95);
+    g.fillCircle(c - 1.4, c - 1.4, 0.9);
     g.generateTexture(key, size, size);
   }
 
@@ -6412,20 +5727,18 @@ export class PreloadScene extends Phaser.Scene {
     g.clear();
     const c = size / 2;
 
-    // Outer halo
+    // FLAT-VECTOR — soft halo, bold dark ember ring, flat orange body,
+    // bright yellow core + catch-light.
     g.fillStyle(0xff7a30, 0.32);
     g.fillCircle(c, c, 7);
-    // Mid orange
-    g.fillStyle(0xff7a30, 0.95);
-    g.fillCircle(c, c, 4.5);
-    // Yellow core
+    g.fillStyle(0x401004, 1);
+    g.fillCircle(c, c, 5);
+    g.fillStyle(0xff7a30, 1);
+    g.fillCircle(c, c, 3.8);
     g.fillStyle(0xffd84a, 1);
-    g.fillCircle(c, c, 3);
-    // Hot center
+    g.fillCircle(c - 0.4, c - 0.4, 2.2);
     g.fillStyle(0xfff8a0, 1);
-    g.fillRect(c - 2, c - 2, 2, 1);
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(c - 1, c - 1, 1, 1);
+    g.fillCircle(c - 1.4, c - 1.4, 0.9);
 
     g.generateTexture(TextureKeys.FlameMissile, size, size);
   }
@@ -6440,21 +5753,16 @@ export class PreloadScene extends Phaser.Scene {
     g.clear();
     const c = size / 2;
 
-    // Dark outer ring (wax pool)
+    // FLAT-VECTOR — bold dark wax-pool ring, flat orange body, bright
+    // yellow core + single catch-light.
     g.fillStyle(0x180a08, 1);
     g.fillEllipse(c, c, 24, 20);
-    // Mid orange flame body
-    g.fillStyle(0xff7a30, 0.95);
+    g.fillStyle(0xff7a30, 1);
     g.fillEllipse(c, c, 18, 14);
-    // Bright yellow core
     g.fillStyle(0xffd84a, 1);
-    g.fillEllipse(c, c, 12, 9);
-    // Hot center
+    g.fillEllipse(c, c, 11, 8);
     g.fillStyle(0xfff8a0, 1);
-    g.fillEllipse(c - 1, c - 1, 5, 4);
-    // Sparkle
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(c - 2, c - 2, 1, 1);
+    g.fillEllipse(c - 2, c - 2, 5, 3.5);
 
     g.generateTexture(TextureKeys.WaxPuddle, size, size);
   }
@@ -6875,28 +6183,45 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(TRIM, 1);
     g.fillRect(cx - 3, 41, 9, 1);
 
-    // 4) HEAD — slight right-of-center, leaning forward.
+    // 4) HEAD — GAUNT + ANGULAR with a pointed vampire chin (NOT a round
+    // ball), slight right-of-center, leaning forward.
+    const hx = cx + 1;
+    const headPts: Array<{ x: number; y: number }> = [
+      { x: hx - 4, y: 8 },   // temple left
+      { x: hx + 4, y: 8 },   // temple right
+      { x: hx + 5, y: 11 },  // cheekbone right
+      { x: hx + 2, y: 14 },  // jaw right
+      { x: hx, y: 16 },      // pointed chin
+      { x: hx - 2, y: 14 },  // jaw left
+      { x: hx - 5, y: 11 },  // cheekbone left
+    ];
     g.fillStyle(SKIN_OUT, 1);
-    g.fillCircle(cx + 1, 11, 5.2);
+    g.fillPoints(headPts, true);
     g.fillStyle(SKIN, 1);
-    g.fillCircle(cx + 1, 11, 4.2);
+    g.fillPoints(
+      headPts.map((p) => ({ x: p.x, y: p.y - 0.4 })),
+      true,
+    );
     g.fillStyle(SKIN_HI, 1);
-    g.fillRect(cx, 9, 1, 1);
-    // Slicked-back hair.
+    g.fillRect(hx - 1, 9, 1, 1);
+    // Slicked-back hair with a widow's peak.
     g.fillStyle(HAIR, 1);
-    g.fillEllipse(cx + 1, 7, 11, 4);
-    g.fillTriangle(cx, 7, cx + 2, 7, cx + 1, 10);
-    // Single red eye + scarred left eye (vampire-mage signature).
+    g.fillEllipse(hx, 7, 11, 4);
+    g.fillTriangle(hx - 2, 8, hx + 2, 8, hx, 11); // widow's peak point
+    // Single glowing RED eye + scar over the other (vampire-mage signature).
     g.fillStyle(0x080000, 1);
-    g.fillRect(cx - 2, 11, 2, 1);
-    g.fillRect(cx + 2, 11, 2, 1);
+    g.fillRect(hx - 3, 11, 2, 1);
     g.fillStyle(EYE, 1);
-    g.fillRect(cx + 2, 11, 2, 1);
+    g.fillRect(hx + 2, 11, 2, 1);
+    g.fillStyle(0xffaab0, 1);
+    g.fillRect(hx + 2, 11, 1, 1);
     g.fillStyle(SCAR, 1);
-    g.fillRect(cx - 3, 10, 1, 3);
-    // Thin lips.
+    g.fillRect(hx - 4, 10, 1, 3);
+    // Thin lips + a tiny white fang.
     g.fillStyle(0x080000, 1);
-    g.fillRect(cx, 13, 3, 1);
+    g.fillRect(hx - 1, 13, 3, 1);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(hx, 14, 1, 1);
 
     // 5) RIGHT ARM extended forward + slightly upward (presenting pose).
     g.fillStyle(OUT, 1);
@@ -7096,20 +6421,18 @@ export class PreloadScene extends Phaser.Scene {
     g.clear();
     const c = size / 2;
 
-    // Outer halo
+    // FLAT-VECTOR — soft halo, bold dark blood ring, flat crimson body,
+    // pink catch-light.
     g.fillStyle(0xc8284a, 0.32);
     g.fillCircle(c, c, 7);
-    // Mid red
-    g.fillStyle(0xa01030, 0.95);
-    g.fillCircle(c, c, 4.5);
-    // Bright crimson core
-    g.fillStyle(0xff4060, 1);
-    g.fillCircle(c, c, 3);
-    // Pink highlight + white sparkle
-    g.fillStyle(0xffa0b0, 1);
-    g.fillRect(c - 2, c - 2, 2, 1);
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(c - 1, c - 1, 1, 1);
+    g.fillStyle(0x340410, 1);
+    g.fillCircle(c, c, 5);
+    g.fillStyle(0xe02040, 1);
+    g.fillCircle(c, c, 3.8);
+    g.fillStyle(0xff7088, 1);
+    g.fillCircle(c - 1, c - 1, 1.4);
+    g.fillStyle(0xffffff, 0.95);
+    g.fillCircle(c - 1.6, c - 1.6, 0.8);
 
     g.generateTexture(TextureKeys.BloodProjectile, size, size);
   }
@@ -7258,9 +6581,20 @@ export class PreloadScene extends Phaser.Scene {
       g.fillTriangle(tx - 1, baseY + 1, tx + 1, baseY + 1, tx + tipBias, tipY - 1);
     }
 
-    // 7) Hood void — pure black ellipse where the face would be
+    // 7) Hood void — SMALL POINTED/peaked cowl (teardrop, taller than wide),
+    //    NOT a round ball. Peak at top, narrowing chin-void at the bottom.
     g.fillStyle(OUT, 1);
-    g.fillEllipse(cx, 14, 16, 14);
+    g.fillPoints(
+      [
+        { x: cx, y: 2 },        // peaked top of the cowl
+        { x: cx + 6, y: 9 },    // right shoulder of the cowl
+        { x: cx + 5, y: 17 },   // right cheek narrowing
+        { x: cx, y: 22 },       // pointed chin-void
+        { x: cx - 5, y: 17 },   // left cheek narrowing
+        { x: cx - 6, y: 9 },    // left shoulder of the cowl
+      ],
+      true,
+    );
 
     // 8) Trinity eyes — three vertical amethyst pinpoints deep in the
     //    hood shadow. One per consumed floor gem (Emerald / Sapphire /

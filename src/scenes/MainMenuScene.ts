@@ -56,14 +56,6 @@ export class MainMenuScene extends Phaser.Scene {
     this.menuFocusIndex = 0;
     this.menuItems = [];
 
-    // Dev-only: [K] opens the StyleMockupScene (variant mockup pages).
-    // Was [M] historically — that key now belongs to the title-music hint.
-    if (import.meta.env.DEV) {
-      this.input.keyboard?.on('keydown-K', () => {
-        this.scene.start(SceneKeys.StyleMockup);
-      });
-    }
-
     // 1) Sky + ground backdrop ------------------------------------------------
     const bg = this.add.graphics();
     this.paintBackdrop(bg);

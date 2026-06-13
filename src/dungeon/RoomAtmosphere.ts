@@ -127,21 +127,22 @@ export class RoomAtmosphere {
     palette: StylePalette,
     rng: RNG,
   ): void {
+    // FLAT-VECTOR floor patches: a flat blob with a thin darker outline ring
+    // + one highlight, instead of a 3-tone painterly smear. Fewer + subtler.
     const g = scene.add.graphics().setDepth(2);
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 20; i++) {
       const px = x + rng.intBetween(20, w - 20);
       const py = y + rng.intBetween(20, h - 20);
-      const size = rng.intBetween(8, 18);
-      g.fillStyle(palette.patch[0], 0.85);
-      g.fillEllipse(px, py, size * 1.6, size);
+      const size = rng.intBetween(9, 16);
+      // Outline ring (darkest patch tone, slightly larger).
+      g.fillStyle(palette.patch[0], 0.55);
+      g.fillEllipse(px, py, size * 1.7 + 3, size + 3);
+      // Flat fill (mid tone).
       g.fillStyle(palette.patch[1], 0.85);
-      g.fillEllipse(px - 2, py - 1, size * 1.2, size * 0.75);
-      g.fillStyle(palette.patch[2], 0.55);
-      g.fillEllipse(px - 1, py - 2, size * 0.55, size * 0.32);
-      if (rng.chance(0.35)) {
-        g.fillStyle(0xffffff, 0.85);
-        g.fillRect(px - 1, py - 2, 1, 1);
-      }
+      g.fillEllipse(px, py, size * 1.6, size);
+      // Single highlight (bright tone).
+      g.fillStyle(palette.patch[2], 0.7);
+      g.fillEllipse(px - size * 0.35, py - size * 0.28, size * 0.5, size * 0.3);
     }
     this.graphics.push(g);
   }
@@ -221,37 +222,30 @@ export class RoomAtmosphere {
     w: number,
     gap: DoorGap | null,
   ): void {
-    fillRectGapped(g, 0, 0, w, 32, gap, 0x040a0a);
-    g.fillStyle(0x081210, 1);
-    for (let x = 0; x < w; x += 14) {
+    // FLAT-VECTOR forest top band: solid dark wall + a cartoon canopy of
+    // rounded leaf clumps (outline → flat fill → single highlight) that
+    // overhangs the wall line. No painterly multi-tone noise.
+    fillRectGapped(g, 0, 0, w, 32, gap, 0x0c1c12);
+    const step = 30;
+    // Dark outline pass (larger + slightly lower so it reads as a 2px rim).
+    g.fillStyle(0x081610, 1);
+    for (let x = -6; x < w + step; x += step) {
       if (inGap(x, gap)) continue;
-      const th = 14 + ((x * 7919) % 18);
-      g.fillTriangle(x - 3, 32, x + 11, 32, x + 4, 32 - th);
+      g.fillCircle(x, 36, 17);
+      g.fillCircle(x + 15, 33, 13);
     }
-    g.fillStyle(0x0a1a18, 1);
-    for (let x = -10; x < w + 10; x += 26) {
+    // Flat foliage fill.
+    g.fillStyle(0x2f5a32, 1);
+    for (let x = -6; x < w + step; x += step) {
       if (inGap(x, gap)) continue;
-      const fh = 26 + ((x * 4421) % 18);
-      g.fillCircle(x + 8, 32 + fh * 0.15, fh * 0.55);
-      g.fillCircle(x - 2, 32 + fh * 0.05, fh * 0.45);
-      g.fillCircle(x + 18, 32 + fh * 0.08, fh * 0.5);
+      g.fillCircle(x, 34, 15);
+      g.fillCircle(x + 15, 31, 11);
     }
-    g.fillStyle(0x14361a, 1);
-    for (let x = 4; x < w; x += 32) {
+    // One soft highlight per clump (top-left).
+    g.fillStyle(0x4ea656, 0.9);
+    for (let x = -6; x < w + step; x += step) {
       if (inGap(x, gap)) continue;
-      const fh = 22 + ((x * 5147) % 14);
-      g.fillCircle(x + 6, 32 + fh * 0.25, fh * 0.4);
-      g.fillCircle(x + 18, 32 + fh * 0.18, fh * 0.36);
-    }
-    g.fillStyle(0x2d6634, 0.85);
-    for (let x = 6; x < w; x += 40) {
-      if (inGap(x, gap)) continue;
-      g.fillEllipse(x + 8, 50, 14, 6);
-    }
-    g.fillStyle(0x4ea656, 0.7);
-    for (let x = 8; x < w; x += 56) {
-      if (inGap(x, gap)) continue;
-      g.fillEllipse(x + 4, 44, 7, 2);
+      g.fillEllipse(x - 4, 28, 7, 3);
     }
   }
 
@@ -261,22 +255,24 @@ export class RoomAtmosphere {
     h: number,
     gap: DoorGap | null,
   ): void {
-    fillRectGapped(g, 0, h - 64, w, 8, gap, 0x040a0a);
-    fillRectGapped(g, 0, h - 56, w, 56, gap, 0x0e2a14);
-    g.fillStyle(0x14361a, 1);
-    for (let x = 0; x < w; x += 22) {
+    // FLAT-VECTOR forest bottom band: solid dark wall + bold top edge +
+    // a flat moss shelf of rounded bumps.
+    fillRectGapped(g, 0, h - 64, w, 64, gap, 0x0c1c12);
+    fillRectGapped(g, 0, h - 64, w, 3, gap, 0x081610);
+    g.fillStyle(0x1f4a26, 1);
+    for (let x = -4; x < w; x += 26) {
       if (inGap(x, gap)) continue;
-      g.fillEllipse(x + 11, h - 54, 22, 10);
+      g.fillEllipse(x + 13, h - 58, 18, 9);
     }
-    g.fillStyle(0x2d6634, 1);
-    for (let x = 0; x < w; x += 28) {
+    g.fillStyle(0x2f5a32, 1);
+    for (let x = -4; x < w; x += 26) {
       if (inGap(x, gap)) continue;
-      g.fillEllipse(x + 12, h - 55, 14, 5);
+      g.fillEllipse(x + 13, h - 60, 12, 5);
     }
     g.fillStyle(0x4ea656, 0.9);
-    for (let x = 0; x < w; x += 36) {
+    for (let x = -4; x < w; x += 40) {
       if (inGap(x, gap)) continue;
-      g.fillEllipse(x + 14, h - 56, 6, 2);
+      g.fillEllipse(x + 13, h - 61, 5, 2);
     }
   }
 
@@ -287,29 +283,29 @@ export class RoomAtmosphere {
     leftGap: DoorGap | null,
     rightGap: DoorGap | null,
   ): void {
+    // FLAT-VECTOR forest side bands: solid dark bark pillar + bold inner
+    // edge + one highlight strip + flat moss bumps on the inner edge.
     for (const side of ['left', 'right'] as const) {
       const sx = side === 'left' ? 0 : w - 64;
       const gap = side === 'left' ? leftGap : rightGap;
-      // Outer outline
-      fillRectVertGapped(g, sx, 32, 64, h - 96, gap, 0x040a0a);
-      fillRectVertGapped(g, sx + 4, 32, 56, h - 96, gap, 0x1a1208);
-      // Highlight strip on inner edge
-      const hiX = side === 'left' ? sx + 56 : sx + 4;
-      fillRectVertGapped(g, hiX, 34, 4, h - 100, gap, 0x3a2a14);
-      // Bark grooves
-      g.fillStyle(0x0a0604, 0.7);
-      for (let gy = 38; gy < h - 60; gy += 18) {
+      fillRectVertGapped(g, sx, 32, 64, h - 96, gap, 0x0c1c12);
+      // Bold inner-edge outline (the edge facing the room).
+      const edgeX = side === 'left' ? sx + 61 : sx;
+      fillRectVertGapped(g, edgeX, 32, 3, h - 96, gap, 0x081610);
+      // Single highlight strip.
+      const hiX = side === 'left' ? sx + 10 : sx + 50;
+      fillRectVertGapped(g, hiX, 36, 4, h - 104, gap, 0x1c3a22);
+      // Flat moss bumps along the inner edge.
+      const mossX = side === 'left' ? sx + 57 : sx + 7;
+      g.fillStyle(0x2f5a32, 1);
+      for (let gy = 46; gy < h - 64; gy += 24) {
         if (inGap(gy, gap)) continue;
-        g.fillRect(sx + (side === 'left' ? 14 : 24), gy, 1, 12);
-        g.fillRect(sx + (side === 'left' ? 30 : 38), gy + 8, 1, 10);
+        g.fillEllipse(mossX, gy, 7, 10);
       }
-      // Inner-edge moss strip
-      const mossX = side === 'left' ? sx + 60 : sx + 4;
-      fillRectVertGapped(g, mossX, 32, 4, h - 96, gap, 0x14361a);
-      g.fillStyle(0x2d6634, 0.9);
-      for (let gy = 40; gy < h - 60; gy += 12) {
+      g.fillStyle(0x4ea656, 0.8);
+      for (let gy = 46; gy < h - 64; gy += 24) {
         if (inGap(gy, gap)) continue;
-        g.fillEllipse(mossX + 2, gy + 4, 5, 3);
+        g.fillEllipse(mossX, gy - 2, 2.5, 3);
       }
     }
   }
