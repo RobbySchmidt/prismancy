@@ -3230,15 +3230,25 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0xffffff, 1);
     g.fillRect(cx, crownY - 4, 1, 1);
 
-    // Cute eyes (dot + catch-light) + smile.
+    // Cute eyes (bigger + soft catch-light), rosy cheeks + a friendly
+    // upturned smile — the old straight-line mouth read as grim/grumpy.
     g.fillStyle(0x111111, 1);
-    g.fillCircle(cx - 2.4, cy - 10, 1.2);
-    g.fillCircle(cx + 2.4, cy - 10, 1.2);
-    g.fillStyle(0xffffff, 0.9);
-    g.fillRect(cx - 3, cy - 11, 1, 1);
-    g.fillRect(cx + 2, cy - 11, 1, 1);
+    g.fillCircle(cx - 2.4, cy - 10, 1.5);
+    g.fillCircle(cx + 2.4, cy - 10, 1.5);
+    g.fillStyle(0xffffff, 0.95);
+    g.fillCircle(cx - 2.9, cy - 10.6, 0.7);
+    g.fillCircle(cx + 1.9, cy - 10.6, 0.7);
+    // Rosy cheeks.
+    g.fillStyle(0xff9ab0, 0.5);
+    g.fillCircle(cx - 3.6, cy - 8.2, 1.2);
+    g.fillCircle(cx + 3.6, cy - 8.2, 1.2);
+    // Friendly smile (corners up, middle low = U-curve).
     g.fillStyle(0xa83048, 1);
-    g.fillRect(cx - 2, cy - 7, 4, 1);
+    g.fillRect(cx - 2, cy - 7, 1, 1);
+    g.fillRect(cx - 1, cy - 6, 1, 1);
+    g.fillRect(cx, cy - 6, 1, 1);
+    g.fillRect(cx + 1, cy - 6, 1, 1);
+    g.fillRect(cx + 2, cy - 7, 1, 1);
 
     // Star sparkles around the silhouette (cross-shaped 5-pixel stars)
     const star = (sx: number, sy: number, color: number): void => {
@@ -6105,7 +6115,6 @@ export class PreloadScene extends Phaser.Scene {
     const SKIN_HI = 0xf0d8e0;
     const HAIR = 0x100614;
     const EYE = 0xff2040;
-    const SCAR = 0x6a1818;
     const SILVER = 0xd0d8e8;
     const SILVER_HI = 0xffffff;
     const SAPPHIRE = 0x4ad8ff;
@@ -6183,16 +6192,19 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(TRIM, 1);
     g.fillRect(cx - 3, 41, 9, 1);
 
-    // 4) HEAD — GAUNT + ANGULAR with a pointed vampire chin (NOT a round
-    // ball), slight right-of-center, leaning forward.
+    // 4) HEAD — elegant gaunt vampire. Pale angular face, slicked-back hair
+    // sitting ON TOP (high widow's-peak hairline, framing sideburns — never
+    // overhanging the face), two clean glowing red eyes, pointed ear + a
+    // single fang. Deliberately readable at this tiny scale: no muddy
+    // scar / lip clutter that previously smeared into a "dark beard".
     const hx = cx + 1;
     const headPts: Array<{ x: number; y: number }> = [
-      { x: hx - 4, y: 8 },   // temple left
-      { x: hx + 4, y: 8 },   // temple right
+      { x: hx - 5, y: 7 },   // temple left
+      { x: hx + 5, y: 7 },   // temple right
       { x: hx + 5, y: 11 },  // cheekbone right
-      { x: hx + 2, y: 14 },  // jaw right
-      { x: hx, y: 16 },      // pointed chin
-      { x: hx - 2, y: 14 },  // jaw left
+      { x: hx + 3, y: 15 },  // jaw right
+      { x: hx, y: 18 },      // pointed chin
+      { x: hx - 3, y: 15 },  // jaw left
       { x: hx - 5, y: 11 },  // cheekbone left
     ];
     g.fillStyle(SKIN_OUT, 1);
@@ -6202,26 +6214,41 @@ export class PreloadScene extends Phaser.Scene {
       headPts.map((p) => ({ x: p.x, y: p.y - 0.4 })),
       true,
     );
+    // Pointed ear (right) — vampire cue poking past the cheek.
+    g.fillStyle(SKIN, 1);
+    g.fillTriangle(hx + 5, 9, hx + 8, 8, hx + 6, 12);
+    g.fillStyle(SKIN_OUT, 1);
+    g.fillRect(hx + 6, 9, 1, 2);
+    // Subtle gaunt cheek shadows (keep the face mostly pale).
+    g.fillStyle(SKIN_OUT, 0.35);
+    g.fillTriangle(hx - 5, 11, hx - 3, 15, hx - 4, 12);
+    g.fillTriangle(hx + 5, 11, hx + 3, 15, hx + 4, 12);
+    // Cheekbone catch-light.
     g.fillStyle(SKIN_HI, 1);
-    g.fillRect(hx - 1, 9, 1, 1);
-    // Slicked-back hair with a widow's peak.
+    g.fillRect(hx - 2, 9, 2, 1);
+    // Slicked-back black hair: top cap + high widow's peak + short sideburns.
     g.fillStyle(HAIR, 1);
-    g.fillEllipse(hx, 7, 11, 4);
-    g.fillTriangle(hx - 2, 8, hx + 2, 8, hx, 11); // widow's peak point
-    // Single glowing RED eye + scar over the other (vampire-mage signature).
-    g.fillStyle(0x080000, 1);
-    g.fillRect(hx - 3, 11, 2, 1);
+    g.fillEllipse(hx, 6, 12, 5);
+    g.fillTriangle(hx - 2, 7, hx + 2, 7, hx, 10); // widow's peak dip
+    g.fillRect(hx - 6, 6, 1, 5);                   // left sideburn
+    g.fillRect(hx + 5, 6, 1, 4);                   // right sideburn
+    g.fillStyle(0x2a1840, 1);
+    g.fillRect(hx - 3, 5, 4, 1);                   // hair sheen
+    // Two clean glowing red eyes (dark socket + red + catch-light).
+    g.fillStyle(0x1a0008, 1);
+    g.fillRect(hx - 4, 11, 3, 2);
+    g.fillRect(hx + 1, 11, 3, 2);
     g.fillStyle(EYE, 1);
+    g.fillRect(hx - 3, 11, 2, 1);
     g.fillRect(hx + 2, 11, 2, 1);
     g.fillStyle(0xffaab0, 1);
+    g.fillRect(hx - 3, 11, 1, 1);
     g.fillRect(hx + 2, 11, 1, 1);
-    g.fillStyle(SCAR, 1);
-    g.fillRect(hx - 4, 10, 1, 3);
-    // Thin lips + a tiny white fang.
-    g.fillStyle(0x080000, 1);
-    g.fillRect(hx - 1, 13, 3, 1);
+    // Thin mouth + a single tiny fang.
+    g.fillStyle(0x3a0010, 1);
+    g.fillRect(hx - 1, 15, 3, 1);
     g.fillStyle(0xffffff, 1);
-    g.fillRect(hx, 14, 1, 1);
+    g.fillRect(hx, 16, 1, 1);
 
     // 5) RIGHT ARM extended forward + slightly upward (presenting pose).
     g.fillStyle(OUT, 1);
