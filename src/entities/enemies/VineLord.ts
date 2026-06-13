@@ -3,7 +3,9 @@ import {
   ENEMY_PROJECTILE_SPEED,
   VINE_LORD_BURROW_FADE_MS,
   VINE_LORD_BURROW_INTERVAL_MS,
+  VINE_LORD_BURROW_HEADING_CONE_RAD,
   VINE_LORD_BURROW_MIN_PLAYER_DIST,
+  VINE_LORD_BURROW_PLAYER_MOVING_EPS,
   VINE_LORD_BURROW_REEMERGE_DIST,
   VINE_LORD_CREEP_SPEED_P1,
   VINE_LORD_CREEP_SPEED_P2,
@@ -274,13 +276,40 @@ export class VineLord extends BossEnemy {
       });
     }
 
-    const safe = candidates.filter((c) => {
+    // First gate: keep only candidates that respect the hard min distance.
+    const minDistSafe = candidates.filter((c) => {
       const dx = c.x - player.x;
       const dy = c.y - player.y;
       return dx * dx + dy * dy >= minDistSq;
     });
-    if (safe.length > 0) {
-      return safe[Math.floor(Math.random() * safe.length)]!;
+
+    // Second gate: if the player is MOVING, drop candidates that lie in the
+    // cone they're heading toward — otherwise the boss surfaces in the
+    // player's path and immediately sandwiches them with its resurface burst
+    // (user-flagged unfair). Direction from player→candidate vs. the player's
+    // velocity heading; excluded when the angle between them is inside the
+    // forward cone. When standing still there is no "path", so this is skipped.
+    const pbody = player.body as Phaser.Physics.Arcade.Body | null;
+    const pvx = pbody?.velocity.x ?? 0;
+    const pvy = pbody?.velocity.y ?? 0;
+    const playerSpeed = Math.hypot(pvx, pvy);
+    const moving = playerSpeed >= VINE_LORD_BURROW_PLAYER_MOVING_EPS;
+    const coneCos = Math.cos(VINE_LORD_BURROW_HEADING_CONE_RAD);
+    const inHeadingCone = (c: { x: number; y: number }): boolean => {
+      if (!moving) return false;
+      const dx = c.x - player.x;
+      const dy = c.y - player.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-3) return true;
+      return (dx / len) * (pvx / playerSpeed) + (dy / len) * (pvy / playerSpeed) > coneCos;
+    };
+    const pathSafe = minDistSafe.filter((c) => !inHeadingCone(c));
+
+    // Prefer "far enough AND not in the player's path"; relax to just
+    // "far enough" if the path filter left nothing.
+    const pool = pathSafe.length > 0 ? pathSafe : minDistSafe;
+    if (pool.length > 0) {
+      return pool[Math.floor(Math.random() * pool.length)]!;
     }
     // Best effort: the farthest clamped candidate from the player.
     let best = candidates[0]!;

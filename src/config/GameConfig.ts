@@ -396,6 +396,14 @@ export const VINE_LORD_BURROW_REEMERGE_DIST = 200;
 /** Hard minimum distance (px, 3 tiles) the re-emerge spot must keep from the
  *  player — burrow used to surface on top of them (2026-06-13 safe-zone fix). */
 export const VINE_LORD_BURROW_MIN_PLAYER_DIST = 3 * 64;
+/** Burrow re-emerge must avoid the cone the player is MOVING toward, so the
+ *  boss never surfaces in the player's path and then sandwiches them with its
+ *  resurface burst. Half-angle (rad) of the excluded forward cone (~60° → 120°
+ *  total). Only applied when the player is actually moving (see EPS below). */
+export const VINE_LORD_BURROW_HEADING_CONE_RAD = Math.PI / 3;
+/** Min player speed (px/s) before the heading-cone exclusion kicks in; below
+ *  this the player counts as standing still and any ≥-min-dist spot is fine. */
+export const VINE_LORD_BURROW_PLAYER_MOVING_EPS = 30;
 /** Visual scale for the boss sprite (relative to the Vine Sprout texture). */
 export const VINE_LORD_VISUAL_SCALE = 2.5 * WORLD_SPRITE_SCALE;
 /** Initial delay before the boss starts shooting after spawning. */
