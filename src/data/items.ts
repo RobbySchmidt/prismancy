@@ -275,7 +275,8 @@ export const ITEMS = {
     // item zerstört die komplette money economy". Now a repeatable [Q]
     // active: each use removes one heart container (max HP −2, gate keeps
     // the last container) and grants +20% on a seeded-random core stat
-    // (damage / fireRate / missileSpeed / moveSpeed). The granted stat-ups
+    // (damage / fireRate / moveSpeed — missileSpeed dropped 2026-06-14 as a
+    // frustrating roll for a heart-container cost). The granted stat-ups
     // live in ItemSystem.sacrificialStatUps and carry across floors via
     // RunCarryOver. The suppressHeartDrops/coinDropMult infrastructure
     // stays in the codebase (tested, reusable) but no item uses it now.

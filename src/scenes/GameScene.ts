@@ -2810,7 +2810,9 @@ export class GameScene extends Phaser.Scene {
   private executeSacrificialStatUp(mult: number): void {
     this.player.health.removeMaxHealth(BLOOD_PACT_HEART_COST);
 
-    const candidates: readonly StatKey[] = ['damage', 'fireRate', 'missileSpeed', 'moveSpeed'];
+    // missileSpeed was dropped from the pool (2026-06-14): a projectile-speed
+    // roll felt frustrating as the reward for sacrificing a heart container.
+    const candidates: readonly StatKey[] = ['damage', 'fireRate', 'moveSpeed'];
     const rng = new RNG(`${this.dungeonSeed}-bloodpact-${this.bloodPactUseCount}`);
     this.bloodPactUseCount++;
     const stat = rng.pick(candidates);
