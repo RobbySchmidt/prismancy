@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Prismancy — Title Key-Art Export</title>
+<style>
+  body { margin: 0; background: #0b0712; color: #e9d5ff; font-family: system-ui, sans-serif; text-align: center; }
+  h1 { font-size: 18px; font-weight: 600; margin: 18px 0 4px; }
+  p  { font-size: 13px; color: #9a8ab0; margin: 0 0 14px; }
+  .bar { margin: 12px 0 18px; }
+  button, select {
+    font: inherit; font-size: 14px; padding: 8px 16px; margin: 0 4px;
+    background: #2a1a3a; color: #fff8c0; border: 1px solid #5a3a7a;
+    border-radius: 6px; cursor: pointer;
+  }
+  button:hover { background: #3a2452; }
+  canvas { background: #000; max-width: 96vw; height: auto; border: 1px solid #2a1a3a; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+  <h1>Prismancy — Title Key-Art</h1>
+  <p>Hintergrund + Wizard + Pixie Queen + Magie-Effekte. Ohne Titel/Menütexte.</p>
+  <div class="bar">
+    <label>Auflösung:
+      <select id="scaleSel">
+        <option value="1">1× (960 × 576)</option>
+        <option value="2" selected>2× (1920 × 1152)</option>
+        <option value="3">3× (2880 × 1728)</option>
+      </select>
+    </label>
+    <button id="dl">PNG herunterladen</button>
+  </div>
+  <canvas id="cv"></canvas>
+
+<script>
+// ============================================================================
+// Prismancy title-screen key-art, ported 1:1 from the in-game procedural
+// painters (MainMenuScene.ts) + character sprite textures (PreloadScene.ts).
+// The game draws everything with Phaser.Graphics; here we emulate the handful
+// of Graphics primitives used, on a Canvas 2D context, so the artwork matches.
+// ============================================================================
+
+const GAME_WIDTH = 960;   // ROOM_WIDTH_TILES(15) * TILE_SIZE(64)
+const GAME_HEIGHT = 576;  // ROOM_HEIGHT_TILES(9) * TILE_SIZE(64)
+const TILE_SIZE = 64;
+
+// --- Phaser.Graphics-compatible shim over a Canvas 2D context ---------------
+function makeG(ctx) {
+  let fill = 'rgba(0,0,0,1)';
+  let line = null; // { width, color }
+  const rgba = (c, a) => {
+    const r = (c >> 16) & 0xff, g = (c >> 8) & 0xff, b = c & 0xff;
+    return `rgba(${r},${g},${b},${a})`;
+  };
+  return {
+    fillStyle(color, alpha = 1) { fill = rgba(color, alpha); },
+    lineStyle(width, color, alpha = 1) { line = width > 0 ? { width, color: rgba(color, alpha) } : null; },
+    fillRect(x, y, w, h) { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); },
+    fillCircle(x, y, r) { ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); },
+    // Phaser fillEllipse(x, y, width, height): width/height are full diameters.
+    fillEllipse(x, y, w, h) { ctx.fillStyle = fill; ctx.beginPath(); ctx.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill(); },
+    strokeEllipse(x, y, w, h) {
+      if (!line) return;
+      ctx.strokeStyle = line.color; ctx.lineWidth = line.width;
+      ctx.beginPath(); ctx.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.stroke();
+    },
+    fillTriangle(x1, y1, x2, y2, x3, y3) {
+      ctx.fillStyle = fill; ctx.beginPath();
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3); ctx.closePath(); ctx.fill();
+    },
+    fillRoundedRect(x, y, w, h, r) {
+      ctx.fillStyle = fill; ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath(); ctx.fill();
+    },
+    fillPoints(points, closed) {
+      ctx.fillStyle = fill; ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      if (closed) ctx.closePath();
+      ctx.fill();
+    },
+  };
+}
+
+// --- helpers ported from MainMenuScene.ts -----------------------------------
+function lerpColor(a, b, t) {
+  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+  const r = Math.round(ar + (br - ar) * t);
+  const gn = Math.round(ag + (bg - ag) * t);
+  const bn = Math.round(ab + (bb - ab) * t);
+  return (r << 16) | (gn << 8) | bn;
+}
+function quadBezier(p0, p1, p2, t) {
+  const u = 1 - t;
+  return u * u * p0 + 2 * u * t * p1 + t * t * p2;
+}
+
+// --- backdrop (MainMenuScene.paintBackdrop) ---------------------------------
+function paintBackdrop(g) {
+  const skyTop = 0x1a0c2a;
+  const skyBottom = 0x0e1a16;
+  const horizonY = GAME_HEIGHT * 0.62;
+  const strips = 16;
+  for (let i = 0; i < strips; i++) {
+    const t = i / (strips - 1);
+    const color = lerpColor(skyTop, skyBottom, t);
+    g.fillStyle(color, 1);
+    const y = (i / strips) * horizonY;
+    const h = Math.ceil(horizonY / strips) + 1;
+    g.fillRect(0, y, GAME_WIDTH, h);
+  }
+
+  const moonX = GAME_WIDTH - 240;
+  const moonY = GAME_HEIGHT * 0.30;
+  const haloLayers = [
+    { r: 220, alpha: 0.06, color: 0xff7ac0 },
+    { r: 170, alpha: 0.1, color: 0xff7ac0 },
+    { r: 120, alpha: 0.16, color: 0xffaad8 },
+    { r: 80, alpha: 0.22, color: 0xffd0e8 },
+    { r: 50, alpha: 0.4, color: 0xffeaf2 },
+  ];
+  for (const layer of haloLayers) {
+    g.fillStyle(layer.color, layer.alpha);
+    g.fillCircle(moonX, moonY, layer.r);
+  }
+
+  // Distant forest silhouette (back).
+  g.fillStyle(0x040a0a, 1);
+  g.fillRect(0, horizonY - 4, GAME_WIDTH, 6);
+  for (let x = 0; x < GAME_WIDTH; x += 18) {
+    const h = 14 + ((x * 7919) % 18);
+    g.fillTriangle(x - 4, horizonY, x + 12, horizonY, x + 4, horizonY - h);
+  }
+
+  // Mid forest silhouette (closer).
+  g.fillStyle(0x081210, 1);
+  g.fillRect(0, horizonY + 6, GAME_WIDTH, 22);
+  for (let x = -10; x < GAME_WIDTH + 10; x += 36) {
+    const h = 36 + ((x * 4421) % 28);
+    g.fillRect(x + 14, horizonY + 6, 4, h * 0.45);
+    g.fillStyle(0x0a1a18, 1);
+    g.fillCircle(x + 16, horizonY + 6 - h * 0.2, h * 0.28);
+    g.fillCircle(x + 6, horizonY + 6 - h * 0.05, h * 0.22);
+    g.fillCircle(x + 26, horizonY + 6, h * 0.24);
+    g.fillStyle(0x081210, 1);
+  }
+
+  // Mossy ground.
+  g.fillStyle(0x0e2a22, 1);
+  g.fillRect(0, horizonY + 20, GAME_WIDTH, GAME_HEIGHT - horizonY);
+  g.fillStyle(0x14361a, 1);
+  g.fillEllipse(GAME_WIDTH / 2, GAME_HEIGHT + 60, GAME_WIDTH * 1.4, 220);
+  g.fillStyle(0x1f4a26, 1);
+  g.fillEllipse(GAME_WIDTH / 2, GAME_HEIGHT + 100, GAME_WIDTH * 1.3, 200);
+
+  // Mist bands.
+  g.fillStyle(0xc0eadd, 0.06);
+  g.fillRect(0, horizonY + 26, GAME_WIDTH, 14);
+  g.fillStyle(0xc0eadd, 0.08);
+  g.fillRect(0, horizonY + 44, GAME_WIDTH, 8);
+
+  // Fireflies.
+  const fly = (x, y, size, color, alpha) => {
+    g.fillStyle(0x040a05, 1);
+    g.fillCircle(x, y, size + 0.8);
+    g.fillStyle(color, alpha);
+    g.fillCircle(x, y, size);
+    g.fillStyle(0xffffff, alpha * 0.9);
+    g.fillRect(x, y - 1, 1, 1);
+  };
+  const fireflies = [
+    [120, 220, 2], [380, 180, 1.6], [460, 260, 2.2], [560, 200, 1.8],
+    [680, 350, 1.6], [820, 240, 2], [180, 380, 1.4], [340, 460, 2],
+    [580, 480, 1.8], [780, 460, 1.6], [880, 380, 2], [80, 320, 1.5],
+  ];
+  for (const [fx, fy, fr] of fireflies) fly(fx, fy, fr, 0x88c060, 1);
+  fly(GAME_WIDTH - 320, 200, 1.6, 0xff7ac0, 1);
+  fly(GAME_WIDTH - 180, 240, 2, 0xff7ac0, 1);
+  fly(GAME_WIDTH - 280, 360, 1.4, 0xffaad8, 1);
+}
+
+function paintQueenHalo(g) {
+  const x = GAME_WIDTH - 240;
+  const y = GAME_HEIGHT / 2 - 30;
+  g.fillStyle(0xff7ac0, 0.14); g.fillCircle(x, y, 180);
+  g.fillStyle(0xff7ac0, 0.18); g.fillCircle(x, y, 130);
+  g.fillStyle(0xffaad8, 0.18); g.fillCircle(x, y, 90);
+}
+
+function paintWizardAura(g) {
+  const x = 240;
+  const y = GAME_HEIGHT / 2 + 60;
+  g.fillStyle(0x88c060, 0.12); g.fillEllipse(x, y + 110, 220, 60);
+  g.fillStyle(0x4ea656, 0.18); g.fillEllipse(x, y + 110, 160, 40);
+  g.fillStyle(0xb0e890, 0.22); g.fillEllipse(x, y + 110, 100, 24);
+}
+
+function paintActionEffects(g) {
+  const wizardWandX = 240 + 60;
+  const wizardWandY = GAME_HEIGHT / 2 + 60 - 50;
+  const queenChestX = GAME_WIDTH - 240 - 30;
+  const queenChestY = GAME_HEIGHT / 2 - 30 + 10;
+
+  const ctrlX = (wizardWandX + queenChestX) / 2;
+  const ctrlY = Math.min(wizardWandY, queenChestY) - 80;
+  const beads = 6;
+  for (let i = 0; i < beads; i++) {
+    const t = (i + 1) / (beads + 1);
+    const px = quadBezier(wizardWandX, ctrlX, queenChestX, t);
+    const py = quadBezier(wizardWandY, ctrlY, queenChestY, t);
+    const alpha = 0.4 + (i / (beads - 1)) * 0.55;
+    const radius = 3 + (i / (beads - 1)) * 5;
+    g.fillStyle(0xc0eaff, alpha * 0.4); g.fillCircle(px, py, radius * 1.6);
+    g.fillStyle(0xeaffff, alpha); g.fillCircle(px, py, radius);
+    g.fillStyle(0xffffff, alpha); g.fillRect(px, py - 1, 1, 1);
+  }
+
+  const thorns = [
+    [GAME_WIDTH - 360, GAME_HEIGHT / 2 - 80],
+    [GAME_WIDTH - 460, GAME_HEIGHT / 2 + 20],
+    [GAME_WIDTH - 560, GAME_HEIGHT / 2 + 100],
+  ];
+  for (const [tx, ty] of thorns) {
+    g.fillStyle(0x040408, 1); g.fillTriangle(tx + 12, ty - 5, tx + 12, ty + 5, tx - 6, ty);
+    g.fillStyle(0xff7ac0, 1); g.fillTriangle(tx + 10, ty - 3, tx + 10, ty + 3, tx - 4, ty);
+    g.fillStyle(0xffaad8, 0.5); g.fillRect(tx + 12, ty - 1, 24, 2);
+    g.fillStyle(0xffaad8, 0.25); g.fillRect(tx + 36, ty - 1, 28, 2);
+  }
+}
+
+// --- character sprites (PreloadScene.ts) ------------------------------------
+const DEFAULT_WIZARD_PALETTE = {
+  OUT: 0x1a0828, HAT: 0x5a1f9a, HAT_DARK: 0x3a0f70, HAT_HI: 0x7a3fbe,
+  SKIN: 0xf0c89a, SKIN_SHADOW: 0xc89a6c, ROBE: 0x7a2cb8, ROBE_HI: 0x9a4cd8,
+  ROBE_SHADOW: 0x5a1c98, BEARD: 0xe8e8e8, BEARD_SHADOW: 0xa8a8a8, BUCKLE: 0xffd84a,
+  WAND: 0xc89758, TIP: 0xffd84a, SHADOW: 0x3a2a4a, BOOT: 0x2a1a0d, BOOT_HI: 0x4a3a2d,
+  EYE: 0x222222, TIP_SPARKLE: 0xfff8c0,
+};
+
+function drawWizard(g, palette) {
+  const size = TILE_SIZE;
+  const { OUT, HAT_DARK, HAT_HI, SKIN, ROBE, ROBE_HI, BEARD, BEARD_SHADOW, BUCKLE, WAND, TIP, BOOT, EYE, TIP_SPARKLE } = palette;
+  const cx = size / 2;
+  const top = 10;
+  const figBot = 53;
+
+  g.fillStyle(palette.SHADOW, 0.45);
+  g.fillEllipse(cx, figBot, 14, 2);
+
+  // Robe.
+  const robe = [
+    { x: cx - 6, y: top + 19 }, { x: cx + 6, y: top + 19 },
+    { x: cx + 11, y: top + 38 }, { x: cx, y: top + 41 }, { x: cx - 11, y: top + 38 },
+  ];
+  g.fillStyle(OUT, 1); g.fillPoints(robe, true);
+  g.fillStyle(ROBE, 1);
+  g.fillPoints([
+    { x: cx - 5, y: top + 20 }, { x: cx + 5, y: top + 20 },
+    { x: cx + 9, y: top + 37 }, { x: cx, y: top + 39.5 }, { x: cx - 9, y: top + 37 },
+  ], true);
+  g.fillStyle(ROBE_HI, 0.7); g.fillEllipse(cx - 3, top + 25, 3, 7);
+
+  // Belt.
+  g.fillStyle(OUT, 1); g.fillRoundedRect(cx - 8, top + 30, 16, 4, 1.5);
+  g.fillStyle(BUCKLE, 1); g.fillRect(cx - 2, top + 31, 4, 2);
+
+  // Boots.
+  g.fillStyle(OUT, 1); g.fillEllipse(cx - 3, top + 42, 5, 3); g.fillEllipse(cx + 3, top + 42, 5, 3);
+  g.fillStyle(BOOT, 1); g.fillEllipse(cx - 3, top + 41.5, 3.5, 2); g.fillEllipse(cx + 3, top + 41.5, 3.5, 2);
+
+  // Beard.
+  g.fillStyle(OUT, 1); g.fillEllipse(cx, top + 17, 10, 9);
+  g.fillStyle(BEARD, 1); g.fillEllipse(cx, top + 17, 8, 7);
+  g.fillStyle(BEARD_SHADOW, 0.5); g.fillEllipse(cx + 2, top + 19, 2.5, 3);
+
+  // Face.
+  g.fillStyle(OUT, 1); g.fillEllipse(cx, top + 12, 9, 6);
+  g.fillStyle(SKIN, 1); g.fillEllipse(cx, top + 12, 7, 4.4);
+  g.fillStyle(EYE, 1); g.fillCircle(cx - 2, top + 11.5, 1.1); g.fillCircle(cx + 2, top + 11.5, 1.1);
+  g.fillStyle(0xffffff, 0.9); g.fillRect(cx - 2, top + 11, 1, 1); g.fillRect(cx + 2, top + 11, 1, 1);
+
+  // Hat.
+  const hat = [
+    { x: cx, y: top - 1 }, { x: cx + 9, y: top + 12 }, { x: cx, y: top + 11 }, { x: cx - 9, y: top + 12 },
+  ];
+  g.fillStyle(OUT, 1); g.fillPoints(hat, true);
+  g.fillStyle(HAT_DARK, 1);
+  g.fillPoints([
+    { x: cx, y: top + 1 }, { x: cx + 7.5, y: top + 11 }, { x: cx, y: top + 10 }, { x: cx - 7.5, y: top + 11 },
+  ], true);
+  g.fillStyle(HAT_HI, 0.7); g.fillTriangle(cx - 1, top + 2, cx + 0.5, top + 2, cx - 3.5, top + 9);
+  g.fillStyle(OUT, 1); g.fillCircle(cx, top - 2, 1.9);
+  g.fillStyle(BUCKLE, 1); g.fillCircle(cx, top - 2, 1.2);
+
+  // Wand.
+  g.fillStyle(OUT, 1); g.fillTriangle(cx + 2, top + 30, cx + 11, top + 16, cx + 12.5, top + 19);
+  g.fillStyle(WAND, 1); g.fillTriangle(cx + 3, top + 30.5, cx + 10.5, top + 17, cx + 11.5, top + 19);
+
+  // Hand.
+  g.fillStyle(OUT, 1); g.fillCircle(cx + 6, top + 26, 2);
+  g.fillStyle(SKIN, 1); g.fillCircle(cx + 6, top + 26, 1.3);
+
+  // Wand tip.
+  g.fillStyle(TIP_SPARKLE, 0.45); g.fillCircle(cx + 11, top + 16, 4);
+  g.fillStyle(OUT, 1); g.fillCircle(cx + 11, top + 16, 2.4);
+  g.fillStyle(TIP, 1); g.fillCircle(cx + 11, top + 16, 1.5);
+  g.fillStyle(TIP_SPARKLE, 1); g.fillRect(cx + 10, top + 15, 1, 1);
+
+  // Ground shadow (groundShadow(g, cx, figBot+2, 9, 1.4, 0.45)).
+  g.fillStyle(0x000000, 0.45); g.fillEllipse(cx, figBot + 2, 18, 2.8);
+}
+
+function drawPixieQueen(g) {
+  const size = 64;
+  const cx = size / 2;
+  const cy = size / 2;
+
+  g.fillStyle(0xff7ac0, 0.2); g.fillCircle(cx, cy, cx);
+  g.fillStyle(0xffaad8, 0.3); g.fillCircle(cx, cy, cx - 10);
+
+  const wing = (sx, sy, wW, wH, fill) => {
+    g.lineStyle(1, 0xa84080, 0.7);
+    g.fillStyle(fill, 0.55);
+    g.fillEllipse(sx, sy, wW, wH);
+    g.strokeEllipse(sx, sy, wW, wH);
+  };
+  wing(cx - 12, cy - 6, 15, 11, 0xffd0e8);
+  wing(cx + 12, cy - 6, 15, 11, 0xffd0e8);
+  wing(cx - 14, cy + 6, 14, 10, 0xfff8a0);
+  wing(cx + 14, cy + 6, 14, 10, 0xfff8a0);
+  g.lineStyle(0, 0, 0);
+
+  // Dress.
+  g.fillStyle(0x4d0d22, 1); g.fillEllipse(cx, cy + 4, 18, 22);
+  g.fillStyle(0xb02468, 1); g.fillEllipse(cx, cy + 5, 15, 18);
+  g.fillStyle(0xff5b86, 1); g.fillEllipse(cx, cy + 1, 12, 13);
+  g.fillStyle(0xff90a8, 1); g.fillEllipse(cx - 2.5, cy - 1, 3.5, 5);
+
+  // Head.
+  g.fillStyle(0x4d0d22, 1); g.fillCircle(cx, cy - 10, 7);
+  g.fillStyle(0xfde68a, 1); g.fillCircle(cx, cy - 10, 5.5);
+
+  // Hair.
+  g.fillStyle(0x4a1a08, 1); g.fillEllipse(cx, cy - 14, 13, 5);
+  g.fillStyle(0xa64a1a, 1); g.fillEllipse(cx, cy - 14.5, 8, 2.4);
+
+  // Crown.
+  const crownY = cy - 18;
+  g.fillStyle(0x664000, 1); g.fillRect(cx - 7, crownY, 14, 4);
+  g.fillStyle(0xffd84a, 1); g.fillRect(cx - 6, crownY + 1, 12, 3);
+  g.fillStyle(0x664000, 1);
+  g.fillTriangle(cx - 7, crownY, cx - 4, crownY - 4, cx - 1, crownY);
+  g.fillTriangle(cx - 2, crownY, cx, crownY - 5, cx + 2, crownY);
+  g.fillTriangle(cx + 1, crownY, cx + 4, crownY - 4, cx + 7, crownY);
+  g.fillStyle(0xffd84a, 1);
+  g.fillTriangle(cx - 6, crownY, cx - 4, crownY - 3, cx - 2, crownY);
+  g.fillTriangle(cx - 1, crownY, cx, crownY - 4, cx + 1, crownY);
+  g.fillTriangle(cx + 2, crownY, cx + 4, crownY - 3, cx + 6, crownY);
+  g.fillStyle(0xff5577, 1); g.fillCircle(cx, crownY - 3, 1.4);
+  g.fillStyle(0xffffff, 1); g.fillRect(cx, crownY - 4, 1, 1);
+
+  // Eyes + cheeks + smile.
+  g.fillStyle(0x111111, 1); g.fillCircle(cx - 2.4, cy - 10, 1.5); g.fillCircle(cx + 2.4, cy - 10, 1.5);
+  g.fillStyle(0xffffff, 0.95); g.fillCircle(cx - 2.9, cy - 10.6, 0.7); g.fillCircle(cx + 1.9, cy - 10.6, 0.7);
+  g.fillStyle(0xff9ab0, 0.5); g.fillCircle(cx - 3.6, cy - 8.2, 1.2); g.fillCircle(cx + 3.6, cy - 8.2, 1.2);
+  g.fillStyle(0xa83048, 1);
+  g.fillRect(cx - 2, cy - 7, 1, 1); g.fillRect(cx - 1, cy - 6, 1, 1); g.fillRect(cx, cy - 6, 1, 1);
+  g.fillRect(cx + 1, cy - 6, 1, 1); g.fillRect(cx + 2, cy - 7, 1, 1);
+
+  // Star sparkles.
+  const star = (sx, sy, color) => {
+    g.fillStyle(color, 1);
+    g.fillRect(sx, sy, 1, 1); g.fillRect(sx - 1, sy, 1, 1); g.fillRect(sx + 1, sy, 1, 1);
+    g.fillRect(sx, sy - 1, 1, 1); g.fillRect(sx, sy + 1, 1, 1);
+  };
+  star(cx - 26, cy - 14, 0xffffff); star(cx + 25, cy - 8, 0xfff8a0);
+  star(cx - 24, cy + 12, 0xfff8a0); star(cx + 26, cy + 14, 0xffffff);
+  star(cx + 22, cy - 22, 0xffffff); star(cx - 22, cy + 22, 0xfff8a0);
+  star(cx, cy - 26, 0xffffff);
+}
+
+// --- render an offscreen 64×64 sprite texture -------------------------------
+function makeSprite(drawFn) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const sg = makeG(c.getContext('2d'));
+  drawFn(sg);
+  return c;
+}
+
+// Phaser image with origin (0.5,0.5), setScale + setRotation. pixelArt → NEAREST.
+function blitSprite(ctx, off, x, y, scale, rotation) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.scale(scale, scale);
+  ctx.drawImage(off, -off.width / 2, -off.height / 2);
+  ctx.restore();
+}
+
+// --- compose the full scene -------------------------------------------------
+function render(scale) {
+  const cv = document.getElementById('cv');
+  cv.width = GAME_WIDTH * scale;
+  cv.height = GAME_HEIGHT * scale;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+
+  // Coordinate-driven layers scale with a transform; sprite blits scale
+  // themselves (and stay nearest-neighbour for the pixelArt look).
+  const g = makeG(ctx);
+
+  // 1) backdrop
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  paintBackdrop(g);
+
+  // 2) queen halo + queen sprite (sprite scale 4, rotation +0.08)
+  paintQueenHalo(g);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  blitSprite(ctx, queenSprite, (GAME_WIDTH - 240) * scale, (GAME_HEIGHT / 2 - 30) * scale, 4 * scale, 0.08);
+
+  // 3) wizard aura + wizard sprite (sprite scale 4, rotation -0.08)
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  paintWizardAura(g);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  blitSprite(ctx, wizardSprite, 240 * scale, (GAME_HEIGHT / 2 + 60) * scale, 4 * scale, -0.08);
+
+  // 4) action effects on top (depth 10 in the scene)
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  paintActionEffects(g);
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+const wizardSprite = makeSprite((g) => drawWizard(g, DEFAULT_WIZARD_PALETTE));
+const queenSprite = makeSprite(drawPixieQueen);
+
+const scaleSel = document.getElementById('scaleSel');
+function redraw() { render(parseInt(scaleSel.value, 10)); }
+scaleSel.addEventListener('change', redraw);
+document.getElementById('dl').addEventListener('click', () => {
+  const cv = document.getElementById('cv');
+  const a = document.createElement('a');
+  a.download = `prismancy-title-${cv.width}x${cv.height}.png`;
+  a.href = cv.toDataURL('image/png');
+  a.click();
+});
+redraw();
+</script>
+</body>
+</html>
